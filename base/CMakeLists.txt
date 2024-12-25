@@ -10,19 +10,23 @@ set(BASE_LINK_PLATFORM_LIBRARIES)
 set(BASE_INCLUDE_PLATFORM_DIRECTORIES)
 
 if (CMAKE_HOST_UNIX)
+    find_package(PkgConfig)
+    pkg_search_module(GLIB REQUIRED glib-2.0)
+
     set(BASE_PLATFORM_COMPILE_OPTIONS
         -DBASE_IMPLEMENTATION
         -DUSE_SYSTEM_LIBEVENT
     )
 
     set(BASE_LINK_PLATFORM_LIBRARIES    
-        glib-2.0
+        ${GLIB_LIBRARIES}
         pthread
+        event
+        dl
     )
 
     set(BASE_INCLUDE_PLATFORM_DIRECTORIES   
-        /usr/local/include/glib-2.0
-        /usr/local/lib/glib-2.0/include # for glibconfig.h
+        ${GLIB_INCLUDE_DIRS}
     )
 
     set(BASE_PLATFORM_SOURCE  
@@ -426,6 +430,9 @@ set(BASE_SOURCE
     version.cc
     vlog.cc
 )
+
+configure_file(build/build_config.h 
+    ${PROJECT_BINARY_DIR}/build_config.h COPYONLY)
 
 target_include_directories(${BASE_TARGET_NAME}
     PRIVATE

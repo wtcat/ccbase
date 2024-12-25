@@ -22,6 +22,7 @@ message(STATUS "OS Platform: ${CMAKE_SYSTEM_NAME}")
 
 #set(CMAKE_BUILD_TYPE Debug)
 #set(CMAKE_BUILD_TYPE Release)
+# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
 message(STATUS "CMAKE_CXX_FLAGS_DEBUG: ${CMAKE_CXX_FLAGS_DEBUG}")
 message(STATUS "CMAKE_CXX_FLAGS_RELEASE : ${CMAKE_CXX_FLAGS_RELEASE}")
 
@@ -45,4 +46,3 @@ collect_link_libraries(libs ${PROJECT_NAME})
 target_link_libraries(${PROJECT_NAME}
     ${libs}
 )
-
