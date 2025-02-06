@@ -17,6 +17,8 @@
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/basic_file_sink.h"
 
+#include "leveldb/db.h"
+
 
 #pragma warning(disable:4251)
 
@@ -70,6 +72,17 @@ int main(int argc, char* argv[]) {
     spdlog::set_default_logger(logger);
     spdlog::set_level(spdlog::level::info);
     spdlog::info("Hello world\n");
+
+    leveldb::DB* db;
+    leveldb::Options options;
+    options.create_if_missing = true;
+    leveldb::Status status = leveldb::DB::Open(options, "testdb.db", &db);
+    if (!status.ok())
+        return -1;
+
+    db->Put(leveldb::WriteOptions(), leveldb::Slice("hello"), leveldb::Slice("Everyone"));
+
+    delete db;
 
 
     base::Thread runner("runner-1");
