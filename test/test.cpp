@@ -14,6 +14,9 @@
 #include "base/threading/thread.h"
 #include "base/threading/worker_pool.h"
 
+#include "spdlog/spdlog.h"
+#include "spdlog/sinks/basic_file_sink.h"
+
 
 #pragma warning(disable:4251)
 
@@ -62,7 +65,12 @@ int main(int argc, char* argv[]) {
     base::AtExitManager atexit;
     MessageLoop message_loop;
     base::WorkerPool worker_pool;
-    
+
+    auto logger = spdlog::basic_logger_mt("F", "logs/basic-log.txt");
+    spdlog::set_default_logger(logger);
+    spdlog::set_level(spdlog::level::info);
+    spdlog::info("Hello world\n");
+
 
     base::Thread runner("runner-1");
     runner.Start();

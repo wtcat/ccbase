@@ -40,6 +40,7 @@ add_executable(${PROJECT_NAME}
 )
 
 add_subdirectory(base)
+add_subdirectory(thirdparty)
 
 collect_link_libraries(libs ${PROJECT_NAME})
 target_link_libraries(${PROJECT_NAME}
