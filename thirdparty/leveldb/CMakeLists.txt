@@ -286,12 +286,12 @@ endif(HAVE_TCMALLOC)
 
 # Needed by port_stdcxx.h
 find_package(Threads REQUIRED)
-#target_link_libraries(leveldbX Threads::Threads)
+# target_link_libraries(leveldbX Threads::Threads)
 
 add_executable(leveldbutil
   "db/leveldbutil.cc"
 )
-target_link_libraries(leveldbutil leveldbX)
+target_link_libraries(leveldbutil leveldbX pthread)
 
 if(LEVELDB_BUILD_TESTS)
   enable_testing()
