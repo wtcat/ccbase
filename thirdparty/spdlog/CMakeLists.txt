@@ -164,7 +164,12 @@ if (SPDLOG_BUILD_SHARED OR BUILD_SHARED_LIBS)
         configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.rc.in ${CMAKE_CURRENT_BINARY_DIR}/version.rc @ONLY)
         list(APPEND SPDLOG_SRCS ${CMAKE_CURRENT_BINARY_DIR}/version.rc)
     endif ()
-    add_library(spdlog SHARED ${SPDLOG_SRCS} ${SPDLOG_ALL_HEADERS})
+#    add_library(spdlog SHARED ${SPDLOG_SRCS} ${SPDLOG_ALL_HEADERS})
+    shared_library(spdlog)
+    target_sources(spdlog PRIVATE
+        ${SPDLOG_SRCS} 
+        ${SPDLOG_ALL_HEADERS}
+    )
     target_compile_definitions(spdlog PUBLIC SPDLOG_SHARED_LIB)
     if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
         target_compile_options(spdlog PUBLIC $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<NOT:$<COMPILE_LANGUAGE:CUDA>>>:/wd4251

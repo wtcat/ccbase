@@ -1,4 +1,5 @@
 ﻿
+#include <assert.h>
 #include <iostream>
 
 #include "base/at_exit.h"
@@ -18,6 +19,8 @@
 #include "spdlog/sinks/basic_file_sink.h"
 
 #include "leveldb/db.h"
+
+#include <opencv2/opencv.hpp>
 
 
 #pragma warning(disable:4251)
@@ -63,25 +66,116 @@ void Timout() {
 }
 } // namespace
 
+//std::is_integral<N>::value && 
+
+template<
+    typename K, 
+    typename V, 
+    int N,
+    typename std::enable_if<std::is_integral<K>::value, void>::type* = nullptr>
+class Hash {
+public:
+    enum { HASK_DEPTH = 4 };
+    template<typename Key, typename Value>
+    struct HashNode {
+        Key    key;
+        Value  value;
+        bool   valid;
+    };
+
+    Hash() : hash_mask_(N / HASK_DEPTH - 1) {}
+    int key(K k) const {
+        return (k & hash_mask_) * HASK_DEPTH;
+    }
+    bool Insert(K k, V v) {
+        int index = key(k);
+        for (int i = 0; i < HASK_DEPTH; i++, index++) {
+            if (!hash_nodes_[index].valid) {
+                hash_nodes_[index].key   = k;
+                hash_nodes_[index].value = v;
+                hash_nodes_[index].valid = true;
+                return true;
+            }
+        }
+        return false;
+    }
+    HashNode<K, V> *Find(K k) {
+        int index = key(k);
+        for (int i = 0; i < HASK_DEPTH; i++, index++) {
+            if (hash_nodes_[index].valid && hash_nodes_[index].key == k)
+                return &hash_nodes_[index];
+        }
+        return nullptr;
+    }
+
+private:
+    HashNode<K, V> hash_nodes_[N] = {};
+    const int hash_mask_;
+};
+
+
+
+
 int main(int argc, char* argv[]) {
     base::AtExitManager atexit;
     MessageLoop message_loop;
     base::WorkerPool worker_pool;
+    int key_array[] = { 50, 51, 52, 53, 54, 55, 56, 57, 58, 59,  61, 62, 63, 64, 65, 66 };
+    int val_array[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,  11, 11, 12, 13, 14, 15 };
+    Hash<int, int, 16> hash;
 
+    for (int i = 0; i < 16; i++) {
+        hash.Insert(key_array[i], val_array[i]);
+    }
+    for (int i = 0; i < 16; i++) {
+        auto node = hash.Find(key_array[i]);
+        assert(node != nullptr);
+        assert(val_array[i] == node->value);
+    }
+
+    //OpenCV
+    cv::Mat img = cv::imread("HeartRatepx.png", cv::IMREAD_UNCHANGED);
+    printf("w(%d) h(%d) channels(%d) elesize(%d)\n",
+        img.cols,
+        img.rows,
+        img.channels(),
+        img.elemSize()
+    );
+
+    //cv::Mat oimg(img.size(), img.type());
+    cv::Mat oimg = img.clone();
+
+    if (oimg.channels() == 4) {
+        for (int y = 0; y < oimg.rows; y++) {
+            uchar* pixel_ptr = oimg.ptr<uchar>(y);
+            for (int x = 0; x < oimg.cols * oimg.channels(); x+=4) {
+                //pixel_ptr[x + 0] =  255 - pixel_ptr[0]; //Alpha
+                //pixel_ptr[x + 1] =  255 - pixel_ptr[1]; //B
+                //pixel_ptr[x + 2] =  255 - pixel_ptr[2]; //G
+                pixel_ptr[x + 3] = 255;// 255 - pixel_ptr[3]; //R
+            }
+        }
+
+        //cv::imwrite("HR.png", img);
+    }
+
+    cv::imshow("HR", oimg);
+    cv::waitKey();
+
+    //Log
     auto logger = spdlog::basic_logger_mt("F", "logs/basic-log.txt");
     spdlog::set_default_logger(logger);
     spdlog::set_level(spdlog::level::info);
     spdlog::info("Hello world\n");
 
+    //LevelDB
     leveldb::DB* db;
     leveldb::Options options;
     options.create_if_missing = true;
     leveldb::Status status = leveldb::DB::Open(options, "testdb.db", &db);
     if (!status.ok())
         return -1;
-
     db->Put(leveldb::WriteOptions(), leveldb::Slice("hello"), leveldb::Slice("Everyone"));
-
     delete db;
 
 

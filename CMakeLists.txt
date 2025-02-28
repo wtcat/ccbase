@@ -26,24 +26,18 @@ message(STATUS "OS Platform: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "CMAKE_CXX_FLAGS_DEBUG: ${CMAKE_CXX_FLAGS_DEBUG}")
 message(STATUS "CMAKE_CXX_FLAGS_RELEASE : ${CMAKE_CXX_FLAGS_RELEASE}")
 
+# Set output path for library and executable file
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 
 set(CMAKE_C_STANDARD   11)
 set(CMAKE_CXX_STANDARD 17)
 
-include_directories(
-    .
-)
-
-add_executable(${PROJECT_NAME} 
-	test/test.cpp
-)
+include_directories(.)
 
 add_subdirectory(base)
 add_subdirectory(thirdparty)
 
-collect_link_libraries(libs ${PROJECT_NAME})
-target_link_libraries(${PROJECT_NAME}
-    ${libs}
-)
+# Applications
+add_subdirectory(application)
+
