@@ -3,6 +3,7 @@ set(TARGET_NAME codegen)
 
 add_executable(${TARGET_NAME}
     main.cc
+    codegen.cc
 )
 
 collect_link_libraries(libs ${TARGET_NAME})

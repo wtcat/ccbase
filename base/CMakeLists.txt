@@ -97,7 +97,7 @@ elseif (CMAKE_HOST_WIN32)
         /Zc:forScope 
         /Gd
         /diagnostics:column
-        /wd4251
+ #       /wd4251
     )
 
     set(BASE_LINK_PLATFORM_LIBRARIES    

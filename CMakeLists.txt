@@ -33,6 +33,12 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 set(CMAKE_C_STANDARD   11)
 set(CMAKE_CXX_STANDARD 17)
 
+if (CMAKE_HOST_WIN32)
+    add_compile_options(
+        /wd4251
+    )
+endif()
+
 include_directories(.)
 
 add_subdirectory(base)
