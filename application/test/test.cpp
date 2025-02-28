@@ -1,6 +1,7 @@
 ﻿
 #include <assert.h>
 #include <iostream>
+#include <type_traits>
 
 #include "base/at_exit.h"
 #include "base/logging.h"
@@ -26,6 +27,113 @@
 #pragma warning(disable:4251)
 
 //using file_proxy = base::FileUtilProxy;
+
+namespace storage {
+
+template<typename T, int N, typename std::enable_if<N <= 65535, void>::type* = nullptr>
+class StorageList {
+public:
+    using NodeType  = unsigned short;
+    using BitVector = unsigned long;
+    enum {
+        kInvalidNode = (1 << sizeof(NodeType)*8) - 1,
+        kBitmapUnitSize  = sizeof(BitVector) * 8,
+        kBitmapVectorSize = N / kBitmapUnitSize + 1
+    };
+
+    template<typename ValueType>
+    struct Node {
+        ValueType data;
+        NodeType next;
+        NodeType prev;
+
+        Node(): next(kInvalidNode), prev(kInvalidNode) {}
+        const ValueType* value() const {
+            return &data;
+        }
+        ValueType *value() {
+            return &data;
+        }
+    };
+
+    int Allocate() {
+        int node;
+
+        // Allocate node ID from bitmap
+        for (int i = 0; i < kBitmapVectorSize; i++) {
+            BitVector bitmap_mask = bitmap_[i];
+            if (bitmap_mask) {
+                node = ffs(bitmap_mask) - 1;
+
+                /* If the node id large than the max limit then break loop */
+                if (node >= N)
+                    break;
+
+                bitmap_[i] |= 0x1u << node;
+                return node;
+            }
+        }
+
+        // If has no free node, we should use the oldest node
+        node = first_;
+        RemoveInternal(node);
+        assert(node < N);
+        return node;
+    }
+
+    void Append(int node) {
+        Node<T>* pnode = nodes_ + node;
+
+        //If the list is empty
+        if (last_ == kInvalidNode) {
+            first_ = last_ = node;
+            return;
+        }
+
+        //Append to the list tail
+        nodes_[last_].next = node;
+        pnode->prev = last_;
+        pnode->next = kInvalidNode;
+        last_ = node;
+    }
+
+    void Remove(int node) {
+        bitmap_[node / kBitmapUnitSize] &= ~(0x1 << node);
+        RemoveInternal(node);
+    }
+    
+private:
+    void RemoveInternal(int node) {
+        Node<T>* pnode = nodes_ + node;
+
+        // Remove node
+        if (pnode->next != kInvalidNode)
+            nodes_[pnode->next].prev = pnode->prev;
+        if (pnode->prev != kInvalidNode)
+            nodes_[pnode->prev].next = pnode->next;
+
+        // Fix the first and last pointer
+        if (first_ == node)
+            first_ = pnode->next;
+        if (last_ == node)
+            last_ = pnode->prev;
+
+        // Clear node
+        pnode->next = kInvalidNode;
+        pnode->prev = kInvalidNode;
+    }
+
+private:
+    BitVector bitmap_[kBitmapVectorSize] = {0};
+    Node<T>   nodes_[N];
+    NodeType  first_{kInvalidNode};
+    NodeType  last_{kInvalidNode};
+};
+
+
+
+} //namespace storage
+
 
 namespace {
 void Hello() {
@@ -113,7 +221,12 @@ private:
     const int hash_mask_;
 };
 
+template<typename T, typename std::enable_if<std::is_integral<T>::value, T>::type* = nullptr>
+auto add_general(T a, T b) {
+    return a + b;
+}
 
+constexpr int Return5(int v) { return v; }
 
 
 int main(int argc, char* argv[]) {
@@ -163,6 +276,15 @@ int main(int argc, char* argv[]) {
     cv::waitKey();
 
     //Log
+
+    storage::StorageList<char, 10> list;
+
+    base::Callback func_cb = base::Bind(&Return5);
+    func_cb.Run(0);
+
+    add_general(1, 2);
+    // add_general("str", 2);
+
     auto logger = spdlog::basic_logger_mt("F", "logs/basic-log.txt");
     spdlog::set_default_logger(logger);
     spdlog::set_level(spdlog::level::info);
