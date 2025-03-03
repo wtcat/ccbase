@@ -37,6 +37,11 @@ public:
         std::vector<ResourceType> pictures;
         std::vector<ResourceType> strings;
     };
+    struct ResourceLess {
+        bool operator()(const ResourceType& l, const ResourceType& r) {
+            return atoi(l.value.c_str()) < atoi(r.value.c_str());
+        }
+    };
 
     static ResourceParser* GetInstance() {
         static ResourceParser generator;
@@ -48,6 +53,17 @@ public:
         for (const auto &iter : resources_)
             callback.Run(*iter.get(), code);
     }
+    bool valid() const {
+        return resources_.size() > 0;
+    }
+    const std::string& GetIdName(unsigned int id) {
+        if (id < ids_.size())
+            return ids_.at(id);
+        return "";
+    }
+    size_t GetIdCount() const {
+        return ids_.size();
+    }
 
 private:
     ResourceParser() = default;
@@ -57,6 +73,7 @@ private:
 
 private:
     std::vector<std::unique_ptr<ViewData>> resources_;
+    std::vector<std::string> ids_;
     DISALLOW_COPY_AND_ASSIGN(ResourceParser);
 };
 
@@ -64,8 +81,8 @@ class CodeBuilder: public base::RefCounted<CodeBuilder> {
 public:
 
     virtual ~CodeBuilder() {}
-    bool GenerateCode(const FilePath& in, const FilePath& out) {
-        if (!ResourceParser::GetInstance()->ParseInput(in))
+    bool GenerateCode(const FilePath& out) {
+        if (!ResourceParser::GetInstance()->valid())
             return false;
 
         std::string code;
@@ -138,6 +155,16 @@ private:
     std::vector<scoped_ptr<ResourceNode>> nodes_;
     unsigned int view_ids_;
 };
+
+class ViewIDCodeBuilder : public CodeBuilder {
+public:
+    ViewIDCodeBuilder() : CodeBuilder() {}
+private:
+    bool CodeWriteHeader(std::string& code) override;
+    bool CodeWriteBody(std::string& code) override;
+    bool CodeWriteFoot(std::string& code) override;
+};
+
 
 } //namespace app
 
