@@ -3,15 +3,225 @@
  */
 
 #include <cstdlib>
+#include <locale>
+#include <codecvt>
 #include <algorithm>
 
 #include "base/file_path.h"
 #include "base/file_util.h"
 #include "base/bind.h"
-
+#include "base/memory/scoped_ptr.h"
 #include "application/codegen/codegen.h"
 
 namespace app {
+size_t StringToLower(const char* instr, char* outstr, size_t maxsize) {
+    if (instr == nullptr || outstr == nullptr)
+        return 0;
+
+    const char* s = instr;
+    while (*s != '\0' && maxsize > 1) {
+        *outstr++ = tolower(*s);
+        s++;
+        maxsize--;
+    }
+
+    return (size_t)(s - instr);
+}
+
+size_t StringToUpper(const char* instr, char* outstr, size_t maxsize) {
+    if (instr == nullptr || outstr == nullptr)
+        return 0;
+
+    const char* s = instr;
+    while (*s != '\0' && maxsize > 1) {
+        *outstr++ = toupper(*s);
+        s++;
+        maxsize--;
+    }
+
+    return (size_t)(s - instr);
+}
+
+//Class ViewCodeFactory
+bool ViewCodeFactory::GenerateViewCode(const FilePath &in) {
+    //Parse resource file
+    if (!ResourceParser::GetInstance()->ParseInput(in)) {
+        printf("Failed to parse input file(re_output.json)\n");
+        return false;
+    }
+
+    //Create resource code builder
+    builders_.push_back(
+        new app::ResourceCodeBuilder(FilePath(L"ui_template_resource.c"))
+    );
+
+    //Create resource id builder
+    builders_.push_back(
+        new app::ViewIDCodeBuilder(FilePath(L"ui_template_ids.h"))
+    );
+
+    //Create view template code builder 
+    ResourceParser::GetInstance()->ForeachViewItem(
+        base::Bind(&ViewCodeFactory::CallBack, this)
+    );
+
+    //Generate all code
+    for (auto builder : builders_) {
+        if (!builder->GenerateCode())
+            return false;
+    }
+
+    return true;
+}
+
+void ViewCodeFactory::CallBack(const ResourceParser::ViewData& view) {
+    char name[256];
+
+    size_t len = StringToLower(view.name.c_str(), name, sizeof(name) - 3);
+    name[len]     = '.';
+    name[len + 1] = 'c';
+    name[len + 2] = '\0';
+
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+    FilePath path(converter.from_bytes(name));
+
+    name[len] = '\0';
+    builders_.push_back(
+        new ViewCodeBuilder(view, path, name)
+    );
+}
+
+//Class ViewCodeBuilder
+void ViewCodeBuilder::AddHeaderFile(std::string& code) {
+    code.append(
+        "/*\n"
+        " * Copyright 2025 Code-Generator\n"
+        " */\n"
+        "\n"
+        "#include \"ui_template.h\"\n"
+        "#include \"app_ui_view.h\"\n"
+        "\n"
+    );
+}
+
+void ViewCodeBuilder::AddPrivateData(std::string& code) {
+    scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
+
+    snprintf(buffer.get(), BUFFER_SIZE,
+        "#define PIC_NUMBERS %d\n"
+        "#define STR_NUMBERS %d\n"
+        "\n",
+        (uint32_t)view_.pictures.size(), (uint32_t)view_.strings.size());
+    code.append(buffer.get());
+
+    snprintf(buffer.get(), BUFFER_SIZE,
+        "typedef struct {\n"
+        "    lv_obj_t* obj;\n"
+        "    //...\n"
+        "    // \n"
+        "    //ui_font_t font;\n"
+        "    %s\n"
+        "    %s\n"
+        "} %s_t;\n"
+        "\n\n",
+        view_.pictures.size() > 0? "lv_img_dsc_t res_img[PIC_NUMBERS];": "",
+        view_.strings.size() > 0 ? "ui_string_t  res_txt[STR_NUMBERS];" : "",
+        view_name_.c_str());
+    code.append(buffer.get());
+}
+
+bool ViewCodeBuilder::CodeWriteHeader(std::string& code) {
+    AddHeaderFile(code);
+    AddPrivateData(code);
+    return true;
+}
+
+bool ViewCodeBuilder::CodeWriteFoot(std::string& code) {
+    scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
+    const char* pname = view_name_.c_str();
+
+    snprintf(buffer.get(), BUFFER_SIZE,
+        "\n\n"
+        "UI_VIEW_DEFINE(%s_view) = {\n"
+        "    .on_create        = %s_create,\n"
+        "    .on_foucus_change = %s_focus_change,\n"
+        "    .on_paint         = %s_paint,\n"
+        "    .on_destroy       = %s_destroy,\n"
+        "    .on_key           = %s_key,\n"
+        "    .user_size        = sizeof(%s_t),\n"
+        "    .flags            = 0  //UIVIEW_F_SHARED_RESOURCE\n"
+        "};\n",
+        pname,
+        pname,
+        pname,
+        pname,
+        pname,
+        pname,
+        pname);
+    code.append(buffer.get());
+
+    char idbuf[256];
+    size_t len = StringToUpper(pname, idbuf, sizeof(idbuf));
+    idbuf[len] = '\0';
+    snprintf(buffer.get(), BUFFER_SIZE,
+        "\n"
+        "LVGL_VIEW_DEFINE(uID__%s, &%s_view);\n",
+        idbuf,
+        pname);
+    code.append(buffer.get());
+
+    return true;
+}
+
+bool ViewCodeBuilder::CodeWriteBody(std::string& code) {
+    AddMethod(code, "create", 
+        "ui_context_t* ctx", 
+        "\t//TODO: implement\n"
+        "\treturn 0;\n"
+    );
+
+    AddMethod(code, "focus_change", 
+        "ui_context_t* ctx", 
+        "\t//TODO: implement\n"
+        "\treturn 0;\n"
+    );
+
+    AddMethod(code, "paint", 
+        "ui_context_t* ctx", 
+        "\t//TODO: implement\n"
+        "\treturn 0;\n"
+    );
+
+    AddMethod(code, "destroy", 
+        "ui_context_t* ctx", 
+        "\t//TODO: implement\n"
+        "\treturn 0;\n"
+    );
+
+    AddMethod(code, "key",
+        "ui_context_t* ctx, int keyid, int keyevt, bool* done", 
+        "\t//TODO: implement\n"
+        "\treturn 0;\n"
+    );
+
+    return true;
+}
+
+void ViewCodeBuilder::AddMethod(std::string& code, const char* suffix,
+    const char* args_list, const char* content) {
+    scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
+
+    snprintf(buffer.get(), BUFFER_SIZE,
+        "static int %s_%s(%s) {\n",
+        view_name_.c_str(), 
+        suffix,
+        args_list);
+    code.append(buffer.get());
+
+    if (content != nullptr)
+        code.append(content);
+    code.append("}\n\n");
+}
 
 //Class ViewIDCodeBuilder
 bool ViewIDCodeBuilder::CodeWriteHeader(std::string& code) {
@@ -35,11 +245,11 @@ bool ViewIDCodeBuilder::CodeWriteBody(std::string& code) {
     size_t count = reptr->GetIdCount();
     for (size_t i = 0; i < count; i++) {
         char idname[8] = {0};
-        itoa(i, idname, 10);
+        itoa((int)i, idname, 10);
         code.append("#define ")
-            .append(reptr->GetIdName(i))
+            .append(reptr->GetIdName((int)i))
             .append("  ")
-            .append(itoa(i, idname, 10))
+            .append(itoa((int)i, idname, 10))
             .append("\n");
     }
     return true;
@@ -156,7 +366,6 @@ void ResourceCodeBuilder::ResourceTableFill(std::string& code) {
     //Append resource table foot
     code.append("};\n\n\n");
 }
-
 
 //Class ResourceParser
 bool ResourceParser::ParseInput(const FilePath& path) {

@@ -1,4 +1,4 @@
 # Thirdparty
 
-add_subdirectory(leveldb)
-add_subdirectory(spdlog)
+add_subdirectory_ifdef(USE_LEVELDB leveldb)
+add_subdirectory_ifdef(USE_SPDLOG  spdlog)

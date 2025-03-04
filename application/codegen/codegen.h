@@ -17,6 +17,10 @@
 
 namespace app {
 
+size_t StringToLower(const char* instr, char* outstr, size_t maxsize);
+size_t StringToUpper(const char* instr, char* outstr, size_t maxsize);
+
+// Class ResourceParser
 class ResourceParser {
 public:
     struct ResourceType {
@@ -48,10 +52,15 @@ public:
         return &generator;
     }
     bool ParseInput(const FilePath& path);
+
     void ForeachView(base::Callback<void(const ViewData &, std::string&)> &callback,
         std::string &code) {
         for (const auto &iter : resources_)
             callback.Run(*iter.get(), code);
+    }
+    void ForeachViewItem(base::Callback<void(const ViewData&)>& callback) {
+        for (const auto& iter : resources_)
+            callback.Run(*iter.get());
     }
     bool valid() const {
         return resources_.size() > 0;
@@ -59,7 +68,7 @@ public:
     const std::string& GetIdName(unsigned int id) {
         if (id < ids_.size())
             return ids_.at(id);
-        return "";
+        return null_str_;
     }
     size_t GetIdCount() const {
         return ids_.size();
@@ -74,14 +83,16 @@ private:
 private:
     std::vector<std::unique_ptr<ViewData>> resources_;
     std::vector<std::string> ids_;
+    std::string null_str_;
     DISALLOW_COPY_AND_ASSIGN(ResourceParser);
 };
 
+// Class CodeBuilder
 class CodeBuilder: public base::RefCounted<CodeBuilder> {
 public:
-
+    CodeBuilder(const FilePath& file) : file_(file) {}
     virtual ~CodeBuilder() {}
-    bool GenerateCode(const FilePath& out) {
+    bool GenerateCode() {
         if (!ResourceParser::GetInstance()->valid())
             return false;
 
@@ -97,30 +108,19 @@ public:
         if (!CodeWriteFoot(code))
             return false;
 
-        return file_util::WriteFile(out, code.c_str(), (int)code.length()) > 0;
-    }
-
-protected:
-    size_t StringToLower(const char* instr, char* outstr, size_t maxsize) {
-        if (instr == nullptr || outstr == nullptr)
-            return 0;
-
-        const char* s = instr;
-        while (*s != '\0' && maxsize > 1) {
-            *outstr++ = tolower(*s);
-            s++;
-            maxsize--;
-        }
-
-        return (size_t)(s - instr);
+        return file_util::WriteFile(file_, code.c_str(), (int)code.length()) > 0;
     }
 
 private:
     virtual bool CodeWriteHeader(std::string& code) { return true; }
     virtual bool CodeWriteBody(std::string& code) { return true; }
     virtual bool CodeWriteFoot(std::string& code) { return true; }
+
+private:
+    const FilePath file_;
 };
 
+// Class ResourceCodeBuilder
 class ResourceCodeBuilder : public CodeBuilder {
 public:
     friend class ResourceParser;
@@ -139,7 +139,8 @@ public:
         }
     };
 
-    ResourceCodeBuilder() : CodeBuilder(), view_ids_(0) {
+    ResourceCodeBuilder(const FilePath& file) : 
+        CodeBuilder(file), view_ids_(0) {
         nodes_.reserve(50);
     }
     ~ResourceCodeBuilder() = default;
@@ -156,13 +157,49 @@ private:
     unsigned int view_ids_;
 };
 
+// Class ViewIDCodeBuilder
 class ViewIDCodeBuilder : public CodeBuilder {
 public:
-    ViewIDCodeBuilder() : CodeBuilder() {}
+    ViewIDCodeBuilder(const FilePath& file) : CodeBuilder(file) {}
 private:
     bool CodeWriteHeader(std::string& code) override;
     bool CodeWriteBody(std::string& code) override;
     bool CodeWriteFoot(std::string& code) override;
+};
+
+//Class ViewCodeBuiler
+class ViewCodeBuilder : public CodeBuilder {
+public:
+    enum { BUFFER_SIZE = 2048 };
+    ViewCodeBuilder(const ResourceParser::ViewData& view, const FilePath& file, 
+        const std::string &view_name)
+        : CodeBuilder(file), view_(view), view_name_(view_name) {}
+
+private:
+    void AddHeaderFile(std::string& code);
+    void AddPrivateData(std::string& code);
+    void AddMethod(std::string& code, const char* suffix, 
+        const char *args_list, const char* content);
+    bool CodeWriteHeader(std::string& code) override;
+    bool CodeWriteBody(std::string& code) override;
+    bool CodeWriteFoot(std::string& code) override;
+
+private:
+    const ResourceParser::ViewData& view_;
+    std::string view_name_;
+};
+
+//Class ViewCodeFactory
+class ViewCodeFactory: public base::RefCounted<ViewCodeFactory> {
+public:
+    ViewCodeFactory() { builders_.reserve(30); }
+    ~ViewCodeFactory() = default;
+    bool GenerateViewCode(const FilePath& in);
+
+private:
+    void CallBack(const ResourceParser::ViewData& view);
+private:
+    std::vector<scoped_refptr<CodeBuilder>> builders_;
 };
 
 
