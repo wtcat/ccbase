@@ -52,6 +52,9 @@ public:
         return &generator;
     }
     bool ParseInput(const FilePath& path);
+    void SetOptions(int id_base) {
+        id_base_ = id_base;
+    }
 
     void ForeachView(base::Callback<void(const ViewData &, std::string&)> &callback,
         std::string &code) {
@@ -73,6 +76,9 @@ public:
     size_t GetIdCount() const {
         return ids_.size();
     }
+    int GetIdBase() const {
+        return id_base_;
+    }
 
 private:
     ResourceParser() = default;
@@ -84,12 +90,14 @@ private:
     std::vector<std::unique_ptr<ViewData>> resources_;
     std::vector<std::string> ids_;
     std::string null_str_;
+    int id_base_;
     DISALLOW_COPY_AND_ASSIGN(ResourceParser);
 };
 
 // Class CodeBuilder
 class CodeBuilder: public base::RefCounted<CodeBuilder> {
 public:
+    enum { BUFFER_SIZE = 4096 };
     CodeBuilder(const FilePath& file) : file_(file) {}
     virtual ~CodeBuilder() {}
     bool GenerateCode() {
@@ -170,7 +178,6 @@ private:
 //Class ViewCodeBuiler
 class ViewCodeBuilder : public CodeBuilder {
 public:
-    enum { BUFFER_SIZE = 2048 };
     ViewCodeBuilder(const ResourceParser::ViewData& view, const FilePath& file, 
         const std::string &view_name)
         : CodeBuilder(file), view_(view), view_name_(view_name) {}
@@ -180,6 +187,8 @@ private:
     void AddPrivateData(std::string& code);
     void AddMethod(std::string& code, const char* suffix, 
         const char *args_list, const char* content);
+    void AddResourceCode(std::string& code);
+
     bool CodeWriteHeader(std::string& code) override;
     bool CodeWriteBody(std::string& code) override;
     bool CodeWriteFoot(std::string& code) override;
@@ -192,9 +201,15 @@ private:
 //Class ViewCodeFactory
 class ViewCodeFactory: public base::RefCounted<ViewCodeFactory> {
 public:
-    ViewCodeFactory() { builders_.reserve(30); }
+
+    ViewCodeFactory() { 
+        builders_.reserve(30); 
+    }
     ~ViewCodeFactory() = default;
     bool GenerateViewCode(const FilePath& in);
+    void SetOptions(int id_base) {
+        ResourceParser::GetInstance()->SetOptions(id_base);
+    }
 
 private:
     void CallBack(const ResourceParser::ViewData& view);

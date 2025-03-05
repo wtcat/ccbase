@@ -15,6 +15,7 @@ int main(int argc, char* argv[]) {
     base::AtExitManager atexit;
 
     scoped_refptr<app::ViewCodeFactory> factory(new app::ViewCodeFactory);
+    factory->SetOptions(100);
     factory->GenerateViewCode(FilePath(L"re_output.json"));
 
     return 0;

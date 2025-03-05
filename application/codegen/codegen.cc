@@ -144,12 +144,12 @@ bool ViewCodeBuilder::CodeWriteFoot(std::string& code) {
         "\n\n"
         "UI_VIEW_DEFINE(%s_view) = {\n"
         "    .on_create        = %s_create,\n"
-        "    .on_foucus_change = %s_focus_change,\n"
+        "    .on_focus_change  = %s_focus_change,\n"
         "    .on_paint         = %s_paint,\n"
         "    .on_destroy       = %s_destroy,\n"
         "    .on_key           = %s_key,\n"
         "    .user_size        = sizeof(%s_t),\n"
-        "    .flags            = 0  //UIVIEW_F_SHARED_RESOURCE\n"
+        "    VIEW_PRIV(\"general\") //TODO: Maybe it needs to change\n"
         "};\n",
         pname,
         pname,
@@ -174,10 +174,13 @@ bool ViewCodeBuilder::CodeWriteFoot(std::string& code) {
 }
 
 bool ViewCodeBuilder::CodeWriteBody(std::string& code) {
+    std::string tcode;
+
+    tcode.reserve(1024);
+    AddResourceCode(tcode);
     AddMethod(code, "create", 
         "ui_context_t* ctx", 
-        "\t//TODO: implement\n"
-        "\treturn 0;\n"
+        tcode.c_str()
     );
 
     AddMethod(code, "focus_change", 
@@ -223,6 +226,91 @@ void ViewCodeBuilder::AddMethod(std::string& code, const char* suffix,
     code.append("}\n\n");
 }
 
+void ViewCodeBuilder::AddResourceCode(std::string& code) {
+    scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
+
+    snprintf(buffer.get(), BUFFER_SIZE,
+        "\t%s_t *priv = ui_context_get_user(ctx);\n"
+        "\tint err;\n\n",
+        view_name_.c_str());
+    code.append(buffer.get());
+
+    //Picture resource code
+    int pic_numbers = (int)view_.pictures.size();
+    if (pic_numbers > 0) {
+        code.append(
+            "\t/*\n"
+            "\t * Get picture resources\n"
+            "\t */\n"
+            "\terr = ui_context_get_picture(ctx, priv->res_img, PIC_NUMBERS,\n"
+        );
+
+        for (int i = 0; i < pic_numbers; i++) {
+            snprintf(buffer.get(), BUFFER_SIZE,
+                "\t\t\"%s\"%s //%d\n",
+                view_.pictures.at(i).name.c_str(),
+                (i < pic_numbers - 1) ? "," : ");",
+                i);
+            code.append(buffer.get());
+        }
+        code.append(
+            "\tif (err)\n"
+            "\t\treturn err;\n"
+            "\n"
+        );
+    }
+
+    // String resource code
+    int str_numbers = (int)view_.strings.size();
+    if (str_numbers > 0) {
+        code.append(
+            "\t/*\n"
+            "\t * Get text resources\n"
+            "\t */\n"
+            "\terr = ui_conext_get_text(ctx, priv->res_txt, STR_NUMBERS,\n"
+        );
+
+        for (int i = 0; i < str_numbers; i++) {
+            snprintf(buffer.get(), BUFFER_SIZE,
+                "\t\t\"%s\"%s //%d\n",
+                view_.strings.at(i).name.c_str(),
+                (i < str_numbers - 1) ? "," : ");",
+                i);
+            code.append(buffer.get());
+        }
+        code.append(
+            "\tif (err)\n"
+            "\t\treturn err;\n"
+            "\n"
+        );
+    }
+
+    // Font resource get code
+    code.append(
+        "\t//err = ui_context_get_font(ctx, DEF_FONTx_FILE, &priv->font);\n"
+        "\t//if (err)\n"
+        "\t\t//return err;\n"
+        "\n"
+    );
+
+    // Lvgl widget create code
+    snprintf(buffer.get(), BUFFER_SIZE,
+        "\t/*\n"
+        "\t * Create lvgl widgets\n"
+        "\t */\n"
+        "\tlv_obj_t *scr = lv_disp_get_scr_act(ui_context_get_display(ctx));\n"
+        "\tconst %s_presenter_t *presenter = ui_context_get_presenter(ctx);\n"
+        "\n"
+        "\tpriv->obj = lv_obj_create(scr);\n"
+        "\tlv_obj_set_pos(priv->obj, 0, 0);\n"
+        "\tlv_obj_set_size(priv->obj, DEF_UI_VIEW_WIDTH, DEF_UI_VIEW_HEIGHT);\n\n"
+        "\t//TODO: implement\n"
+        "\n"
+        "\treturn 0;\n",
+        view_name_.c_str());
+    code.append(buffer.get());
+}
+
 //Class ViewIDCodeBuilder
 bool ViewIDCodeBuilder::CodeWriteHeader(std::string& code) {
     code.append(
@@ -249,7 +337,7 @@ bool ViewIDCodeBuilder::CodeWriteBody(std::string& code) {
         code.append("#define ")
             .append(reptr->GetIdName((int)i))
             .append("  ")
-            .append(itoa((int)i, idname, 10))
+            .append(itoa((int)i + reptr->GetIdBase(), idname, 10))
             .append("\n");
     }
     return true;
@@ -262,6 +350,7 @@ bool ResourceCodeBuilder::CodeWriteHeader(std::string& code) {
         " * Copyright 2025 wtcat\n"
         " */\n"
         "\n"
+        "#include <assert.h>\n"
         "#include \"ui_template.h\"\n"
         "\n"
         "/*\n"
@@ -277,17 +366,22 @@ bool ResourceCodeBuilder::CodeWriteHeader(std::string& code) {
 }
 
 bool ResourceCodeBuilder::CodeWriteFoot(std::string& code) {
-    static const char foot[] = {
+    scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
+    int id = ResourceParser::GetInstance()->GetIdBase();
+
+    snprintf(buffer.get(), BUFFER_SIZE,
         "UI_PUBLIC_API\n"
         "const sdk_resources_t* _sdk_view_get_resource(uint16_t view_id) {\n"
-        "    if (view_id < SDK_RESOURCE_NUM(sdk_resource_table))\n"
+        "    assert(view_id >= %d);\n"
+        "    uint16_t offset = view_id - %d;\n"
+        "    if (offset < SDK_RESOURCE_NUM(sdk_resource_table))\n"
         "        return &sdk_resource_table[view_id];\n"
         "    return NULL;\n"
-        "}\n"
-    };
+        "}\n",
+        id, id);
 
     ResourceTableFill(code);
-    code.append(foot);
+    code.append(buffer.get());
     return true;
 }
 
