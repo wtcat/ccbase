@@ -44,20 +44,24 @@ size_t StringToUpper(const char* instr, char* outstr, size_t maxsize) {
 
 //Class ViewCodeFactory
 bool ViewCodeFactory::GenerateViewCode(const FilePath &in) {
+    ResourceParser* re_parser = ResourceParser::GetInstance();
+
     //Parse resource file
-    if (!ResourceParser::GetInstance()->ParseInput(in)) {
+    if (!re_parser->ParseInput(in)) {
         printf("Failed to parse input file(re_output.json)\n");
         return false;
     }
 
     //Create resource code builder
     builders_.push_back(
-        new app::ResourceCodeBuilder(FilePath(L"ui_template_resource.c"))
+        new app::ResourceCodeBuilder(
+            re_parser->GetOutputPath().Append(L"ui_template_resource.c"))
     );
 
     //Create resource id builder
     builders_.push_back(
-        new app::ViewIDCodeBuilder(FilePath(L"ui_template_ids.h"))
+        new app::ViewIDCodeBuilder(
+            re_parser->GetOutputPath().Append(L"ui_template_ids.h"))
     );
 
     //Create view template code builder 
@@ -83,7 +87,8 @@ void ViewCodeFactory::CallBack(const ResourceParser::ViewData& view) {
     name[len + 2] = '\0';
 
     std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-    FilePath path(converter.from_bytes(name));
+    FilePath path(ResourceParser::GetInstance()->GetOutputPath()
+        .Append(converter.from_bytes(name)));
 
     name[len] = '\0';
     builders_.push_back(
@@ -176,6 +181,8 @@ bool ViewCodeBuilder::CodeWriteFoot(std::string& code) {
 bool ViewCodeBuilder::CodeWriteBody(std::string& code) {
     std::string tcode;
 
+    AddExampleCode(code);
+
     tcode.reserve(1024);
     AddResourceCode(tcode);
     AddMethod(code, "create", 
@@ -203,7 +210,9 @@ bool ViewCodeBuilder::CodeWriteBody(std::string& code) {
 
     AddMethod(code, "key",
         "ui_context_t* ctx, int keyid, int keyevt, bool* done", 
-        "\t//TODO: implement\n"
+        "\t//if (keyevt == UIVIEW_KEY_RELEASE && keyid == UIVIEW_KEY_HOME) {\n"
+        "\t\t//TODO: implement\n"
+        "\t//}\n"
         "\treturn 0;\n"
     );
 
@@ -311,6 +320,28 @@ void ViewCodeBuilder::AddResourceCode(std::string& code) {
     code.append(buffer.get());
 }
 
+void ViewCodeBuilder::AddExampleCode(std::string& code) {
+    scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
+    snprintf(buffer.get(), BUFFER_SIZE,
+        "#if 0\n"
+        "//LVGL event callback example"
+        "(Events: LV_EVENT_CLICKED, ...) \n"
+        "static void xxxx_event_cb(lv_event_t * e) {\n"
+        "    ui_context_t* ctx = lv_event_get_user_data(e);\n"
+        "    %s_presenter_t* presenter = ui_context_get_presenter(ctx);\n"
+        "    %s_t* priv = ui_context_get_user(ctx);\n"
+        "    lv_obj_t* obj = lv_event_get_target(e);\n"
+        "\n"
+        "    //TODO: implement\n"
+        "}\n"
+        "lv_obj_add_event_cb(priv->xxxx_obj, xxxx_event_cb, LV_EVENT_xxxxx, ctx);\n"
+        "#endif //if 0\n"
+        "\n",
+        view_name_.c_str(), 
+        view_name_.c_str());
+    code.append(buffer.get());
+}
+
 //Class ViewIDCodeBuilder
 bool ViewIDCodeBuilder::CodeWriteHeader(std::string& code) {
     code.append(
@@ -371,13 +402,14 @@ bool ResourceCodeBuilder::CodeWriteFoot(std::string& code) {
 
     snprintf(buffer.get(), BUFFER_SIZE,
         "UI_PUBLIC_API\n"
-        "const sdk_resources_t* _sdk_view_get_resource(uint16_t view_id) {\n"
+        "const sdk_resources_t* %s(uint16_t view_id) {\n"
         "    assert(view_id >= %d);\n"
         "    uint16_t offset = view_id - %d;\n"
         "    if (offset < SDK_RESOURCE_NUM(sdk_resource_table))\n"
         "        return &sdk_resource_table[view_id];\n"
         "    return NULL;\n"
         "}\n",
+        ResourceParser::GetInstance()->GetFunctionName().c_str(), 
         id, id);
 
     ResourceTableFill(code);

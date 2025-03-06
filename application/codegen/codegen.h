@@ -52,8 +52,10 @@ public:
         return &generator;
     }
     bool ParseInput(const FilePath& path);
-    void SetOptions(int id_base) {
+    void SetOptions(int id_base, const std::string& rfnname, const FilePath &outpath) {
         id_base_ = id_base;
+        resource_fnname_ = rfnname;
+        outpath_ = outpath;
     }
 
     void ForeachView(base::Callback<void(const ViewData &, std::string&)> &callback,
@@ -73,15 +75,22 @@ public:
             return ids_.at(id);
         return null_str_;
     }
+
     size_t GetIdCount() const {
         return ids_.size();
     }
     int GetIdBase() const {
         return id_base_;
     }
+    const std::string& GetFunctionName() {
+        return resource_fnname_;
+    }
+    const FilePath& GetOutputPath() {
+        return outpath_;
+    }
 
 private:
-    ResourceParser() = default;
+    ResourceParser() : id_base_(0) {}
     bool ForeachListValue(const base::DictionaryValue* value,
         const std::string& key,
         std::vector<ResourceType>& vector);
@@ -90,6 +99,8 @@ private:
     std::vector<std::unique_ptr<ViewData>> resources_;
     std::vector<std::string> ids_;
     std::string null_str_;
+    std::string resource_fnname_;
+    FilePath outpath_;
     int id_base_;
     DISALLOW_COPY_AND_ASSIGN(ResourceParser);
 };
@@ -185,6 +196,7 @@ public:
 private:
     void AddHeaderFile(std::string& code);
     void AddPrivateData(std::string& code);
+    void AddExampleCode(std::string& code);
     void AddMethod(std::string& code, const char* suffix, 
         const char *args_list, const char* content);
     void AddResourceCode(std::string& code);
@@ -207,8 +219,9 @@ public:
     }
     ~ViewCodeFactory() = default;
     bool GenerateViewCode(const FilePath& in);
-    void SetOptions(int id_base) {
-        ResourceParser::GetInstance()->SetOptions(id_base);
+    void SetOptions(int id_base, const std::string &rfnname, 
+        const FilePath &outpath) {
+        ResourceParser::GetInstance()->SetOptions(id_base, rfnname, outpath);
     }
 
 private:
