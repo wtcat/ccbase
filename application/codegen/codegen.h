@@ -15,10 +15,9 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/json/json_file_value_serializer.h"
 
-namespace app {
+#include "application/helper/helper.h"
 
-size_t StringToLower(const char* instr, char* outstr, size_t maxsize);
-size_t StringToUpper(const char* instr, char* outstr, size_t maxsize);
+namespace app {
 
 // Class ResourceParser
 class ResourceParser {

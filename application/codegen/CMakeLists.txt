@@ -4,6 +4,7 @@ set(TARGET_NAME codegen)
 add_executable(${TARGET_NAME}
     main.cc
     codegen.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/../helper/helper.cc
 )
 
 if (CMAKE_HOST_WIN32)

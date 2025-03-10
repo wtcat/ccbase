@@ -8,6 +8,7 @@
 #include "base/memory/scoped_ptr.h"
 
 #include "application/rescan/rescan.h"
+#include "application/rescan/xml_generator.h"
 
 
 int main(int argc, char* argv[]) {
@@ -26,9 +27,14 @@ int main(int argc, char* argv[]) {
         }
 
 
-        app::ResourceScan scanner;
+        scoped_refptr<app::ResourceScan> scanner = new app::ResourceScan();
         FilePath path(L"RES");
-        scanner.Scan(path);
+
+        if (scanner->Scan(path)) {
+            app::UIEditorProject ui(scanner.get(), path);
+            ui.SetSceenSize(454, 454);
+            ui.GenerateXMLDoc("bt_watch.ui");
+        }
     }
 
     return 0;

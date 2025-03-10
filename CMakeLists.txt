@@ -33,6 +33,11 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 #Options
 option(USE_LEVELDB "Enable levelDB" OFF)
 option(USE_SPDLOG  "Enable spdlog"  OFF)
+option(USE_XML     "Enable tinyXML library" ON)
+
+if (USE_XML)
+set(tinyxml2_SHARED_LIBS tinyxml2)
+endif()
 
 set(CMAKE_C_STANDARD   11)
 set(CMAKE_CXX_STANDARD 17)
