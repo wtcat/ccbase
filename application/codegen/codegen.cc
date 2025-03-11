@@ -229,7 +229,7 @@ void ViewCodeBuilder::AddResourceCode(std::string& code) {
 
         for (int i = 0; i < pic_numbers; i++) {
             snprintf(buffer.get(), BUFFER_SIZE,
-                "\t\t\"%s\"%s //%d\n",
+                "\t\t__RE(\"%s\")%s //%d\n",
                 view_.pictures.at(i).name.c_str(),
                 (i < pic_numbers - 1) ? "," : ");",
                 i);
@@ -254,7 +254,7 @@ void ViewCodeBuilder::AddResourceCode(std::string& code) {
 
         for (int i = 0; i < str_numbers; i++) {
             snprintf(buffer.get(), BUFFER_SIZE,
-                "\t\t\"%s\"%s //%d\n",
+                "\t\t__RE(\"%s\")%s //%d\n",
                 view_.strings.at(i).name.c_str(),
                 (i < str_numbers - 1) ? "," : ");",
                 i);

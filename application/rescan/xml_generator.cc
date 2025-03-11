@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <string>
+#include <algorithm>
 
 #include "base/logging.h"
 #include "base/file_path.h"
@@ -16,6 +17,15 @@
 #include "application/rescan/xml_generator.h"
 
 namespace app {
+    
+static bool filename_number_compare(const FilePath& l,
+    const FilePath& r) {
+    std::string lstr = l.BaseName().RemoveExtension().AsUTF8Unsafe();
+    std::string rstr = r.BaseName().RemoveExtension().AsUTF8Unsafe();
+    unsigned long lv = std::strtoul(lstr.c_str(), NULL, 10);
+    unsigned long rv = std::strtoul(rstr.c_str(), NULL, 10);
+    return lv < rv;
+}
 
 UIEditorProject::UIEditorProject(const ResourceScan* rescan, const FilePath& repath) :
     doc_(),
@@ -213,11 +223,8 @@ void UIEditorProject::AddScenePicture(xml::XMLElement* parent,
 
     //Add picture property
     std::string file_name = picture->path.BaseName().RemoveExtension().AsUTF8Unsafe();
-    if (!isdigit((int)file_name[0]))
-        AddPictureHeader(rpic, file_name, picture->width, picture->height);
-    else
-        AddPictureHeader(rpic, std::string("pic_").append(file_name), 
-            picture->width, picture->height);
+    AddPictureHeader(rpic, std::string("PIC_").append(file_name), 
+        picture->width, picture->height);
 
     //Add picture path information
     xml::XMLElement* layer = doc_.NewElement("element");
@@ -269,9 +276,19 @@ void UIEditorProject::AddPictureRegion(xml::XMLElement* parent,
         layer->SetAttribute("class", "layer");
         rgrp->InsertEndChild(layer);
 
+        //Sort files
+        std::vector<FilePath> picture_sorted;
+        picture_sorted.reserve(picture_nums);
+        for (int i = 0; i < picture_nums; i++)
+            picture_sorted.push_back(picgrp->pictures[i]->path);
+
+        std::sort(picture_sorted.begin(),
+            picture_sorted.end(),
+            filename_number_compare);
+
         for (int i = 0; i < picture_nums; i++) {
             AddProperty(layer, AddCount(i, 0),
-                GetRelativePath(picgrp->pictures[i]->path));
+                GetRelativePath(picture_sorted[i]));
         }
     }
 }
