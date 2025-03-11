@@ -63,10 +63,10 @@ public:
     ~ResourceScan();
 
     bool Scan(const FilePath& dir);
-    template<typename T>
-    void ForeachView(base::Callback<void(const scoped_refptr<ViewResource>, T arg)>& callback, T arg) const {
+    template<typename Function>
+    void ForeachView(base::Callback<Function>& callback) const {
         for (const auto iter : views_)
-            callback.Run(iter, arg);
+            callback.Run(iter);
     }
     const FilePath& GetStringFile() const {
         return string_file_;

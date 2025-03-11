@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string>
 
-
 #include "base/logging.h"
 #include "base/file_path.h"
 #include "base/file_util.h"
@@ -18,12 +17,21 @@
 
 namespace app {
 
-static void SceneCallback(const scoped_refptr<ResourceScan::ViewResource> view, 
-    xml::XMLElement* parent) {
+UIEditorProject::UIEditorProject(const ResourceScan* rescan, const FilePath& repath) :
+    doc_(),
+    rescan_ptr_(rescan),
+    resource_path_(repath),
+    screen_width_("0x0"),
+    screen_height_("0x0"),
+    scene_idc_(0x0),
+    string_idc_(0x10000) {
+    FilePath abs_path(repath);
 
+    file_util::AbsolutePath(&abs_path);
+    resource_abspath_ = abs_path.AsUTF8Unsafe();
+    rel_path_.reserve(1024);
 }
 
-//Class UIEditorProject
 bool UIEditorProject::GenerateXMLDoc(const std::string& filename) {
     //Create XML declare
     xml::XMLDeclaration* declare = doc_.NewDeclaration(
@@ -41,8 +49,10 @@ bool UIEditorProject::GenerateXMLDoc(const std::string& filename) {
     AddScenes(root);
 
     //Add resource list
+    AddResources(root);
 
-    //Add generate parameters
+    //Add generate options
+    AddGenerateOption(root);
 
     //Save doc
     if (doc_.SaveFile(filename.c_str()) == xml::XML_SUCCESS) {
@@ -54,6 +64,11 @@ bool UIEditorProject::GenerateXMLDoc(const std::string& filename) {
     return false;
 }
 
+void UIEditorProject::SetSceenSize(int w, int h) {
+    snprintf(screen_width_, sizeof(screen_width_), "0x%x", w);
+    snprintf(screen_height_, sizeof(screen_height_), "0x%x", h);
+}
+
 void UIEditorProject::AddProperty(xml::XMLElement* parent, const char* name, 
     const char* value) {
     xml::XMLElement* property = doc_.NewElement("property");
@@ -62,26 +77,39 @@ void UIEditorProject::AddProperty(xml::XMLElement* parent, const char* name,
     parent->InsertEndChild(property);
 }
 
-void UIEditorProject::AddProjectProperty(xml::XMLElement* root) {
-    scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
+void UIEditorProject::AddStringItem(xml::XMLElement* parent, const char* value) {
+    xml::XMLElement* string = doc_.NewElement("string");
+    string->SetAttribute("value", value);
+    parent->InsertEndChild(string);
+}
 
+void UIEditorProject::AddTextItem(xml::XMLElement* parent, const char* value) {
+    xml::XMLElement* text = doc_.NewElement("txt");
+    text->SetAttribute("value", value);
+    parent->InsertEndChild(text);
+}
+
+void UIEditorProject::AddPictureItem(xml::XMLElement* parent, const char* name, 
+    const char* value) {
+    xml::XMLElement* picture = doc_.NewElement("picture");
+    picture->SetAttribute("value", name);
+    if (value != nullptr)
+        picture->SetAttribute("LayerID", value);
+    parent->InsertEndChild(picture);
+}
+
+void UIEditorProject::AddProjectProperty(xml::XMLElement* root) {
+#define _PATH_PREIFX(x) "..\\output\\" x
     AddProperty(root, "prj_name", "bt_watch");
     AddProperty(root, "prj_language", "0x0");
-
-    snprintf(buffer.get(), BUFFER_SIZE,
-        "0x%x", screen_width_);
-    AddProperty(root, "prj_screen_width", buffer.get());
-
-    snprintf(buffer.get(), BUFFER_SIZE,
-        "0x%x", screen_height_);
-    AddProperty(root, "prj_screen_height", buffer.get());
-
-    AddProperty(root, "prj_res_file", ".\\res\\bt_watch.res");
-    AddProperty(root, "prj_res_str_dir", ".\\res");
-    AddProperty(root, "prj_res_head_file", ".\\bt_watch_pic.h");
-    AddProperty(root, "prj_res_str_head_file", ".\\bt_watch_str.h");
-    AddProperty(root, "prj_sty_head_file", ".\\bt_watch_sty.h");
-    AddProperty(root, "prj_sty_file", ".\\res\\bt_watch.sty");
+    AddProperty(root, "prj_screen_width", screen_width_);
+    AddProperty(root, "prj_screen_height", screen_height_);
+    AddProperty(root, "prj_res_file", _PATH_PREIFX("res\\bt_watch.res"));
+    AddProperty(root, "prj_res_str_dir", _PATH_PREIFX("res"));
+    AddProperty(root, "prj_res_head_file", _PATH_PREIFX("bt_watch_pic.h"));
+    AddProperty(root, "prj_res_str_head_file", _PATH_PREIFX("bt_watch_str.h"));
+    AddProperty(root, "prj_sty_head_file", _PATH_PREIFX("bt_watch_sty.h"));
+    AddProperty(root, "prj_sty_file", _PATH_PREIFX("res\\bt_watch.sty"));
     AddProperty(root, "prj_build_res_type", "0x1");
     AddProperty(root, "prj_build_res_mode", "0x0");
     
@@ -115,13 +143,30 @@ void UIEditorProject::AddScene(xml::XMLElement* root, const ResourceScan::ViewRe
     scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
     //Create scene node
     xml::XMLElement* scene = doc_.NewElement("scene");
-    doc_.InsertEndChild(root);
+    root->InsertEndChild(scene);
 
     //Add scene header
-    StringToUpper(view->name.c_str(), buffer.get(), BUFFER_SIZE);
+    char* name = buffer.get();
+    strcpy(name, "SCENE_");
+    name += 6;
+    StringToUpper(view->name.c_str(), name, BUFFER_SIZE);
+    name[view->name.size()] = '\0';
     AddSceneHeader(scene, buffer.get());
 
+    //Add resource group
+    xml::XMLElement* group = AddSceneResourceGroup(scene);
 
+    //Add picture group
+    for (auto grp_iter : view->groups)
+        AddPictureRegion(group, grp_iter.get());
+
+    //Add Pictures
+    for (auto iter : view->pictures)
+        AddScenePicture(group, iter.get());
+
+    //Add strings
+    for (const auto &iter : view->strings)
+        AddSceneString(group, iter);
 }
 
 void UIEditorProject::AddSceneHeader(xml::XMLElement* parent, const char* scene_name) {
@@ -137,6 +182,216 @@ void UIEditorProject::AddSceneHeader(xml::XMLElement* parent, const char* scene_
 }
 
 void UIEditorProject::AddScenes(xml::XMLElement* root) {
-    rescan_ptr_->ForeachView(base::Bind(&SceneCallback), root);
+    rescan_ptr_->ForeachView(base::Bind(&UIEditorProject::SceneCallback, this, root));
 }
+
+xml::XMLElement* UIEditorProject::AddSceneResourceGroup(xml::XMLElement* parent) {
+    xml::XMLElement* rgroup = doc_.NewElement("element");
+    rgroup->SetAttribute("class", "resgroup_resource");
+    parent->InsertEndChild(rgroup);
+
+    AddProperty(rgroup, "name", "window");
+    AddProperty(rgroup, "id", AddCount(scene_idc_, 1));
+    AddProperty(rgroup, "x", "0x0000");
+    AddProperty(rgroup, "y", "0x0000");
+    AddProperty(rgroup, "width", screen_width_);
+    AddProperty(rgroup, "height", screen_height_);
+    AddProperty(rgroup, "background", "0x00202020");
+    AddProperty(rgroup, "opaque", "0x0000");
+    AddProperty(rgroup, "transparency", "0x00ff");
+    AddProperty(rgroup, "visible", "0x0001");
+    AddProperty(rgroup, "editable", "1");
+
+    return rgroup;
+}
+
+void UIEditorProject::AddScenePicture(xml::XMLElement* parent, 
+    const ResourceScan::Picture* picture) {
+    xml::XMLElement* rpic = doc_.NewElement("element");
+    rpic->SetAttribute("class", "picture_resource");
+    parent->InsertEndChild(rpic);
+
+    //Add picture property
+    std::string file_name = picture->path.BaseName().RemoveExtension().AsUTF8Unsafe();
+    if (!isdigit((int)file_name[0]))
+        AddPictureHeader(rpic, file_name, picture->width, picture->height);
+    else
+        AddPictureHeader(rpic, std::string("pic_").append(file_name), 
+            picture->width, picture->height);
+
+    //Add picture path information
+    xml::XMLElement* layer = doc_.NewElement("element");
+    layer->SetAttribute("class", "layer");
+    rpic->InsertEndChild(layer);
+
+    AddProperty(layer, "0", GetRelativePath(picture->path));
+}
+
+void UIEditorProject::AddSceneString(xml::XMLElement* parent, const std::string& str) {
+    xml::XMLElement* rstr = doc_.NewElement("element");
+    rstr->SetAttribute("class", "string_resource");
+    parent->InsertEndChild(rstr);
+
+    //Add string property
+    AddProperty(rstr, "name", str.c_str());
+    AddProperty(rstr, "id", AddCount(string_idc_, 1));
+    AddProperty(rstr, "x", "0x0000");
+    AddProperty(rstr, "y", "0x0000");
+    AddProperty(rstr, "width", "0x0020");
+    AddProperty(rstr, "height", "0x0020");
+    AddProperty(rstr, "foreground", "0x00000000");
+    AddProperty(rstr, "background", "0x00ffffff");
+    AddProperty(rstr, "visible", "0x0001");
+    AddProperty(rstr, "align", "0x000e");
+    AddProperty(rstr, "mode", "0x0002");
+    AddProperty(rstr, "size", ToHexString((int)str.size()));
+    AddProperty(rstr, "scroll", "0x0");
+    AddProperty(rstr, "direction", "-1");
+    AddProperty(rstr, "space", "0x0064");
+    AddProperty(rstr, "pixel", "0x0001");
+    AddProperty(rstr, "strid", str.c_str());
+}
+
+void UIEditorProject::AddPictureRegion(xml::XMLElement* parent, 
+    const ResourceScan::PictureGroup* picgrp) {
+    int picture_nums = (int)picgrp->pictures.size();
+    if (picture_nums > 0) {
+        xml::XMLElement* rgrp = doc_.NewElement("element");
+        rgrp->SetAttribute("class", "picregion_resource");
+        parent->InsertEndChild(rgrp);
+
+        //Add picture common property
+        AddPictureHeader(rgrp, picgrp->name, picgrp->pictures[0]->width,
+            picgrp->pictures[0]->height);
+
+        //Add layer for picture region
+        xml::XMLElement* layer = doc_.NewElement("element");
+        layer->SetAttribute("class", "layer");
+        rgrp->InsertEndChild(layer);
+
+        for (int i = 0; i < picture_nums; i++) {
+            AddProperty(layer, AddCount(i, 0),
+                GetRelativePath(picgrp->pictures[i]->path));
+        }
+    }
+}
+
+void UIEditorProject::AddPictureHeader(xml::XMLElement* node, const std::string& name, 
+    int width, int height) {
+    AddProperty(node, "name", name.c_str());
+    AddProperty(node, "id", AddCount(scene_idc_, 1));
+    AddProperty(node, "x", "0x0000");
+    AddProperty(node, "y", "0x0000");
+    AddProperty(node, "width", ToHexString(width));
+    AddProperty(node, "height", ToHexString(height));
+    AddProperty(node, "visible", "0x0010");
+    AddProperty(node, "compress", "0x0000");
+    AddProperty(node, "PNG_A8", "0x0000");
+    AddProperty(node, "ARGB", "0x0000");
+}
+
+void UIEditorProject::AddResources(xml::XMLElement* parent) {
+    xml::XMLElement* resource = doc_.NewElement("resource");
+    parent->InsertEndChild(resource);
+
+    std::vector<const StringResource *> str_vector;
+    str_vector.reserve(50);
+    layer_idc_ = 0;
+
+    //Add all picture resource
+    rescan_ptr_->ForeachView(
+        base::Bind(&UIEditorProject::ResourceCallback, this, resource, &str_vector));
+
+    //Add text file
+    AddTextItem(resource, rescan_ptr_->GetStringFile().AsUTF8Unsafe().c_str());
+
+    //Add string resource
+    for (auto &svec : str_vector) {
+        for (auto& iter : *svec)
+            AddStringItem(resource, iter.c_str());
+    }
+}
+
+void UIEditorProject::AddGenerateOption(xml::XMLElement* parent) {
+    xml::XMLElement* config = doc_.NewElement("config");
+    parent->InsertEndChild(config);
+
+    AddProperty(config, "blockHeight", "78");
+    AddProperty(config, "blockWidth", "78");
+    //AddProperty(config, "cacheID", "yyyyyyyyyyyy");
+    AddProperty(config, "compressFormat", "2");
+    AddProperty(config, "etc2CompSpeed", "1");
+    AddProperty(config, "index_algorithm", "0");
+    AddProperty(config, "index_frameDelay", "-1");
+    AddProperty(config, "index_isDithering", "0");
+    AddProperty(config, "isBlockCompress", "0");
+    AddProperty(config, "isCompressRes", "1");
+    AddProperty(config, "isDither", "0");
+    AddProperty(config, "isPNGARGBToETC2", "1");
+    AddProperty(config, "isPNGIndex8Comp", "1");
+    AddProperty(config, "isRawJpeg", "1");
+    AddProperty(config, "isRebuildETC2Res", "0");
+    AddProperty(config, "isSplitPack", "0");
+    AddProperty(config, "isSplitRes", "0");
+    AddProperty(config, "picResFormat", "0");
+    AddProperty(config, "rawJpeg_Quar", "80");
+    AddProperty(config, "rawJpeg_blockHeight", "466");
+    AddProperty(config, "rawJpeg_blockWidth", "466");
+    AddProperty(config, "rawJpeg_minHeight", "160");
+    AddProperty(config, "rawJpeg_minWidth", "160");
+    AddProperty(config, "rawJpeg_perPixBytes", "2");
+    AddProperty(config, "resMode", "0");
+    AddProperty(config, "splitPackStart", "0");
+    AddProperty(config, "splitResSize", "10");
+}
+
+void UIEditorProject::SceneCallback(xml::XMLElement* parent, 
+    const scoped_refptr<ResourceScan::ViewResource> view) {
+    AddScene(parent, view.get());
+}
+
+void UIEditorProject::ResourceCallback(xml::XMLElement* parent, 
+    std::vector<const StringResource*> *svec, 
+    const scoped_refptr<ResourceScan::ViewResource> view) {
+    ResourceScan::ViewResource* viewp = view.get();
+
+    for (auto grp_iter : viewp->groups) {
+        for (auto iter : grp_iter->pictures) {
+            AddPictureItem(parent, GetRelativePath(iter->path), 
+                AddCount(layer_idc_, 1));
+        }
+    }
+
+    for (auto iter : viewp->pictures) {
+        AddPictureItem(parent, GetRelativePath(iter->path),
+            AddCount(layer_idc_, 1));
+    }
+
+    svec->push_back(&viewp->strings);
+}
+
+const char* UIEditorProject::AddCount(int& left, int right) {
+    static char buf[NUM_BUFFER_SIZE];
+    left += right;
+    return itoa(left, buf, 10);
+}
+
+const char* UIEditorProject::ToHexString(int value) {
+    static char buf[NUM_BUFFER_SIZE];
+    snprintf(buf, sizeof(buf), "0x%x", value);
+    return buf;
+}
+
+const char* UIEditorProject::GetRelativePath(const FilePath& path) {
+    rel_path_.clear();
+    rel_path_.append(path.AsUTF8Unsafe());
+
+    char* cpath = rel_path_.data();
+    cpath += resource_abspath_.size();
+
+    if (*cpath == '/' || *cpath == '\\')
+        *--cpath = '.';
+    return cpath;
+}
+
 } //namespace app

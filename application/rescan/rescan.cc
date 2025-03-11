@@ -45,14 +45,21 @@ bool ResourceScan::IsPicture(const std::string& extname) {
 }
 
 bool ResourceScan::Scan(const FilePath& dir) {
+    FilePath path(dir);
+
+    if (!file_util::AbsolutePath(&path)) {
+        DLOG(ERROR) << "Invalid path: " << path.value();
+        return false;
+    }
+
     //Check whether the resource path is valid
-    if (!CheckPath(dir)) {
+    if (!CheckPath(path)) {
         DLOG(ERROR) << "Invalid resource directory!";
         return false;
     }
 
     //Walk around the directory by recursive
-    if (!ScanDirectory(dir))
+    if (!ScanDirectory(path))
         return false;
 
     //Fix picture parameters

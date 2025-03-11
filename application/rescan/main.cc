@@ -31,9 +31,9 @@ int main(int argc, char* argv[]) {
         FilePath path(L"RES");
 
         if (scanner->Scan(path)) {
-            app::UIEditorProject ui(scanner.get(), path);
-            ui.SetSceenSize(454, 454);
-            ui.GenerateXMLDoc("bt_watch.ui");
+            scoped_refptr<app::UIEditorProject> ui = new app::UIEditorProject(scanner.get(), path);
+            ui->SetSceenSize(454, 454);
+            ui->GenerateXMLDoc("bt_watch.ui");
         }
     }
 
