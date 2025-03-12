@@ -361,8 +361,8 @@ bool ResourceCodeBuilder::CodeWriteHeader(std::string& code) {
         " * Helper Macro\n"
         " */\n"
         "#define SDK_RESOURCE_NUM(table) (sizeof(table) / sizeof(table[0]))\n"
-        "#define SDK_RESOURCE_ITEM(view_id, scene_id, pic, txt, picset) \\\n"
-        "     {picset, pic, txt, scene_id, view_id}\n"
+        "#define SDK_RESOURCE_ITEM(view_id, scene_id, npic, ntxt, nset) \\\n"
+        "     { scene_id, view_id, npic, nset, ntxt }\n"
     };
     code.clear();
     code.append(header);
@@ -399,47 +399,15 @@ bool ResourceCodeBuilder::CodeWriteBody(std::string& code) {
 
 void ResourceCodeBuilder::ResourceCallback(const ResourceParser::ViewData& view,
     std::string& code) {
-    char symbol_name[256];
-    auto generate_fn = [&](const std::string& name, 
-        const std::vector<ResourceParser::ResourceType> &vec,
-        const char* extname) ->void {
-        if (vec.size() > 0) {
-            char buf[128];
-            snprintf(buf, sizeof(buf),
-                "\n/* %s */\nSDK_RESOURCE_DEFINE(%s_%s,\n", 
-                name.c_str(), 
-                symbol_name,
-                extname
-            );
-            code.append(buf);
-            for (const auto& iter : vec)
-                code.append("\t_RESOURCE_ITEM(").append(iter.name).append("),\n");
-            code.append(");\n");
-        }
-    };
-
-    size_t len = StringToLower(view.name.c_str(), symbol_name, sizeof(symbol_name) - 1);
-    symbol_name[len] = '\0';
-
-    //Picture resource
-    generate_fn(view.name, view.pictures, "pic");
-
-    //String resource
-    generate_fn(view.name, view.strings, "txt");
-
-    //Picture group resource
-    if (view.picgroups.size() > 0)
-        generate_fn(view.name, view.picgroups, "grp");
-
     //Collect variable information
     scoped_ptr<ResourceNode> item(new ResourceNode());
+
     item->view = view_ids_++;
     item->scene = view.value;
-    item->picture.append(symbol_name).append("_pic");
-    item->text.append(symbol_name).append("_txt");
+    item->picture_num = (uint16_t)view.pictures.size();
+    item->text_num = (uint16_t)view.strings.size();
+    item->anim_num = (uint16_t)view.picgroups.size();
 
-    if (view.picgroups.size() > 0)
-        item->anim.append(symbol_name).append("_grp");
     nodes_.push_back(std::move(item));
 }
 
@@ -460,12 +428,13 @@ void ResourceCodeBuilder::ResourceTableFill(std::string& code) {
 
     //Generate resource table item
     for (const auto& iter : nodes_) {
+        char buffer[32];
         code.append("\tSDK_RESOURCE_ITEM(")
             .append(ResourceParser::GetInstance()->GetIdName(iter->view)).append(", ")
             .append(iter->scene).append(", ")
-            .append(iter->picture).append(", ")
-            .append(iter->text).append(", ")
-            .append(iter->anim.size() ? iter->anim : "NULL").append("),\n");
+            .append(itoa(iter->picture_num, buffer, 10)).append(", ")
+            .append(itoa(iter->text_num, buffer, 10)).append(", ")
+            .append(itoa(iter->anim_num, buffer, 10)).append("),\n");
     }
 
     //Append resource table foot

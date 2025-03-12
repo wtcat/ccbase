@@ -146,9 +146,9 @@ public:
     friend class ResourceParser;
     struct ResourceNode {
         std::string scene;
-        std::string picture;
-        std::string text;
-        std::string anim;
+        unsigned int picture_num;
+        unsigned int text_num;
+        unsigned int anim_num;
         unsigned int view;
     };
 
