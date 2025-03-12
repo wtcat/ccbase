@@ -51,6 +51,7 @@ private:
     void ResourceCallback(xml::XMLElement* parent, std::vector<const StringResource*> *svec, 
         const scoped_refptr<ResourceScan::ViewResource> view);
 
+    const std::string &GetResourceName(const char* prefix, const std::string& name);
     const char* GetRelativePath(const FilePath& path);
     const char* AddCount(int &left, int right);
     const char* ToHexString(int value);
@@ -58,11 +59,13 @@ private:
 private:
     xml::XMLDocument doc_;
     const ResourceScan* rescan_ptr_;
+    const ResourceScan::ViewResource* current_view_;
     FilePath resource_path_;
     std::string resource_abspath_;
     std::string res_file_;
     std::string res_path_;
     std::string rel_path_;
+    std::string res_name_;
     char screen_width_[8];
     char screen_height_[8];
     int scene_idc_;

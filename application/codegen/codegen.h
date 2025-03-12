@@ -39,6 +39,7 @@ public:
         std::string value;
         std::vector<ResourceType> pictures;
         std::vector<ResourceType> strings;
+        std::vector<ResourceType> picgroups;
     };
     struct ResourceLess {
         bool operator()(const ResourceType& l, const ResourceType& r) {
@@ -57,7 +58,8 @@ public:
         outpath_ = outpath;
     }
 
-    void ForeachView(base::Callback<void(const ViewData &, std::string&)> &callback,
+    template<typename Function>
+    void ForeachView(base::Callback<Function> &callback,
         std::string &code) {
         for (const auto &iter : resources_)
             callback.Run(*iter.get(), code);

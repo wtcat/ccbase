@@ -73,8 +73,12 @@ bool ResourceScan::Scan(const FilePath& dir) {
 }
 
 bool ResourceScan::CheckPath(const FilePath& dir) {
-    const fs::path root_path(dir.MaybeAsASCII());
+    if (!file_util::PathExists(dir)) {
+        DLOG(ERROR) << "Path invalid: " << dir.value();
+        return false;
+    }
 
+    const fs::path root_path(dir.MaybeAsASCII());
     for (const auto& entry : fs::directory_iterator(root_path)) {
         if (fs::is_directory(entry))
             continue;

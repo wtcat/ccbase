@@ -4,6 +4,8 @@
 
 #include "base/at_exit.h"
 #include "base/file_path.h"
+#include "base/file_util.h"
+#include "base/logging.h"
 #include "base/command_line.h"
 #include "base/memory/scoped_ptr.h"
 
@@ -40,9 +42,17 @@ int main(int argc, char* argv[]) {
             input_dir = cmdline->GetSwitchValuePath("input_dir");
         }
         if (cmdline->HasSwitch("output_dir")) {
+            FilePath dir = cmdline->GetSwitchValuePath(output_dir);
+            if (!file_util::PathExists(dir)) {
+                if (!file_util::CreateDirectory(dir)) {
+                    DLOG(ERROR) << "Failed to create directory: " << dir.value();
+                    return false;
+                }
+            }
+
             output_dir.clear();
-            output_dir = cmdline->GetSwitchValueASCII("output_dir");
-            output_dir.append("\\").append("bt_watch.ui");
+            output_dir.append(cmdline->GetSwitchValueASCII("output_dir"))
+                      .append("\\").append("bt_watch.ui");
         }
         if (cmdline->HasSwitch("sceen_width")) {
             std::string str = cmdline->GetSwitchValueASCII("sceen_width");

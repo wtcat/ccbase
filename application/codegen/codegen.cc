@@ -400,7 +400,6 @@ bool ResourceCodeBuilder::CodeWriteBody(std::string& code) {
 void ResourceCodeBuilder::ResourceCallback(const ResourceParser::ViewData& view,
     std::string& code) {
     char symbol_name[256];
-
     auto generate_fn = [&](const std::string& name, 
         const std::vector<ResourceParser::ResourceType> &vec,
         const char* extname) ->void {
@@ -428,12 +427,19 @@ void ResourceCodeBuilder::ResourceCallback(const ResourceParser::ViewData& view,
     //String resource
     generate_fn(view.name, view.strings, "txt");
 
+    //Picture group resource
+    if (view.picgroups.size() > 0)
+        generate_fn(view.name, view.picgroups, "grp");
+
     //Collect variable information
     scoped_ptr<ResourceNode> item(new ResourceNode());
     item->view = view_ids_++;
     item->scene = view.value;
     item->picture.append(symbol_name).append("_pic");
     item->text.append(symbol_name).append("_txt");
+
+    if (view.picgroups.size() > 0)
+        item->anim.append(symbol_name).append("_grp");
     nodes_.push_back(std::move(item));
 }
 
@@ -510,7 +516,7 @@ bool ResourceParser::ParseInput(const FilePath& path) {
     //Walk around resource node list
     ids_.reserve(80);
     resources_.reserve(50);
-    for (auto iter = list_value->begin();
+    for (auto &iter = list_value->begin();
         iter != list_value->end();
         ++iter) {
         std::unique_ptr<ViewData> view_ptr = std::make_unique<ViewData>();
@@ -542,6 +548,9 @@ bool ResourceParser::ParseInput(const FilePath& path) {
         std::sort(view_ptr.get()->strings.begin(),
             view_ptr.get()->strings.end(), ResourceLess());
 
+        //Get all picture groups of the view
+        ForeachListValue(dict_value, "groups", view_ptr.get()->picgroups);
+
         ids_.push_back("uID__" + view_ptr.get()->name);
         resources_.push_back(std::move(view_ptr));
     }
@@ -553,10 +562,8 @@ bool ResourceParser::ForeachListValue(const base::DictionaryValue* value,
     const std::string& key,
     std::vector<ResourceType>& vector) {
     const base::ListValue* list_value;
-    if (!value->GetList(key, &list_value)) {
-        printf("Not found key: \"%s\"\n", key.c_str());
+    if (!value->GetList(key, &list_value))
         return false;
-    }
 
     //Walk around resource node list
     ResourceType resource(64, 32);

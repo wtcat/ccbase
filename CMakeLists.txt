@@ -44,6 +44,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 if (CMAKE_HOST_WIN32)
     add_compile_options(
+        /DUNICODE=1
         /wd4251
     )
 endif()

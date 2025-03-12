@@ -12,7 +12,7 @@
 #include "base/base_export.h"
 #include "base/basictypes.h"
 #include "base/base_time.h"
-#include "build/build_config.h"
+#include "base/build/build_config.h"
 
 #if defined(OS_WIN)
 #include <windows.h>

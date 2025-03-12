@@ -30,6 +30,7 @@ static bool filename_number_compare(const FilePath& l,
 UIEditorProject::UIEditorProject(const ResourceScan* rescan, const FilePath& repath) :
     doc_(),
     rescan_ptr_(rescan),
+    current_view_(nullptr),
     resource_path_(repath),
     screen_width_("0x0"),
     screen_height_("0x0"),
@@ -40,6 +41,16 @@ UIEditorProject::UIEditorProject(const ResourceScan* rescan, const FilePath& rep
     file_util::AbsolutePath(&abs_path);
     resource_abspath_ = abs_path.AsUTF8Unsafe();
     rel_path_.reserve(1024);
+    res_name_.reserve(256);
+}
+
+inline const std::string &UIEditorProject::GetResourceName(const char* prefix, 
+    const std::string& name) {
+    res_name_.clear();
+    return res_name_.append(prefix)
+                    .append(current_view_->name)
+                    .append("_")
+                    .append(name);
 }
 
 bool UIEditorProject::GenerateXMLDoc(const std::string& filename) {
@@ -155,6 +166,9 @@ void UIEditorProject::AddScene(xml::XMLElement* root, const ResourceScan::ViewRe
     xml::XMLElement* scene = doc_.NewElement("scene");
     root->InsertEndChild(scene);
 
+    //Set current view pointer
+    current_view_ = view;
+
     //Add scene header
     char* name = buffer.get();
     strcpy(name, "SCENE_");
@@ -223,7 +237,7 @@ void UIEditorProject::AddScenePicture(xml::XMLElement* parent,
 
     //Add picture property
     std::string file_name = picture->path.BaseName().RemoveExtension().AsUTF8Unsafe();
-    AddPictureHeader(rpic, std::string("PIC_").append(file_name), 
+    AddPictureHeader(rpic, GetResourceName("PIC_", file_name),
         picture->width, picture->height);
 
     //Add picture path information
@@ -268,7 +282,8 @@ void UIEditorProject::AddPictureRegion(xml::XMLElement* parent,
         parent->InsertEndChild(rgrp);
 
         //Add picture common property
-        AddPictureHeader(rgrp, picgrp->name, picgrp->pictures[0]->width,
+        AddPictureHeader(rgrp, GetResourceName("GRP_", picgrp->name),
+            picgrp->pictures[0]->width,
             picgrp->pictures[0]->height);
 
         //Add layer for picture region

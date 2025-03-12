@@ -4,6 +4,8 @@
 
 #include "base/at_exit.h"
 #include "base/file_path.h"
+#include "base/file_util.h"
+#include "base/logging.h"
 #include "base/command_line.h"
 #include "base/memory/scoped_ptr.h"
 
@@ -54,6 +56,13 @@ int main(int argc, char* argv[]) {
             outpath = cmdline->GetSwitchValuePath("output_dir");
         }
 
+        if (!file_util::PathExists(outpath)) {
+            if (!file_util::CreateDirectory(outpath)) {
+                DLOG(ERROR) << "Failed to create directory: " << outpath.value();
+                return false;
+            }
+        }
+        
         //Inject generate options
         factory->SetOptions(view_base, rfnname, outpath);
 
