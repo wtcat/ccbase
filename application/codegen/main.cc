@@ -67,7 +67,10 @@ int main(int argc, char* argv[]) {
         factory->SetOptions(view_base, rfnname, outpath);
 
         //Generate template code
-        factory->GenerateViewCode(file);
+        if (!factory->GenerateViewCode(file)) {
+            DLOG(ERROR) << "Generate error";
+            return -1;
+        }
     }
 
     return 0;
