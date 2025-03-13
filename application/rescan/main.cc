@@ -22,9 +22,15 @@ int main(int argc, char* argv[]) {
 
         if (cmdline->HasSwitch("help")) {
             printf(
-                "rescan [--input_dir=path] [--output_dir=output file] [--sceen_width=width] [--sceen_height=height]\n"
+                "rescan "
+                "[--input_dir=path] "
+                "[--compatible_file=project file] "
+                "[--output_dir=output file] "
+                "[--sceen_width=width] "
+                "[--sceen_height=height]\n"
                 "Options:\n"
                 "\t--input_dir         Resource directory path\n"
+                "\t--compatible_file   Old project file\n"
                 "\t--output_dir        Output directory path\n"
                 "\t--sceen_width       Screen width\n"
                 "\t--sceen_height      Screen Height\n"
@@ -32,27 +38,24 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        FilePath input_dir(L"RES");
-        std::string output_dir("bt_watch.ui");
-        int width = 466;
-        int height = 466;
+        FilePath input_dir(L"454x454");
+        bool compatible = true; // cmdline->HasSwitch("compatible_file");
+        int  width  = 466;
+        int  height = 466;
+        bool okay;
 
         if (cmdline->HasSwitch("input_dir")) {
             input_dir.clear();
             input_dir = cmdline->GetSwitchValuePath("input_dir");
         }
         if (cmdline->HasSwitch("output_dir")) {
-            FilePath dir = cmdline->GetSwitchValuePath(output_dir);
+            FilePath dir = cmdline->GetSwitchValuePath("output_dir");
             if (!file_util::PathExists(dir)) {
                 if (!file_util::CreateDirectory(dir)) {
                     DLOG(ERROR) << "Failed to create directory: " << dir.value();
                     return false;
                 }
             }
-
-            output_dir.clear();
-            output_dir.append(cmdline->GetSwitchValueASCII("output_dir"))
-                      .append("\\").append("bt_watch.ui");
         }
         if (cmdline->HasSwitch("sceen_width")) {
             std::string str = cmdline->GetSwitchValueASCII("sceen_width");
@@ -64,10 +67,21 @@ int main(int argc, char* argv[]) {
         }
 
         scoped_refptr<app::ResourceScan> scanner = new app::ResourceScan();
-        if (scanner->Scan(input_dir)) {
+        if (scanner->ScanResource(input_dir, compatible)) {
             scoped_refptr<app::UIEditorProject> ui = new app::UIEditorProject(scanner.get(), input_dir);
-            ui->SetSceenSize(width, height);
-            ui->GenerateXMLDoc(output_dir);
+            if (compatible) {
+                if (!ui->SetCompatibleFile(cmdline->GetSwitchValuePath("compatible_file"))) {
+                    DLOG(ERROR) << "Invalid compatible file!";
+                    return -1;
+                }
+                
+                okay = ui->GenerateXMLDoc(
+                    input_dir.Append(FilePath::StringType(L"bt_watch_new.ui")).AsUTF8Unsafe().c_str());
+            } else {
+                ui->SetSceenSize(width, height);
+                okay = ui->GenerateXMLDoc("bt_watch_new.ui");
+            }
+            return okay ? 0 : -1;
         }
     }
 

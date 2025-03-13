@@ -62,7 +62,7 @@ public:
     }
     ~ResourceScan();
 
-    bool Scan(const FilePath& dir);
+    bool ScanResource(const FilePath& dir, bool compatible);
     template<typename Function>
     void ForeachView(base::Callback<Function>& callback) const {
         for (const auto iter : views_)
@@ -73,6 +73,7 @@ public:
     }
 
 private:
+    bool Scan(const FilePath& dir);
     void ForeachViewPicture(const ViewResource* view,
         base::Callback<void(scoped_refptr<Picture>)>& callback);
     bool CheckPath(const FilePath& dir);

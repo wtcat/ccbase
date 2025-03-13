@@ -26,9 +26,14 @@ public:
     ~UIEditorProject() = default;
 
     void SetSceenSize(int w, int h);
+    bool SetCompatibleFile(const FilePath& file);
     bool GenerateXMLDoc(const std::string& filename);
 
 private:
+    bool compatible() const {
+        return compatible_old_;
+    }
+
     void AddProperty(xml::XMLElement* parent, const char* name, const char* value);
     void AddPictureItem(xml::XMLElement* parent, const char* name, const char* value);
     void AddStringItem(xml::XMLElement* parent, const char* value);
@@ -46,6 +51,7 @@ private:
     void AddPictureHeader(xml::XMLElement* parent, const std::string& name, int width, int height);
     void AddResources(xml::XMLElement* parent);
     void AddGenerateOption(xml::XMLElement* parent);
+    void AppendResource(xml::XMLElement* parent);
 
     void SceneCallback(xml::XMLElement* parent, const scoped_refptr<ResourceScan::ViewResource> view);
     void ResourceCallback(xml::XMLElement* parent, std::vector<const StringResource*> *svec, 
@@ -55,6 +61,7 @@ private:
     const char* GetRelativePath(const FilePath& path);
     const char* AddCount(int &left, int right);
     const char* ToHexString(int value);
+    xml::XMLElement* FindChild(xml::XMLElement* parent, const char *elem);
 
 private:
     xml::XMLDocument doc_;
@@ -66,12 +73,15 @@ private:
     std::string res_path_;
     std::string rel_path_;
     std::string res_name_;
+    xml::XMLElement* compatible_root_node_;
+    xml::XMLElement* compatible_lastscene_node_;
+    xml::XMLElement* compatible_resource_node_;
     char screen_width_[8];
     char screen_height_[8];
     int scene_idc_;
     int string_idc_;
     int layer_idc_;
-
+    bool compatible_old_;
 };
 
 

@@ -16,6 +16,10 @@
 #include "application/rescan/rescan.h"
 #include "application/rescan/xml_generator.h"
 
+#define PICTURE_PERFIX "PIC_"
+#define GROUP_PREFIX   "GRP_"
+#define SCENE_PREFIX   "SCENE__"
+
 namespace app {
     
 static bool filename_number_compare(const FilePath& l,
@@ -32,10 +36,14 @@ UIEditorProject::UIEditorProject(const ResourceScan* rescan, const FilePath& rep
     rescan_ptr_(rescan),
     current_view_(nullptr),
     resource_path_(repath),
+    compatible_root_node_(nullptr),
+    compatible_lastscene_node_(nullptr),
+    compatible_resource_node_(nullptr),
     screen_width_("0x0"),
     screen_height_("0x0"),
     scene_idc_(0x0),
-    string_idc_(0x10000) {
+    string_idc_(0x10000),
+    compatible_old_(false) {
     FilePath abs_path(repath);
 
     file_util::AbsolutePath(&abs_path);
@@ -54,26 +62,34 @@ inline const std::string &UIEditorProject::GetResourceName(const char* prefix,
 }
 
 bool UIEditorProject::GenerateXMLDoc(const std::string& filename) {
-    //Create XML declare
-    xml::XMLDeclaration* declare = doc_.NewDeclaration(
-        "xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\"");
-    doc_.InsertFirstChild(declare);
+    if (!compatible()) {
+        //Create XML declare
+        xml::XMLDeclaration* declare = doc_.NewDeclaration(
+            "xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\"");
+        doc_.InsertFirstChild(declare);
 
-    //Create root node
-    xml::XMLElement* root = doc_.NewElement("ui-rad");
-    doc_.InsertEndChild(root);
+        //Create root node
+        xml::XMLElement* root = doc_.NewElement("ui-rad");
+        doc_.InsertEndChild(root);
 
-    //Add global property 
-    AddProjectProperty(root);
+        //Add global property 
+        AddProjectProperty(root);
 
-    //Add scenes
-    AddScenes(root);
+        //Add scenes
+        AddScenes(root);
 
-    //Add resource list
-    AddResources(root);
+        //Add resource list
+        AddResources(root);
 
-    //Add generate options
-    AddGenerateOption(root);
+        //Add generate options
+        AddGenerateOption(root);
+    } else {
+        //Add new scene
+        AddScenes(compatible_root_node_);
+        
+        //Append resource
+        AppendResource(compatible_resource_node_);
+    }
 
     //Save doc
     if (doc_.SaveFile(filename.c_str()) == xml::XML_SUCCESS) {
@@ -82,6 +98,31 @@ bool UIEditorProject::GenerateXMLDoc(const std::string& filename) {
     }
 
     DLOG(ERROR) << "Generate XML failed!\n";
+    return false;
+}
+
+bool UIEditorProject::SetCompatibleFile(const FilePath& file) {
+    if (file_util::PathExists(file)) {
+        //Parse UI-Eidtor project file
+        if (doc_.LoadFile(file.AsUTF8Unsafe().c_str()) == xml::XML_SUCCESS) {
+            compatible_root_node_ = doc_.RootElement();
+            if (compatible_root_node_ == nullptr)
+                return false;
+
+            //Find resource and config node
+            compatible_resource_node_ = FindChild(compatible_root_node_, "resource");
+            if (compatible_resource_node_ == nullptr)
+                return false;
+
+            //Get last scene node
+            compatible_lastscene_node_ = compatible_resource_node_->PreviousSiblingElement("scene");
+            if (compatible_lastscene_node_ == nullptr)
+                return false;
+
+            compatible_old_ = true;
+            return true;
+        }
+    }
     return false;
 }
 
@@ -110,13 +151,17 @@ void UIEditorProject::AddTextItem(xml::XMLElement* parent, const char* value) {
     parent->InsertEndChild(text);
 }
 
+//Add picture to resource list
 void UIEditorProject::AddPictureItem(xml::XMLElement* parent, const char* name, 
     const char* value) {
     xml::XMLElement* picture = doc_.NewElement("picture");
     picture->SetAttribute("value", name);
     if (value != nullptr)
         picture->SetAttribute("LayerID", value);
-    parent->InsertEndChild(picture);
+    if (!compatible())
+        parent->InsertEndChild(picture);
+    else
+        parent->InsertFirstChild(picture);
 }
 
 void UIEditorProject::AddProjectProperty(xml::XMLElement* root) {
@@ -164,15 +209,18 @@ void UIEditorProject::AddScene(xml::XMLElement* root, const ResourceScan::ViewRe
     scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
     //Create scene node
     xml::XMLElement* scene = doc_.NewElement("scene");
-    root->InsertEndChild(scene);
+    if (compatible())
+        root->InsertAfterChild(compatible_lastscene_node_, scene);
+    else
+        root->InsertEndChild(scene);
 
     //Set current view pointer
     current_view_ = view;
 
     //Add scene header
     char* name = buffer.get();
-    strcpy(name, "SCENE_");
-    name += 6;
+    strcpy(name, SCENE_PREFIX);
+    name += sizeof(SCENE_PREFIX) - 1;
     StringToUpper(view->name.c_str(), name, BUFFER_SIZE);
     name[view->name.size()] = '\0';
     AddSceneHeader(scene, buffer.get());
@@ -237,7 +285,7 @@ void UIEditorProject::AddScenePicture(xml::XMLElement* parent,
 
     //Add picture property
     std::string file_name = picture->path.BaseName().RemoveExtension().AsUTF8Unsafe();
-    AddPictureHeader(rpic, GetResourceName("PIC_", file_name),
+    AddPictureHeader(rpic, GetResourceName(PICTURE_PERFIX, file_name),
         picture->width, picture->height);
 
     //Add picture path information
@@ -282,7 +330,7 @@ void UIEditorProject::AddPictureRegion(xml::XMLElement* parent,
         parent->InsertEndChild(rgrp);
 
         //Add picture common property
-        AddPictureHeader(rgrp, GetResourceName("GRP_", picgrp->name),
+        AddPictureHeader(rgrp, GetResourceName(GROUP_PREFIX, picgrp->name),
             picgrp->pictures[0]->width,
             picgrp->pictures[0]->height);
 
@@ -377,6 +425,33 @@ void UIEditorProject::AddGenerateOption(xml::XMLElement* parent) {
     AddProperty(config, "splitResSize", "10");
 }
 
+void UIEditorProject::AppendResource(xml::XMLElement* parent) {
+    //Prepend picture resource
+    //Append string resource
+    std::vector<const StringResource*> str_vector;
+    str_vector.reserve(50);
+
+    //Calculator first layout ID
+    layer_idc_ = 1;
+    for (xml::XMLElement* node = parent->FirstChildElement();
+        node != nullptr;
+        node = node->NextSiblingElement()) {
+        if (!strcmp(node->Name(), "txt"))
+            break;
+        layer_idc_++;
+    }
+
+    //Add all picture resource
+    rescan_ptr_->ForeachView(
+        base::Bind(&UIEditorProject::ResourceCallback, this, parent, &str_vector));
+
+    //Add string resource
+    for (auto& svec : str_vector) {
+        for (auto& iter : *svec)
+            AddStringItem(parent, iter.c_str());
+    }
+}
+
 void UIEditorProject::SceneCallback(xml::XMLElement* parent, 
     const scoped_refptr<ResourceScan::ViewResource> view) {
     AddScene(parent, view.get());
@@ -387,18 +462,19 @@ void UIEditorProject::ResourceCallback(xml::XMLElement* parent,
     const scoped_refptr<ResourceScan::ViewResource> view) {
     ResourceScan::ViewResource* viewp = view.get();
 
+    //Add all pictures to resource list
     for (auto grp_iter : viewp->groups) {
         for (auto iter : grp_iter->pictures) {
             AddPictureItem(parent, GetRelativePath(iter->path), 
                 AddCount(layer_idc_, 1));
         }
     }
-
     for (auto iter : viewp->pictures) {
         AddPictureItem(parent, GetRelativePath(iter->path),
             AddCount(layer_idc_, 1));
     }
 
+    //Collect strings
     svec->push_back(&viewp->strings);
 }
 
@@ -424,6 +500,17 @@ const char* UIEditorProject::GetRelativePath(const FilePath& path) {
     if (*cpath == '/' || *cpath == '\\')
         *--cpath = '.';
     return cpath;
+}
+
+xml::XMLElement* UIEditorProject::FindChild(xml::XMLElement* parent, 
+    const char* elem) {
+    for (xml::XMLElement* node = parent->FirstChildElement(); 
+        node != nullptr;
+        node = node->NextSiblingElement()) {
+        if (!strcmp(node->Name(), elem))
+            return node;
+    }
+    return nullptr;
 }
 
 } //namespace app
