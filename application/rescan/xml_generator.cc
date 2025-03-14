@@ -36,6 +36,7 @@ UIEditorProject::UIEditorProject(const ResourceScan* rescan, const FilePath& rep
     rescan_ptr_(rescan),
     current_view_(nullptr),
     resource_path_(repath),
+    resource_output_path_(L"..\\output"),
     compatible_root_node_(nullptr),
     compatible_lastscene_node_(nullptr),
     compatible_resource_node_(nullptr),
@@ -59,6 +60,11 @@ inline const std::string &UIEditorProject::GetResourceName(const char* prefix,
                     .append(current_view_->name)
                     .append("_")
                     .append(name);
+}
+
+void UIEditorProject::SetResourceOutputPath(const FilePath& opath) {
+    resource_output_path_.clear();
+    resource_output_path_ = opath;
 }
 
 bool UIEditorProject::GenerateXMLDoc(const std::string& filename) {
@@ -166,6 +172,11 @@ void UIEditorProject::AddPictureItem(xml::XMLElement* parent, const char* name,
 
 void UIEditorProject::AddProjectProperty(xml::XMLElement* root) {
 #define _PATH_PREIFX(x) "..\\output\\" x
+    //auto _PATH_PREIFX = [&](const char *path) -> const char* {
+    //    return resource_output_path_.Append(FilePath::FromUTF8Unsafe(path))
+    //        .AsUTF8Unsafe().c_str();
+    //};
+
     AddProperty(root, "prj_name", "bt_watch");
     AddProperty(root, "prj_language", "0x0");
     AddProperty(root, "prj_screen_width", screen_width_);
@@ -179,9 +190,9 @@ void UIEditorProject::AddProjectProperty(xml::XMLElement* root) {
     AddProperty(root, "prj_build_res_type", "0x1");
     AddProperty(root, "prj_build_res_mode", "0x0");
     
-    std::string rpath(resource_path_.AsUTF8Unsafe());
-    AddProperty(root, "prj_case_path", rpath.c_str());
-    AddProperty(root, "prj_sdk_path", rpath.c_str());
+    const char *rel_path = GetRelativePath(FilePath::FromUTF8Unsafe(resource_abspath_));
+    AddProperty(root, "prj_case_path", rel_path);
+    AddProperty(root, "prj_sdk_path", rel_path);
 
     AddProperty(root, "desktop_file_create", "0x0");
     AddProperty(root, "desktop_file_path", "");
@@ -383,7 +394,7 @@ void UIEditorProject::AddResources(xml::XMLElement* parent) {
         base::Bind(&UIEditorProject::ResourceCallback, this, resource, &str_vector));
 
     //Add text file
-    AddTextItem(resource, rescan_ptr_->GetStringFile().AsUTF8Unsafe().c_str());
+    AddTextItem(resource, GetRelativePath(rescan_ptr_->GetStringFile()));
 
     //Add string resource
     for (auto &svec : str_vector) {
@@ -494,9 +505,11 @@ const char* UIEditorProject::GetRelativePath(const FilePath& path) {
     rel_path_.clear();
     rel_path_.append(path.AsUTF8Unsafe());
 
+    if (rel_path_.size() == resource_abspath_.size())
+        return ".\\";
+
     char* cpath = rel_path_.data();
     cpath += resource_abspath_.size();
-
     if (*cpath == '/' || *cpath == '\\')
         *--cpath = '.';
     return cpath;

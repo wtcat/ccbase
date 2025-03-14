@@ -26,6 +26,7 @@ public:
     ~UIEditorProject() = default;
 
     void SetSceenSize(int w, int h);
+    void SetResourceOutputPath(const FilePath& opath);
     bool SetCompatibleFile(const FilePath& file);
     bool GenerateXMLDoc(const std::string& filename);
 
@@ -68,6 +69,7 @@ private:
     const ResourceScan* rescan_ptr_;
     const ResourceScan::ViewResource* current_view_;
     FilePath resource_path_;
+    FilePath resource_output_path_;
     std::string resource_abspath_;
     std::string res_file_;
     std::string res_path_;

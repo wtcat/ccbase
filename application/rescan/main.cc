@@ -38,8 +38,8 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        FilePath input_dir(L"454x454");
-        bool compatible = true; // cmdline->HasSwitch("compatible_file");
+        FilePath input_dir(L"TemplateNew");
+        bool compatible = cmdline->HasSwitch("compatible_file");
         int  width  = 466;
         int  height = 466;
         bool okay;
@@ -48,15 +48,7 @@ int main(int argc, char* argv[]) {
             input_dir.clear();
             input_dir = cmdline->GetSwitchValuePath("input_dir");
         }
-        if (cmdline->HasSwitch("output_dir")) {
-            FilePath dir = cmdline->GetSwitchValuePath("output_dir");
-            if (!file_util::PathExists(dir)) {
-                if (!file_util::CreateDirectory(dir)) {
-                    DLOG(ERROR) << "Failed to create directory: " << dir.value();
-                    return false;
-                }
-            }
-        }
+
         if (cmdline->HasSwitch("sceen_width")) {
             std::string str = cmdline->GetSwitchValueASCII("sceen_width");
             width = std::strtol(str.c_str(), NULL, 10);
@@ -74,13 +66,23 @@ int main(int argc, char* argv[]) {
                     DLOG(ERROR) << "Invalid compatible file!";
                     return -1;
                 }
-                
-                okay = ui->GenerateXMLDoc(
-                    input_dir.Append(FilePath::StringType(L"bt_watch_new.ui")).AsUTF8Unsafe().c_str());
             } else {
                 ui->SetSceenSize(width, height);
-                okay = ui->GenerateXMLDoc("bt_watch_new.ui");
+                if (cmdline->HasSwitch("output_dir")) {
+                    FilePath dir = cmdline->GetSwitchValuePath("output_dir");
+                    if (!file_util::PathExists(dir)) {
+                        if (!file_util::CreateDirectory(dir)) {
+                            DLOG(ERROR) << "Failed to create directory: " << dir.value();
+                            return false;
+                        }
+                    }
+                    ui->SetResourceOutputPath(dir);
+                }
             }
+            
+            okay = ui->GenerateXMLDoc(
+                input_dir.Append(FilePath::StringType(L"bt_watch_new.ui")).AsUTF8Unsafe().c_str());
+            
             return okay ? 0 : -1;
         }
     }
