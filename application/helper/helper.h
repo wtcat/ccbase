@@ -10,6 +10,7 @@ namespace app {
 
 size_t StringToLower(const char* instr, char* outstr, size_t maxsize);
 size_t StringToUpper(const char* instr, char* outstr, size_t maxsize);
+size_t StringCopy(char* dst, const char* src, size_t dsize);
 
 } //namespace app
 

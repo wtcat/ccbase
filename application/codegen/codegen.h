@@ -216,10 +216,25 @@ private:
     std::string view_name_;
 };
 
+//Class ViewPresenterBuilder
+class ViewPresenterBuilder : public CodeBuilder {
+public:
+    ViewPresenterBuilder(const FilePath& file, const std::string &view_name)
+        : CodeBuilder(file), name_(view_name) {}
+private:
+    bool CodeWriteHeader(std::string& code) override;
+    bool CodeWriteBody(std::string& code) override;
+    bool CodeWriteFoot(std::string& code) override;
+    DISALLOW_COPY_AND_ASSIGN(ViewPresenterBuilder);
+
+private:
+    std::string name_;
+};
+
 //Class ViewCodeFactory
 class ViewCodeFactory: public base::RefCounted<ViewCodeFactory> {
 public:
-
+    enum { kAppendStringLength = 32 };
     ViewCodeFactory() { 
         builders_.reserve(30); 
     }

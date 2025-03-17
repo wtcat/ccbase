@@ -15,6 +15,48 @@
 
 namespace app {
 
+//Class ViewPresenterBuilder
+bool ViewPresenterBuilder::CodeWriteHeader(std::string& code) {
+    scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
+    snprintf(buffer.get(), BUFFER_SIZE,
+        "/*\n"
+        " * Copyright wtcat 2025\n"
+        " */\n"
+        "\n"
+        "#ifndef %s_presenter_h_\n"
+        "#define %s_presenter_h_\n"
+        "\n"
+        "#ifdef __cplusplus\n"
+        "extern \"C\" {\n"
+        "#endif\n"
+        "\n", name_.c_str(), name_.c_str());
+    code.append(buffer.get());
+    return true;
+}
+
+bool ViewPresenterBuilder::CodeWriteBody(std::string& code) {
+    scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
+    snprintf(buffer.get(), BUFFER_SIZE,
+        "typedef struct {\n"
+        "\t//TODO: implement\n"
+        "}%s_presenter_t\n"
+        "\n", name_.c_str());
+    code.append(buffer.get());
+    return true;
+}
+
+bool ViewPresenterBuilder::CodeWriteFoot(std::string& code) {
+    scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
+    snprintf(buffer.get(), BUFFER_SIZE,
+        "#ifdef __cplusplus\n"
+        "}\n"
+        "#endif\n"
+        "#endif /* %s_presenter_h_ */\n",
+        name_.c_str());
+    code.append(buffer.get());
+    return true;
+}
+
 //Class CMakeBuilder
 bool CMakeBuiler::CodeWriteHeader(std::string& code) {
     code.append(
@@ -95,10 +137,10 @@ bool ViewCodeFactory::GenerateViewCode(const FilePath &in) {
             return false;
     }
 
-    //Generate cmake project file
+    //Create cmake project file
     scoped_refptr<CodeBuilder> cmake(
         new CMakeBuiler(
-            ResourceParser::GetInstance()->GetOutputPath().Append(L"CMakeLists.txt"), 
+            ResourceParser::GetInstance()->GetOutputPath().Append(L"CMakeLists.txt"),
             builders_));
     cmake->GenerateCode();
     
@@ -106,20 +148,26 @@ bool ViewCodeFactory::GenerateViewCode(const FilePath &in) {
 }
 
 void ViewCodeFactory::CallBack(const ResourceParser::ViewData& view) {
-    char name[256];
+    char name[256 + kAppendStringLength];
+    size_t len = StringToLower(view.name.c_str(), name, sizeof(name) - kAppendStringLength);
 
-    size_t len = StringToLower(view.name.c_str(), name, sizeof(name) - 3);
-    name[len]     = '.';
-    name[len + 1] = 'c';
-    name[len + 2] = '\0';
-
+    // View file
     std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+    StringCopy(name + len, ".c", kAppendStringLength);
     FilePath path(ResourceParser::GetInstance()->GetOutputPath()
         .Append(converter.from_bytes(name)));
-
     name[len] = '\0';
     builders_.push_back(
         new ViewCodeBuilder(view, path, name)
+    );
+
+    // Presenter file
+    StringCopy(name + len, "_presenter.h", kAppendStringLength);
+    FilePath hdr_path(ResourceParser::GetInstance()->GetOutputPath()
+        .Append(converter.from_bytes(name)));
+    name[len] = '\0';
+    builders_.push_back(
+        new ViewPresenterBuilder(hdr_path, name)
     );
 }
 
