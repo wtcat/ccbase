@@ -15,6 +15,53 @@
 
 namespace app {
 
+//Class CMakeBuilder
+bool CMakeBuiler::CodeWriteHeader(std::string& code) {
+    code.append(
+        "# UI project files \n\n"
+        "set(SRC_TARGET app)\n"
+    );
+    return true;
+}
+
+bool CMakeBuiler::CodeWriteBody(std::string& code) {
+    //Add include directories
+    AddCMakeOption(code, "target_include_directories",
+        [](CMakeBuiler* cls, std::string& xcode) -> std::string& {
+            return xcode.append("\t${CMAKE_CURRENT_SOURCE_DIR}\n");
+        });
+
+    //Add compile options
+    AddCMakeOption(code, "target_include_directories",
+        [](CMakeBuiler* cls, std::string& xcode) -> std::string& {
+            return xcode.append("\t-Os\n");
+        });
+
+    //Add source files
+    AddCMakeOption(code, "target_sources", 
+        [](CMakeBuiler* cls, std::string& xcode) -> std::string& {
+            for (auto &iter : cls->src_vector_) {
+                xcode.append("\t${CMAKE_CURRENT_SOURCE_DIR}/")
+                    .append(iter->filename().BaseName().AsUTF8Unsafe())
+                    .append("\n");
+            }
+            return xcode;
+        });
+
+    return true;
+}
+
+bool CMakeBuiler::CodeWriteFoot(std::string& code) {
+    return true;
+}
+
+void CMakeBuiler::AddCMakeOption(std::string& code, const char* function, 
+    std::string& (*fill)(CMakeBuiler *cls, std::string& code)) {
+    code.append(function)
+        .append("(${SRC_TARGET}\n\tPRIVATE\n");
+    fill(this, code).append(")\n\n");
+}
+
 //Class ViewCodeFactory
 bool ViewCodeFactory::GenerateViewCode(const FilePath &in) {
     ResourceParser* re_parser = ResourceParser::GetInstance();
@@ -48,6 +95,13 @@ bool ViewCodeFactory::GenerateViewCode(const FilePath &in) {
             return false;
     }
 
+    //Generate cmake project file
+    scoped_refptr<CodeBuilder> cmake(
+        new CMakeBuiler(
+            ResourceParser::GetInstance()->GetOutputPath().Append(L"CMakeLists.txt"), 
+            builders_));
+    cmake->GenerateCode();
+    
     return true;
 }
 

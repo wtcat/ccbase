@@ -64,7 +64,9 @@ public:
         for (const auto &iter : resources_)
             callback.Run(*iter.get(), code);
     }
-    void ForeachViewItem(base::Callback<void(const ViewData&)>& callback) {
+
+    template<typename Function>
+    void ForeachViewItem(base::Callback<Function>& callback) {
         for (const auto& iter : resources_)
             callback.Run(*iter.get());
     }
@@ -129,6 +131,9 @@ public:
             return false;
 
         return file_util::WriteFile(file_, code.c_str(), (int)code.length()) > 0;
+    }
+    const FilePath& filename() const {
+        return file_;
     }
 
 private:
@@ -229,6 +234,24 @@ private:
     void CallBack(const ResourceParser::ViewData& view);
 private:
     std::vector<scoped_refptr<CodeBuilder>> builders_;
+};
+
+//Class cmake builer
+class CMakeBuiler : public CodeBuilder {
+public:
+    CMakeBuiler(const FilePath &file, const std::vector<scoped_refptr<CodeBuilder>>& src)
+        : CodeBuilder(file), src_vector_(src) {}
+
+private:
+    void AddCMakeOption(std::string& code, const char *function, 
+        std::string& (*fill)(CMakeBuiler *cls, std::string& code));
+    bool CodeWriteHeader(std::string& code) override;
+    bool CodeWriteBody(std::string& code) override;
+    bool CodeWriteFoot(std::string& code) override;
+    DISALLOW_COPY_AND_ASSIGN(CMakeBuiler);
+
+private:
+    const std::vector<scoped_refptr<CodeBuilder>>& src_vector_;
 };
 
 
