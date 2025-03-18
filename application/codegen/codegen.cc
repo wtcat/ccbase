@@ -206,6 +206,10 @@ void ViewCodeBuilder::AddEnumList(std::string& code) {
 }
 
 void ViewCodeBuilder::AddHeaderFile(std::string& code) {
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer),
+        "#include \"%s_presenter.h\"\n",
+        view_name_.c_str());
     code.append(
         "/*\n"
         " * Copyright 2025 Code-Generator\n"
@@ -213,8 +217,8 @@ void ViewCodeBuilder::AddHeaderFile(std::string& code) {
         "\n"
         "#include \"ui_template.h\"\n"
         "#include \"app_ui_view.h\"\n"
-        "\n"
     );
+    code.append(buffer).append("\n");
 }
 
 void ViewCodeBuilder::AddPrivateData(std::string& code) {
@@ -245,8 +249,8 @@ void ViewCodeBuilder::AddPrivateData(std::string& code) {
     snprintf(buffer.get(), BUFFER_SIZE,
         "typedef struct {\n"
         "\tlv_obj_t* obj;\n"
-        "\t//...\n"
-        "\t// \n"
+        "\t\n"
+        "\t// Resource objects \n"
         "\t%s\n"
         "\t%s\n"
         "%s"
