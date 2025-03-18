@@ -222,7 +222,7 @@ void ViewCodeBuilder::AddPrivateData(std::string& code) {
     scoped_ptr<char> font(new char[BUFFER_SIZE]);
 
     snprintf(buffer.get(), BUFFER_SIZE,
-        "#define FONT_NAME   \"%s\"\n"
+        "#define FONT_NAME   %s\n"
         "#define PIC_NUMBERS %d\n"
         "#define STR_NUMBERS %d\n"
         "\n",
