@@ -105,7 +105,7 @@ void CMakeBuiler::AddCMakeOption(std::string& code, const char* function,
 }
 
 //Class ViewCodeFactory
-bool ViewCodeFactory::GenerateViewCode(const FilePath &in) {
+bool ViewCodeFactory::GenerateViewCode(const FilePath &in, bool overwrite) {
     ResourceParser* re_parser = ResourceParser::GetInstance();
 
     //Parse resource file
@@ -117,13 +117,13 @@ bool ViewCodeFactory::GenerateViewCode(const FilePath &in) {
     //Create resource code builder
     builders_.push_back(
         new app::ResourceCodeBuilder(
-            re_parser->GetOutputPath().Append(L"ui_template_resource.c"))
+            re_parser->output_path().Append(L"ui_template_resource.c"))
     );
 
     //Create resource id builder
     builders_.push_back(
         new app::ViewIDCodeBuilder(
-            re_parser->GetOutputPath().Append(L"ui_template_ids.h"))
+            re_parser->output_path().Append(L"ui_template_ids.h"))
     );
 
     //Create view template code builder 
@@ -133,16 +133,16 @@ bool ViewCodeFactory::GenerateViewCode(const FilePath &in) {
 
     //Generate all code
     for (auto builder : builders_) {
-        if (!builder->GenerateCode())
+        if (!builder->GenerateCode(overwrite))
             return false;
     }
 
     //Create cmake project file
     scoped_refptr<CodeBuilder> cmake(
         new CMakeBuiler(
-            ResourceParser::GetInstance()->GetOutputPath().Append(L"CMakeLists.txt"),
+            ResourceParser::GetInstance()->output_path().Append(L"CMakeLists.txt"),
             builders_));
-    cmake->GenerateCode();
+    cmake->GenerateCode(overwrite);
     
     return true;
 }
@@ -154,7 +154,7 @@ void ViewCodeFactory::CallBack(const ResourceParser::ViewData& view) {
     // View file
     std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
     StringCopy(name + len, ".c", kAppendStringLength);
-    FilePath path(ResourceParser::GetInstance()->GetOutputPath()
+    FilePath path(ResourceParser::GetInstance()->output_path()
         .Append(converter.from_bytes(name)));
     name[len] = '\0';
     builders_.push_back(
@@ -163,7 +163,7 @@ void ViewCodeFactory::CallBack(const ResourceParser::ViewData& view) {
 
     // Presenter file
     StringCopy(name + len, "_presenter.h", kAppendStringLength);
-    FilePath hdr_path(ResourceParser::GetInstance()->GetOutputPath()
+    FilePath hdr_path(ResourceParser::GetInstance()->output_path()
         .Append(converter.from_bytes(name)));
     name[len] = '\0';
     builders_.push_back(
@@ -172,6 +172,39 @@ void ViewCodeFactory::CallBack(const ResourceParser::ViewData& view) {
 }
 
 //Class ViewCodeBuilder
+void ViewCodeBuilder::AddEnumList(std::string& code) {
+    scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
+
+
+    //Picture index list
+    code.append(
+        "/* Picture index list */\n"
+        "enum picture_index {\n"
+    );
+    for (size_t i = 0, size = view_.pictures.size();
+        i < size; i++) {
+        snprintf(buffer.get(), BUFFER_SIZE,
+            "\tK_%s,\n",
+            view_.pictures[i].name.c_str());
+        code.append(buffer.get());
+    }
+    code.append("};\n\n");
+
+    //String index list
+    code.append(
+        "/* Text index list */\n"
+        "enum text_index {\n"
+    );
+    for (size_t i = 0, size = view_.strings.size();
+        i < size; i++) {
+        snprintf(buffer.get(), BUFFER_SIZE,
+            "\tK_%s,\n",
+            view_.strings[i].name.c_str());
+        code.append(buffer.get());
+    }
+    code.append("};\n\n");
+}
+
 void ViewCodeBuilder::AddHeaderFile(std::string& code) {
     code.append(
         "/*\n"
@@ -186,26 +219,42 @@ void ViewCodeBuilder::AddHeaderFile(std::string& code) {
 
 void ViewCodeBuilder::AddPrivateData(std::string& code) {
     scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
+    scoped_ptr<char> font(new char[BUFFER_SIZE]);
 
     snprintf(buffer.get(), BUFFER_SIZE,
+        "#define FONT_NAME   \"%s\"\n"
         "#define PIC_NUMBERS %d\n"
         "#define STR_NUMBERS %d\n"
         "\n",
-        (uint32_t)view_.pictures.size(), (uint32_t)view_.strings.size());
+        ResourceParser::GetInstance()->default_font().c_str(),
+        (uint32_t)view_.pictures.size(), 
+        (uint32_t)view_.strings.size());
     code.append(buffer.get());
+
+    AddEnumList(code);
+
+    //Generate font member code
+    int offset = 0;
+    for (auto &iter : view_.fonts) {
+        int len = snprintf(font.get() + offset, 
+            (int)BUFFER_SIZE - offset,
+            "\tui_font_t font%d;\n", atoi(iter.value.c_str()));
+        offset += len;
+    }
 
     snprintf(buffer.get(), BUFFER_SIZE,
         "typedef struct {\n"
-        "    lv_obj_t* obj;\n"
-        "    //...\n"
-        "    // \n"
-        "    //ui_font_t font;\n"
-        "    %s\n"
-        "    %s\n"
+        "\tlv_obj_t* obj;\n"
+        "\t//...\n"
+        "\t// \n"
+        "\t%s\n"
+        "\t%s\n"
+        "%s"
         "} %s_t;\n"
         "\n\n",
         view_.pictures.size() > 0? "lv_img_dsc_t res_img[PIC_NUMBERS];": "",
         view_.strings.size() > 0 ? "ui_string_t  res_txt[STR_NUMBERS];" : "",
+        font.get(),
         view_name_.c_str());
     code.append(buffer.get());
 }
@@ -320,62 +369,13 @@ void ViewCodeBuilder::AddResourceCode(std::string& code) {
     code.append(buffer.get());
 
     //Picture resource code
-    int pic_numbers = (int)view_.pictures.size();
-    if (pic_numbers > 0) {
-        code.append(
-            "\t/*\n"
-            "\t * Get picture resources\n"
-            "\t */\n"
-            "\terr = ui_context_get_picture(ctx, priv->res_img, PIC_NUMBERS,\n"
-        );
-
-        for (int i = 0; i < pic_numbers; i++) {
-            snprintf(buffer.get(), BUFFER_SIZE,
-                "\t\t__RE(\"%s\")%s //%d\n",
-                view_.pictures.at(i).name.c_str(),
-                (i < pic_numbers - 1) ? "," : ");",
-                i);
-            code.append(buffer.get());
-        }
-        code.append(
-            "\tif (err)\n"
-            "\t\treturn err;\n"
-            "\n"
-        );
-    }
+    AddPictureCode(code, buffer.get(), BUFFER_SIZE);
 
     // String resource code
-    int str_numbers = (int)view_.strings.size();
-    if (str_numbers > 0) {
-        code.append(
-            "\t/*\n"
-            "\t * Get text resources\n"
-            "\t */\n"
-            "\terr = ui_conext_get_text(ctx, priv->res_txt, STR_NUMBERS,\n"
-        );
-
-        for (int i = 0; i < str_numbers; i++) {
-            snprintf(buffer.get(), BUFFER_SIZE,
-                "\t\t__RE(\"%s\")%s //%d\n",
-                view_.strings.at(i).name.c_str(),
-                (i < str_numbers - 1) ? "," : ");",
-                i);
-            code.append(buffer.get());
-        }
-        code.append(
-            "\tif (err)\n"
-            "\t\treturn err;\n"
-            "\n"
-        );
-    }
+    AddStringCode(code, buffer.get(), BUFFER_SIZE);
 
     // Font resource get code
-    code.append(
-        "\t//err = ui_context_get_font(ctx, DEF_FONTx_FILE, &priv->font);\n"
-        "\t//if (err)\n"
-        "\t\t//return err;\n"
-        "\n"
-    );
+    AddFontCode(code, buffer.get(), BUFFER_SIZE);
 
     // Lvgl widget create code
     snprintf(buffer.get(), BUFFER_SIZE,
@@ -393,6 +393,74 @@ void ViewCodeBuilder::AddResourceCode(std::string& code) {
         "\treturn 0;\n",
         view_name_.c_str());
     code.append(buffer.get());
+}
+
+void ViewCodeBuilder::AddFontCode(std::string& code, char* buf, size_t size) {
+    code.append(
+        "\t/* Get font resource */\n"
+    );
+    for (auto &iter : view_.fonts) {
+        int font_size = atoi(iter.value.c_str());
+        snprintf(buf, size,
+            "\terr = ui_context_get_font(ctx, FONT_NAME, %d, &priv->font%d);\n"
+            "\tif (err)\n"
+            "\t\treturn err;\n"
+            "\n", 
+            font_size, font_size);
+        code.append(buf);
+    }
+}
+
+void ViewCodeBuilder::AddPictureCode(std::string& code, char* buf, size_t size) {
+    int pic_numbers = (int)view_.pictures.size();
+    if (pic_numbers > 0) {
+        code.append(
+            "\t/*\n"
+            "\t * Get picture resources\n"
+            "\t */\n"
+            "\terr = ui_context_get_picture(ctx, priv->res_img, PIC_NUMBERS,\n"
+        );
+
+        for (int i = 0; i < pic_numbers; i++) {
+            snprintf(buf, size,
+                "\t\t__RE(\"%s\")%s //%d\n",
+                view_.pictures.at(i).name.c_str(),
+                (i < pic_numbers - 1) ? "," : ");",
+                i);
+            code.append(buf);
+        }
+        code.append(
+            "\tif (err)\n"
+            "\t\treturn err;\n"
+            "\n"
+        );
+    }
+}
+
+void ViewCodeBuilder::AddStringCode(std::string& code, char* buf, size_t size) {
+    int str_numbers = (int)view_.strings.size();
+    if (str_numbers > 0) {
+        code.append(
+            "\t/*\n"
+            "\t * Get text resources\n"
+            "\t */\n"
+            "\terr = ui_conext_get_text(ctx, priv->res_txt, STR_NUMBERS,\n"
+        );
+
+        for (int i = 0; i < str_numbers; i++) {
+            snprintf(buf, size,
+                "\t\t__RE(\"%s\")%s //%d\n",
+                view_.strings.at(i).name.c_str(),
+                (i < str_numbers - 1) ? "," : ");",
+                i);
+            code.append(buf);
+        }
+        code.append(
+            "\tif (err)\n"
+            "\t\treturn err;\n"
+            "\n"
+        );
+    }
 }
 
 void ViewCodeBuilder::AddExampleCode(std::string& code) {
@@ -436,14 +504,14 @@ bool ViewIDCodeBuilder::CodeWriteFoot(std::string& code) {
 
 bool ViewIDCodeBuilder::CodeWriteBody(std::string& code) {
     ResourceParser* reptr = ResourceParser::GetInstance();
-    size_t count = reptr->GetIdCount();
+    size_t count = reptr->id_count();
     for (size_t i = 0; i < count; i++) {
         char idname[8] = {0};
         itoa((int)i, idname, 10);
         code.append("#define ")
             .append(reptr->GetIdName((int)i))
             .append("  ")
-            .append(itoa((int)i + reptr->GetIdBase(), idname, 10))
+            .append(itoa((int)i + reptr->id_base(), idname, 10))
             .append("\n");
     }
     return true;
@@ -473,7 +541,7 @@ bool ResourceCodeBuilder::CodeWriteHeader(std::string& code) {
 
 bool ResourceCodeBuilder::CodeWriteFoot(std::string& code) {
     scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
-    int id = ResourceParser::GetInstance()->GetIdBase();
+    int id = ResourceParser::GetInstance()->id_base();
 
     snprintf(buffer.get(), BUFFER_SIZE,
         "UI_PUBLIC_API\n"
@@ -481,10 +549,10 @@ bool ResourceCodeBuilder::CodeWriteFoot(std::string& code) {
         "    assert(view_id >= %d);\n"
         "    uint16_t offset = view_id - %d;\n"
         "    if (offset < SDK_RESOURCE_NUM(sdk_resource_table))\n"
-        "        return &sdk_resource_table[view_id];\n"
+        "        return &sdk_resource_table[offset];\n"
         "    return NULL;\n"
         "}\n",
-        ResourceParser::GetInstance()->GetFunctionName().c_str(), 
+        ResourceParser::GetInstance()->function_name().c_str(),
         id, id);
 
     ResourceTableFill(code);
@@ -621,6 +689,9 @@ bool ResourceParser::ParseInput(const FilePath& path) {
 
         //Get all picture groups of the view
         ForeachListValue(dict_value, "groups", view_ptr.get()->picgroups);
+
+        //Get all fonts
+        ForeachListValue(dict_value, "fonts", view_ptr.get()->fonts);
 
         ids_.push_back("uID__" + view_ptr.get()->name);
         resources_.push_back(std::move(view_ptr));

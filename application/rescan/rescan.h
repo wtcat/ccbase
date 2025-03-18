@@ -24,6 +24,11 @@ public:
         LEVEL_MAX
     };
 
+    struct Text : public base::RefCountedThreadSafe<Text> {
+        Text(const char* s) : text(s), font_height(0) {}
+        std::string text;
+        int font_height;
+    };
     struct Picture : public base::RefCountedThreadSafe<Picture> {
         Picture(const FilePath& fpath) : 
             path(fpath), 
@@ -52,7 +57,7 @@ public:
             strings.reserve(10);
         }
         std::string name;
-        std::vector<std::string> strings;
+        std::vector<scoped_refptr<Text>> strings;
         std::vector<scoped_refptr<Picture>> pictures;
         std::vector<scoped_refptr<PictureGroup>> groups;
     };
@@ -73,6 +78,29 @@ public:
     }
 
 private:
+    struct LineParser {
+        LineParser(std::string& text) :
+            line_start(nullptr),
+            line_end(text.data() - 1),
+            end(text.data() + text.size()) {}
+
+        bool ToNextLine() {
+            if (line_end >= end)
+                return false;
+
+            line_start = ++line_end;
+            while (*line_end != '\n' && line_end < end) {
+                if (*line_end == ',' || *line_end == ' ' || *line_end == '\t' || *line_end == '\r')
+                    *line_end = '\0';
+                line_end++;
+            }
+            return true;
+        }
+
+        char* line_start;
+        char* line_end;
+        char* end;
+    };
     bool Scan(const FilePath& dir);
     void ForeachViewPicture(const ViewResource* view,
         base::Callback<void(scoped_refptr<Picture>)>& callback);

@@ -169,33 +169,35 @@ bool ResourceScan::ScanDirectory(const FilePath& dir) {
 bool ResourceScan::LoadString(const FilePath& file) {
     std::string text;
 
+    text.reserve(2048);
     if (!file_util::ReadFileToString(file, &text)) {
         DLOG(ERROR) << "Failed to read string file" << "(" << file.value() << ")\n";
         return false;
     }
 
-    //Parse string ID
-    char* buf  = text.data();
-    size_t len = text.size();
-
-    //Insert terminal char
-    for (size_t i = 0; i < len; i++) {
-        if (buf[i] == ',' || buf[i] == ' ' || buf[i] == '\t' || buf[i] == '\n' || buf[i] == '\r')
-            buf[i] = '\0';
-    }
-
-    for (size_t i = 0; i < len;) {
-        if (buf[i]) {
-            if (buf[i] == 'S') {
-                std::string str(&buf[i]);
-                current_->strings.push_back(str);
-                i += str.size();
+    LineParser parser(text);
+    Text* ptext = nullptr;
+    int line = 0;
+    while (parser.ToNextLine()) {
+        for (const char* p = parser.line_start; p < parser.line_end;) {
+            if (!ptext && *p == 'S') {
+                scoped_refptr<Text> text(new Text(p));
+                current_->strings.push_back(text);
+                ptext = text.get();
+                p += ptext->text.size();
+            } else if (ptext && isdigit((int)*p)) {
+                ptext->font_height = atoi(p);
+                ptext = nullptr;
+                break;
             } else {
-                i++;
+                p++;
             }
-            continue;
         }
-        i++;
+        if (ptext && ptext->font_height == 0) {
+            DLOG(ERROR) << "Failed to parse line: " << line;
+            ptext = nullptr;
+        }
+        line++;
     }
 
     return true;

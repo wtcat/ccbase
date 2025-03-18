@@ -10,6 +10,8 @@
 #include "base/memory/ref_counted.h"
 #include "thirdparty/tinyxml2/tinyxml2.h"
 
+#include "application/rescan/rescan.h"
+
 namespace app {
 
 namespace xml = tinyxml2;
@@ -21,7 +23,7 @@ public:
         BUFFER_SIZE = 256,
         NUM_BUFFER_SIZE = 32
     };
-    using StringResource = std::vector<std::string>;
+    using StringResource = std::vector<scoped_refptr<ResourceScan::Text>>;
     UIEditorProject(const ResourceScan* rescan, const FilePath& repath);
     ~UIEditorProject() = default;
 
@@ -47,7 +49,7 @@ private:
     void AddSceneHeader(xml::XMLElement* parent, const char* scene_name);
     xml::XMLElement* AddSceneResourceGroup(xml::XMLElement* parent);
     void AddScenePicture(xml::XMLElement* parent, const ResourceScan::Picture* picture);
-    void AddSceneString(xml::XMLElement* parent, const std::string& str);
+    void AddSceneString(xml::XMLElement* parent, const ResourceScan::Text* str);
     void AddPictureRegion(xml::XMLElement* parent, const ResourceScan::PictureGroup* picgrp);
     void AddPictureHeader(xml::XMLElement* parent, const std::string& name, int width, int height);
     void AddResources(xml::XMLElement* parent);

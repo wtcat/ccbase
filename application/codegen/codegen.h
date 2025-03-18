@@ -40,6 +40,7 @@ public:
         std::vector<ResourceType> pictures;
         std::vector<ResourceType> strings;
         std::vector<ResourceType> picgroups;
+        std::vector<ResourceType> fonts;
     };
     struct ResourceLess {
         bool operator()(const ResourceType& l, const ResourceType& r) {
@@ -52,10 +53,12 @@ public:
         return &generator;
     }
     bool ParseInput(const FilePath& path);
-    void SetOptions(int id_base, const std::string& rfnname, const FilePath &outpath) {
+    void SetOptions(int id_base, const std::string& rfnname, const FilePath &outpath,
+        const std::string &font) {
         id_base_ = id_base;
         resource_fnname_ = rfnname;
         outpath_ = outpath;
+        default_font_ = font;
     }
 
     template<typename Function>
@@ -79,17 +82,20 @@ public:
         return null_str_;
     }
 
-    size_t GetIdCount() const {
+    size_t id_count() const {
         return ids_.size();
     }
-    int GetIdBase() const {
+    int id_base() const {
         return id_base_;
     }
-    const std::string& GetFunctionName() {
+    const std::string& function_name() {
         return resource_fnname_;
     }
-    const FilePath& GetOutputPath() {
+    const FilePath& output_path() {
         return outpath_;
+    }
+    const std::string& default_font() const {
+        return default_font_;
     }
 
 private:
@@ -103,6 +109,7 @@ private:
     std::vector<std::string> ids_;
     std::string null_str_;
     std::string resource_fnname_;
+    std::string default_font_;
     FilePath outpath_;
     int id_base_;
     DISALLOW_COPY_AND_ASSIGN(ResourceParser);
@@ -114,9 +121,15 @@ public:
     enum { BUFFER_SIZE = 4096 };
     CodeBuilder(const FilePath& file) : file_(file) {}
     virtual ~CodeBuilder() {}
-    bool GenerateCode() {
+    bool GenerateCode(bool overwrite) {
         if (!ResourceParser::GetInstance()->valid())
             return false;
+
+        //Don't overwrite file if it exists
+        if (!overwrite) {
+            if (file_util::PathExists(file_))
+                return true;
+        }
 
         std::string code;
         code.reserve(40960);
@@ -200,12 +213,16 @@ public:
         : CodeBuilder(file), view_(view), view_name_(view_name) {}
 
 private:
+    void AddEnumList(std::string& code);
     void AddHeaderFile(std::string& code);
     void AddPrivateData(std::string& code);
     void AddExampleCode(std::string& code);
     void AddMethod(std::string& code, const char* suffix, 
         const char *args_list, const char* content);
     void AddResourceCode(std::string& code);
+    void AddFontCode(std::string& code, char *buf, size_t size);
+    void AddPictureCode(std::string& code, char* buf, size_t size);
+    void AddStringCode(std::string& code, char* buf, size_t size);
 
     bool CodeWriteHeader(std::string& code) override;
     bool CodeWriteBody(std::string& code) override;
@@ -235,14 +252,15 @@ private:
 class ViewCodeFactory: public base::RefCounted<ViewCodeFactory> {
 public:
     enum { kAppendStringLength = 32 };
-    ViewCodeFactory() { 
+    ViewCodeFactory() {
         builders_.reserve(30); 
     }
     ~ViewCodeFactory() = default;
-    bool GenerateViewCode(const FilePath& in);
+    bool GenerateViewCode(const FilePath& in, bool overwrite = false);
     void SetOptions(int id_base, const std::string &rfnname, 
-        const FilePath &outpath) {
-        ResourceParser::GetInstance()->SetOptions(id_base, rfnname, outpath);
+        const FilePath &outpath, 
+        const std::string &font) {
+        ResourceParser::GetInstance()->SetOptions(id_base, rfnname, outpath, font);
     }
 
 private:

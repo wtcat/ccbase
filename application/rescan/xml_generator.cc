@@ -249,7 +249,7 @@ void UIEditorProject::AddScene(xml::XMLElement* root, const ResourceScan::ViewRe
 
     //Add strings
     for (const auto &iter : view->strings)
-        AddSceneString(group, iter);
+        AddSceneString(group, iter.get());
 }
 
 void UIEditorProject::AddSceneHeader(xml::XMLElement* parent, const char* scene_name) {
@@ -307,13 +307,13 @@ void UIEditorProject::AddScenePicture(xml::XMLElement* parent,
     AddProperty(layer, "0", GetRelativePath(picture->path));
 }
 
-void UIEditorProject::AddSceneString(xml::XMLElement* parent, const std::string& str) {
+void UIEditorProject::AddSceneString(xml::XMLElement* parent, const ResourceScan::Text *str) {
     xml::XMLElement* rstr = doc_.NewElement("element");
     rstr->SetAttribute("class", "string_resource");
     parent->InsertEndChild(rstr);
 
     //Add string property
-    AddProperty(rstr, "name", str.c_str());
+    AddProperty(rstr, "name", str->text.c_str());
     AddProperty(rstr, "id", AddCount(string_idc_, 1));
     AddProperty(rstr, "x", "0x0000");
     AddProperty(rstr, "y", "0x0000");
@@ -324,12 +324,12 @@ void UIEditorProject::AddSceneString(xml::XMLElement* parent, const std::string&
     AddProperty(rstr, "visible", "0x0001");
     AddProperty(rstr, "align", "0x000e");
     AddProperty(rstr, "mode", "0x0002");
-    AddProperty(rstr, "size", ToHexString((int)str.size()));
+    AddProperty(rstr, "size", ToHexString((int)str->font_height));
     AddProperty(rstr, "scroll", "0x0");
     AddProperty(rstr, "direction", "-1");
     AddProperty(rstr, "space", "0x0064");
     AddProperty(rstr, "pixel", "0x0001");
-    AddProperty(rstr, "strid", str.c_str());
+    AddProperty(rstr, "strid", str->text.c_str());
 }
 
 void UIEditorProject::AddPictureRegion(xml::XMLElement* parent, 
@@ -399,7 +399,7 @@ void UIEditorProject::AddResources(xml::XMLElement* parent) {
     //Add string resource
     for (auto &svec : str_vector) {
         for (auto& iter : *svec)
-            AddStringItem(resource, iter.c_str());
+            AddStringItem(resource, iter->text.c_str());
     }
 }
 
@@ -459,7 +459,7 @@ void UIEditorProject::AppendResource(xml::XMLElement* parent) {
     //Add string resource
     for (auto& svec : str_vector) {
         for (auto& iter : *svec)
-            AddStringItem(parent, iter.c_str());
+            AddStringItem(parent, iter->text.c_str());
     }
 }
 
