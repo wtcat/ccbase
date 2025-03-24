@@ -61,32 +61,30 @@ bool ViewPresenterBuilder::CodeWriteFoot(std::string& code) {
 bool CMakeBuiler::CodeWriteHeader(std::string& code) {
     code.append(
         "# UI project files \n\n"
-        "set(SRC_TARGET app)\n"
+        "zephyr_library_named(NewUI)\n"
+        "file(GLOB C_SOURCES \"*.c\")\n\n"
+
     );
     return true;
 }
 
 bool CMakeBuiler::CodeWriteBody(std::string& code) {
     //Add include directories
-    AddCMakeOption(code, "target_include_directories",
+    AddCMakeOption(code, "zephyr_library_include_directories",
         [](CMakeBuiler* cls, std::string& xcode) -> std::string& {
             return xcode.append("\t${CMAKE_CURRENT_SOURCE_DIR}\n");
         });
 
     //Add compile options
-    AddCMakeOption(code, "target_include_directories",
+    AddCMakeOption(code, "zephyr_library_compile_options",
         [](CMakeBuiler* cls, std::string& xcode) -> std::string& {
             return xcode.append("\t-Os\n");
         });
 
     //Add source files
-    AddCMakeOption(code, "target_sources", 
+    AddCMakeOption(code, "zephyr_library_sources",
         [](CMakeBuiler* cls, std::string& xcode) -> std::string& {
-            for (auto &iter : cls->src_vector_) {
-                xcode.append("\t${CMAKE_CURRENT_SOURCE_DIR}/")
-                    .append(iter->filename().BaseName().AsUTF8Unsafe())
-                    .append("\n");
-            }
+            xcode.append("\t${C_SOURCES}\n");
             return xcode;
         });
 
@@ -100,7 +98,7 @@ bool CMakeBuiler::CodeWriteFoot(std::string& code) {
 void CMakeBuiler::AddCMakeOption(std::string& code, const char* function, 
     std::string& (*fill)(CMakeBuiler *cls, std::string& code)) {
     code.append(function)
-        .append("(${SRC_TARGET}\n\tPRIVATE\n");
+        .append("(\n");
     fill(this, code).append(")\n\n");
 }
 
@@ -229,10 +227,12 @@ void ViewCodeBuilder::AddPrivateData(std::string& code) {
         "#define FONT_NAME   %s\n"
         "#define PIC_NUMBERS %d\n"
         "#define STR_NUMBERS %d\n"
+        "#define GRP_NUMBERS %d\n"
         "\n",
         ResourceParser::GetInstance()->default_font().c_str(),
         (uint32_t)view_.pictures.size(), 
-        (uint32_t)view_.strings.size());
+        (uint32_t)view_.strings.size(),
+        (uint32_t)view_.picgroups.size());
     code.append(buffer.get());
 
     AddEnumList(code);
@@ -253,11 +253,13 @@ void ViewCodeBuilder::AddPrivateData(std::string& code) {
         "\t// Resource objects \n"
         "\t%s\n"
         "\t%s\n"
+        "\t%s\n"
         "%s"
         "} %s_t;\n"
         "\n\n",
-        view_.pictures.size() > 0? "lv_img_dsc_t res_img[PIC_NUMBERS];": "",
-        view_.strings.size() > 0 ? "ui_string_t  res_txt[STR_NUMBERS];" : "",
+        view_.pictures.size()?  "lv_img_dsc_t res_img[PIC_NUMBERS];": "",
+        view_.strings.size()?   "ui_string_t res_txt[STR_NUMBERS];" : "",
+        view_.picgroups.size()? "ui_picture_set_t res_anim[GRP_NUMBERS];" : "",
         font.get(),
         view_name_.c_str());
     code.append(buffer.get());
@@ -372,6 +374,9 @@ void ViewCodeBuilder::AddResourceCode(std::string& code) {
         view_name_.c_str());
     code.append(buffer.get());
 
+    //Animation resource code
+    AddGroupCode(code, buffer.get(), BUFFER_SIZE);
+
     //Picture resource code
     AddPictureCode(code, buffer.get(), BUFFER_SIZE);
 
@@ -456,6 +461,32 @@ void ViewCodeBuilder::AddStringCode(std::string& code, char* buf, size_t size) {
                 "\t\t__RE(\"%s\")%s //%d\n",
                 view_.strings.at(i).name.c_str(),
                 (i < str_numbers - 1) ? "," : ");",
+                i);
+            code.append(buf);
+        }
+        code.append(
+            "\tif (err)\n"
+            "\t\treturn err;\n"
+            "\n"
+        );
+    }
+}
+
+void ViewCodeBuilder::AddGroupCode(std::string& code, char* buf, size_t size) {
+    int grp_numbers = (int)view_.picgroups.size();
+    if (grp_numbers > 0) {
+        code.append(
+            "\t/*\n"
+            "\t * Get animation resources\n"
+            "\t */\n"
+            "\terr = ui_context_get_picture_set(ctx, priv->res_anim, GRP_NUMBERS,\n"
+        );
+
+        for (int i = 0; i < grp_numbers; i++) {
+            snprintf(buf, size,
+                "\t\t__RE(\"%s\")%s //%d\n",
+                view_.picgroups.at(i).name.c_str(),
+                (i < grp_numbers - 1) ? "," : ");",
                 i);
             code.append(buf);
         }
@@ -659,12 +690,10 @@ bool ResourceParser::ParseInput(const FilePath& path) {
     //Walk around resource node list
     ids_.reserve(80);
     resources_.reserve(50);
-    for (auto &iter = list_value->begin();
-        iter != list_value->end();
-        ++iter) {
+    for (const auto iter: *list_value) {
         std::unique_ptr<ViewData> view_ptr = std::make_unique<ViewData>();
 
-        if (!(*iter)->GetAsDictionary(&dict_value)) {
+        if (!(iter)->GetAsDictionary(&dict_value)) {
             printf("Invalid \"views\" value\n");
             return false;
         }

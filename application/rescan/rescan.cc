@@ -204,7 +204,7 @@ bool ResourceScan::LoadString(const FilePath& file) {
 }
 
 void ResourceScan::ForeachViewPicture(const ViewResource* view,
-    base::Callback<void(scoped_refptr<Picture>)>& callback) {
+    base::Callback<void(scoped_refptr<Picture>)>&& callback) {
     for (auto iter : view->pictures)
         callback.Run(iter);
 

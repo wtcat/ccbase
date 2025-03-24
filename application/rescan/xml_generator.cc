@@ -313,7 +313,10 @@ void UIEditorProject::AddSceneString(xml::XMLElement* parent, const ResourceScan
     parent->InsertEndChild(rstr);
 
     //Add string property
-    AddProperty(rstr, "name", str->text.c_str());
+    char name[256];
+    snprintf(name, sizeof(name), "%s_%d", 
+        str->text.c_str(), str->font_height);
+    AddProperty(rstr, "name", name);
     AddProperty(rstr, "id", AddCount(string_idc_, 1));
     AddProperty(rstr, "x", "0x0000");
     AddProperty(rstr, "y", "0x0000");

@@ -62,14 +62,14 @@ public:
     }
 
     template<typename Function>
-    void ForeachView(base::Callback<Function> &callback,
+    void ForeachView(base::Callback<Function> &&callback,
         std::string &code) {
         for (const auto &iter : resources_)
             callback.Run(*iter.get(), code);
     }
 
     template<typename Function>
-    void ForeachViewItem(base::Callback<Function>& callback) {
+    void ForeachViewItem(base::Callback<Function>&& callback) {
         for (const auto& iter : resources_)
             callback.Run(*iter.get());
     }
@@ -223,6 +223,7 @@ private:
     void AddFontCode(std::string& code, char *buf, size_t size);
     void AddPictureCode(std::string& code, char* buf, size_t size);
     void AddStringCode(std::string& code, char* buf, size_t size);
+    void AddGroupCode(std::string& code, char* buf, size_t size);
 
     bool CodeWriteHeader(std::string& code) override;
     bool CodeWriteBody(std::string& code) override;
