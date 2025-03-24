@@ -16,10 +16,10 @@
 #include "base/threading/thread.h"
 #include "base/threading/worker_pool.h"
 
-#include "spdlog/spdlog.h"
-#include "spdlog/sinks/basic_file_sink.h"
-
-#include "leveldb/db.h"
+//#include "spdlog/spdlog.h"
+//#include "spdlog/sinks/basic_file_sink.h"
+//
+//#include "leveldb/db.h"
 
 #include <opencv2/opencv.hpp>
 
@@ -27,113 +27,6 @@
 #pragma warning(disable:4251)
 
 //using file_proxy = base::FileUtilProxy;
-
-namespace storage {
-
-template<typename T, int N, typename std::enable_if<N <= 65535, void>::type* = nullptr>
-class StorageList {
-public:
-    using NodeType  = unsigned short;
-    using BitVector = unsigned long;
-    enum {
-        kInvalidNode = (1 << sizeof(NodeType)*8) - 1,
-        kBitmapUnitSize  = sizeof(BitVector) * 8,
-        kBitmapVectorSize = N / kBitmapUnitSize + 1
-    };
-
-    template<typename ValueType>
-    struct Node {
-        ValueType data;
-        NodeType next;
-        NodeType prev;
-
-        Node(): next(kInvalidNode), prev(kInvalidNode) {}
-        const ValueType* value() const {
-            return &data;
-        }
-        ValueType *value() {
-            return &data;
-        }
-    };
-
-    int Allocate() {
-        int node;
-
-        // Allocate node ID from bitmap
-        for (int i = 0; i < kBitmapVectorSize; i++) {
-            BitVector bitmap_mask = bitmap_[i];
-            if (bitmap_mask) {
-                node = ffs(bitmap_mask) - 1;
-
-                /* If the node id large than the max limit then break loop */
-                if (node >= N)
-                    break;
-
-                bitmap_[i] |= 0x1u << node;
-                return node;
-            }
-        }
-
-        // If has no free node, we should use the oldest node
-        node = first_;
-        RemoveInternal(node);
-        assert(node < N);
-        return node;
-    }
-
-    void Append(int node) {
-        Node<T>* pnode = nodes_ + node;
-
-        //If the list is empty
-        if (last_ == kInvalidNode) {
-            first_ = last_ = node;
-            return;
-        }
-
-        //Append to the list tail
-        nodes_[last_].next = node;
-        pnode->prev = last_;
-        pnode->next = kInvalidNode;
-        last_ = node;
-    }
-
-    void Remove(int node) {
-        bitmap_[node / kBitmapUnitSize] &= ~(0x1 << node);
-        RemoveInternal(node);
-    }
-    
-private:
-    void RemoveInternal(int node) {
-        Node<T>* pnode = nodes_ + node;
-
-        // Remove node
-        if (pnode->next != kInvalidNode)
-            nodes_[pnode->next].prev = pnode->prev;
-        if (pnode->prev != kInvalidNode)
-            nodes_[pnode->prev].next = pnode->next;
-
-        // Fix the first and last pointer
-        if (first_ == node)
-            first_ = pnode->next;
-        if (last_ == node)
-            last_ = pnode->prev;
-
-        // Clear node
-        pnode->next = kInvalidNode;
-        pnode->prev = kInvalidNode;
-    }
-
-private:
-    BitVector bitmap_[kBitmapVectorSize] = {0};
-    Node<T>   nodes_[N];
-    NodeType  first_{kInvalidNode};
-    NodeType  last_{kInvalidNode};
-};
-
-
-
-} //namespace storage
-
 
 namespace {
 void Hello() {
@@ -176,51 +69,6 @@ void Timout() {
 
 //std::is_integral<N>::value && 
 
-template<
-    typename K, 
-    typename V, 
-    int N,
-    typename std::enable_if<std::is_integral<K>::value, void>::type* = nullptr>
-class Hash {
-public:
-    enum { HASK_DEPTH = 4 };
-    template<typename Key, typename Value>
-    struct HashNode {
-        Key    key;
-        Value  value;
-        bool   valid;
-    };
-
-    Hash() : hash_mask_(N / HASK_DEPTH - 1) {}
-    int key(K k) const {
-        return (k & hash_mask_) * HASK_DEPTH;
-    }
-    bool Insert(K k, V v) {
-        int index = key(k);
-        for (int i = 0; i < HASK_DEPTH; i++, index++) {
-            if (!hash_nodes_[index].valid) {
-                hash_nodes_[index].key   = k;
-                hash_nodes_[index].value = v;
-                hash_nodes_[index].valid = true;
-                return true;
-            }
-        }
-        return false;
-    }
-    HashNode<K, V> *Find(K k) {
-        int index = key(k);
-        for (int i = 0; i < HASK_DEPTH; i++, index++) {
-            if (hash_nodes_[index].valid && hash_nodes_[index].key == k)
-                return &hash_nodes_[index];
-        }
-        return nullptr;
-    }
-
-private:
-    HashNode<K, V> hash_nodes_[N] = {};
-    const int hash_mask_;
-};
-
 template<typename T, typename std::enable_if<std::is_integral<T>::value, T>::type* = nullptr>
 auto add_general(T a, T b) {
     return a + b;
@@ -229,22 +77,70 @@ auto add_general(T a, T b) {
 constexpr int Return5(int v) { return v; }
 
 
+template<typename... Args>
+constexpr auto AddSum(Args&&... args) {
+    return (args + ...);
+}
+
+template<typename Type, size_t Size>
+class TestContainer {
+public:
+
+    template<typename... Args>
+    constexpr TestContainer(Args... args) : buf_(args...) {}
+
+    class Iterator {
+    public:
+        Iterator(Type* ptr) : ptr_(ptr) {}
+        Type& operator*() const {
+            return *ptr_;
+        }
+        Iterator& operator++() {
+            ++ptr_;
+            return *this;
+        }
+        Iterator& operator++(int) {
+            Iterator temp = *this;
+            ++ptr_;
+            return temp;
+        }
+        bool operator==(const Iterator& iter) {
+            return ptr_ == iter.ptr_;
+        }
+        bool operator!=(const Iterator& iter) {
+            return ptr_ != iter.ptr_;
+        }
+    private:
+        Type* ptr_;
+    };
+
+    Iterator begin() {
+        return Iterator(buf_);
+    }
+    Iterator end() {
+        return Iterator(buf_ + Size);
+    }
+
+    Type& operator[](size_t index) {
+        return buf_[index];
+    }
+
+private:
+    Type buf_[Size];
+};
+
+
 int main(int argc, char* argv[]) {
     base::AtExitManager atexit;
     MessageLoop message_loop;
     base::WorkerPool worker_pool;
-    int key_array[] = { 50, 51, 52, 53, 54, 55, 56, 57, 58, 59,  61, 62, 63, 64, 65, 66 };
-    int val_array[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,  11, 11, 12, 13, 14, 15 };
-    Hash<int, int, 16> hash;
 
-    for (int i = 0; i < 16; i++) {
-        hash.Insert(key_array[i], val_array[i]);
+
+    TestContainer<int, 3> array = { 1, 2, 3 };
+    for (auto iter : array) {
     }
-    for (int i = 0; i < 16; i++) {
-        auto node = hash.Find(key_array[i]);
-        assert(node != nullptr);
-        assert(val_array[i] == node->value);
-    }
+
+    AddSum(1, 2, 3, 4, 5, 6, 7);
 
     //OpenCV
     cv::Mat img = cv::imread("HeartRatepx.png", cv::IMREAD_UNCHANGED);
@@ -252,7 +148,7 @@ int main(int argc, char* argv[]) {
         img.cols,
         img.rows,
         img.channels(),
-        img.elemSize()
+        (int)img.elemSize()
     );
 
     //cv::Mat oimg(img.size(), img.type());
@@ -277,14 +173,13 @@ int main(int argc, char* argv[]) {
 
     //Log
 
-    storage::StorageList<char, 10> list;
 
     base::Callback func_cb = base::Bind(&Return5);
     func_cb.Run(0);
 
     add_general(1, 2);
     // add_general("str", 2);
-
+#if 0
     auto logger = spdlog::basic_logger_mt("F", "logs/basic-log.txt");
     spdlog::set_default_logger(logger);
     spdlog::set_level(spdlog::level::info);
@@ -299,7 +194,7 @@ int main(int argc, char* argv[]) {
         return -1;
     db->Put(leveldb::WriteOptions(), leveldb::Slice("hello"), leveldb::Slice("Everyone"));
     delete db;
-
+#endif
 
     base::Thread runner("runner-1");
     runner.Start();
