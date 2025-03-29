@@ -179,7 +179,7 @@ public:
 
     ResourceCodeBuilder(const FilePath& file) : 
         CodeBuilder(file), view_ids_(0) {
-        nodes_.reserve(50);
+        nodes_.reserve(1024);
     }
     ~ResourceCodeBuilder() = default;
 

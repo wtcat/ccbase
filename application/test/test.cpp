@@ -1,5 +1,8 @@
 ﻿
 #include <assert.h>
+#include <stdlib.h>
+
+#include <memory>
 #include <iostream>
 #include <type_traits>
 
@@ -77,11 +80,14 @@ auto add_general(T a, T b) {
 constexpr int Return5(int v) { return v; }
 
 
+//Variable argument...
 template<typename... Args>
 constexpr auto AddSum(Args&&... args) {
     return (args + ...);
 }
 
+
+//Iterator implemention
 template<typename Type, size_t Size>
 class TestContainer {
 public:
@@ -130,11 +136,52 @@ private:
 };
 
 
+//Memory allocator implemention
+
+template<typename T>
+class TestAllocator {
+public:
+    using value_type = T;
+    using size_type = size_t;
+    using difference = std::ptrdiff_t;
+
+    //template<typename U>
+    //struct rebind {
+    //    typedef TestAllocator<U> other;
+    //};
+
+    TestAllocator() = default;
+    TestAllocator(const TestAllocator&) = default;
+
+    T* allocate(size_type size) noexcept {
+        return static_cast<T*>(malloc(sizeof(T) * size));
+    }
+
+    void deallocate(T* p, size_type) noexcept {
+        free((void *)p);
+    }
+
+    size_type max_size() const {
+        return std::numeric_limits<size_type>::max();
+    }
+
+    template<typename U>
+    bool operator==(const TestAllocator<U>& other) const {
+        return *this == other;
+    }
+};
+
+
+
 int main(int argc, char* argv[]) {
     base::AtExitManager atexit;
     MessageLoop message_loop;
     base::WorkerPool worker_pool;
 
+
+    //std::vector<int, TestAllocator<int>> vec;
+    //for (int i = 0; i < 30; i++)
+    //    vec.push_back(i);
 
     TestContainer<int, 3> array = { 1, 2, 3 };
     for (auto iter : array) {
