@@ -28,6 +28,7 @@ int main(int argc, char* argv[]) {
                 "[--input_file = filename] "
                 "[--output_dir = output path] "
                 "[--defaut_fontfile = fontfile] "
+                "[--resource_namespace = namespace] "
                 "[--overwrite]\n"
                 "Options:\n"
                 "  --view_base          The base ID for views. (default: 0)\n"
@@ -35,53 +36,56 @@ int main(int argc, char* argv[]) {
                 "  --input_file         The resource information file. (default: re_output.json)\n"
                 "  --output_dir         The output directory\n"
                 "  --defaut_fontfile    The default font file\n"
-                "  --overwrite          Overwrite files that has exists"
+                "  --resource_namespace Current resource namespace\n"
+                "  --overwrite          Overwrite files that has exists\n"
             );
             return 0;
         }
 
         scoped_refptr<app::ViewCodeFactory> factory(new app::ViewCodeFactory);
+        scoped_ptr<app::ResourceParser::ResourceOptions> option(new app::ResourceParser::ResourceOptions);
         FilePath file(L"re_output.json");
-        FilePath outpath(L".");
-        std::string rfnname("_sdk_view_get_resource");
-        std::string default_font("font");
-        int view_base = 0;
         bool overwrite;
-
-        if (cmdline->HasSwitch("view_base"))
-            view_base = std::stoi(cmdline->GetSwitchValueASCII("view_base"));
 
         if (cmdline->HasSwitch("input_file")) {
             file.clear();
             file = cmdline->GetSwitchValuePath("input_file");
         }
 
-        if (cmdline->HasSwitch("resource_fnname")) {
-            rfnname.clear();
-            rfnname = cmdline->GetSwitchValueASCII("resource_fnname");
-        }
+        if (cmdline->HasSwitch("view_base"))
+            option->id_base = std::stoi(cmdline->GetSwitchValueASCII("view_base"));
 
-        if (cmdline->HasSwitch("output_dir")) {
-            outpath.clear();
-            outpath = cmdline->GetSwitchValuePath("output_dir");
-        }
+        if (cmdline->HasSwitch("resource_fnname"))
+            option->resource_fnname = cmdline->GetSwitchValueASCII("resource_fnname");
+        else
+            option->resource_fnname = "_sdk_view_get_resource";
 
-        if (cmdline->HasSwitch("defaut_fontfile")) {
-            default_font.clear();
-            default_font = cmdline->GetSwitchValueASCII("defaut_fontfile");
-        }
+        if (cmdline->HasSwitch("resource_namespace"))
+            option->resource_namespace = cmdline->GetSwitchValueASCII("resource_namespace");
+        else
+            option->resource_namespace = "general";
+        
+        if (cmdline->HasSwitch("output_dir"))
+            option->outpath = cmdline->GetSwitchValuePath("output_dir");
+        else
+            option->outpath = FilePath(L".");
+
+        if (cmdline->HasSwitch("defaut_fontfile"))
+            option->default_font = cmdline->GetSwitchValueASCII("defaut_fontfile");
+        else
+            option->default_font = "font";
 
         overwrite = cmdline->HasSwitch("overwrite");
 
-        if (!file_util::PathExists(outpath)) {
-            if (!file_util::CreateDirectory(outpath)) {
-                DLOG(ERROR) << "Failed to create directory: " << outpath.value();
+        if (!file_util::PathExists(option->outpath)) {
+            if (!file_util::CreateDirectory(option->outpath)) {
+                DLOG(ERROR) << "Failed to create directory: " << option->outpath.value();
                 return false;
             }
         }
         
         //Inject generate options
-        factory->SetOptions(view_base, rfnname, outpath, default_font);
+        factory->SetOptions(std::move(option));
 
         //Generate template code
         if (!factory->GenerateViewCode(file, overwrite)) {

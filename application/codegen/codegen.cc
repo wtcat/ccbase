@@ -284,7 +284,7 @@ bool ViewCodeBuilder::CodeWriteFoot(std::string& code) {
         "    .on_destroy       = %s_destroy,\n"
         "    .on_key           = %s_key,\n"
         "    .user_size        = sizeof(%s_t),\n"
-        "    VIEW_PRIV(\"general\") //TODO: Maybe it needs to change\n"
+        "    VIEW_PRIV(\"%s\") //TODO: Maybe it needs to change\n"
         "};\n",
         pname,
         pname,
@@ -292,7 +292,8 @@ bool ViewCodeBuilder::CodeWriteFoot(std::string& code) {
         pname,
         pname,
         pname,
-        pname);
+        pname, 
+        ResourceParser::GetInstance()->resource_namespace().c_str());
     code.append(buffer.get());
 
     char idbuf[256];

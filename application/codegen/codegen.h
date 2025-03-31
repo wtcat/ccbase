@@ -22,6 +22,15 @@ namespace app {
 // Class ResourceParser
 class ResourceParser {
 public:
+    struct ResourceOptions {
+        ResourceOptions() : id_base(0) {}
+        std::string resource_fnname;
+        std::string resource_namespace;
+        std::string default_font;
+        FilePath    outpath;
+        int         id_base;
+    };
+
     struct ResourceType {
         ResourceType(size_t namelen, size_t valuelen) {
             name.reserve(namelen);
@@ -34,6 +43,7 @@ public:
         std::string name;
         std::string value;
     };
+
     struct ViewData {
         std::string name;
         std::string value;
@@ -42,6 +52,7 @@ public:
         std::vector<ResourceType> picgroups;
         std::vector<ResourceType> fonts;
     };
+
     struct ResourceLess {
         bool operator()(const ResourceType& l, const ResourceType& r) {
             return atoi(l.value.c_str()) < atoi(r.value.c_str());
@@ -53,12 +64,8 @@ public:
         return &generator;
     }
     bool ParseInput(const FilePath& path);
-    void SetOptions(int id_base, const std::string& rfnname, const FilePath &outpath,
-        const std::string &font) {
-        id_base_ = id_base;
-        resource_fnname_ = rfnname;
-        outpath_ = outpath;
-        default_font_ = font;
+    void SetOptions(scoped_ptr<ResourceOptions> &&option) {
+        options_ = option;
     }
 
     template<typename Function>
@@ -86,20 +93,23 @@ public:
         return ids_.size();
     }
     int id_base() const {
-        return id_base_;
+        return options_->id_base;
     }
     const std::string& function_name() {
-        return resource_fnname_;
+        return options_->resource_fnname;
     }
     const FilePath& output_path() {
-        return outpath_;
+        return options_->outpath;
     }
     const std::string& default_font() const {
-        return default_font_;
+        return options_->default_font;
+    }
+    const std::string& resource_namespace() const {
+        return options_->resource_namespace;
     }
 
 private:
-    ResourceParser() : id_base_(0) {}
+    ResourceParser() = default;
     bool ForeachListValue(const base::DictionaryValue* value,
         const std::string& key,
         std::vector<ResourceType>& vector);
@@ -108,10 +118,7 @@ private:
     std::vector<std::unique_ptr<ViewData>> resources_;
     std::vector<std::string> ids_;
     std::string null_str_;
-    std::string resource_fnname_;
-    std::string default_font_;
-    FilePath outpath_;
-    int id_base_;
+    scoped_ptr<ResourceOptions> options_;
     DISALLOW_COPY_AND_ASSIGN(ResourceParser);
 };
 
@@ -258,10 +265,9 @@ public:
     }
     ~ViewCodeFactory() = default;
     bool GenerateViewCode(const FilePath& in, bool overwrite = false);
-    void SetOptions(int id_base, const std::string &rfnname, 
-        const FilePath &outpath, 
-        const std::string &font) {
-        ResourceParser::GetInstance()->SetOptions(id_base, rfnname, outpath, font);
+    void SetOptions(scoped_ptr<ResourceParser::ResourceOptions>&& option) {
+        ResourceParser::GetInstance()->SetOptions(
+            std::forward<scoped_ptr<ResourceParser::ResourceOptions>>(option));
     }
 
 private:
