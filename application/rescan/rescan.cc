@@ -12,6 +12,7 @@
 
 #include <opencv2/opencv.hpp>
 #include "application/rescan/rescan.h"
+#include "application/helper/helper.h"
 
 
 namespace app {
@@ -150,7 +151,7 @@ bool ResourceScan::ScanDirectory(const FilePath& dir) {
                         current_group_->pictures.push_back(new Picture(filepath));
                 } else if (entry.path().filename().string() == "@STR.txt") {
                     //Load and parse string from text file
-                    LoadString(filepath);
+                    ParserString(filepath);
                 }
             } else {
                 DCHECK(current_ != nullptr);
@@ -166,38 +167,44 @@ bool ResourceScan::ScanDirectory(const FilePath& dir) {
     return true;
 }
 
-bool ResourceScan::LoadString(const FilePath& file) {
-    std::string text;
+bool ResourceScan::ParserString(const FilePath& file) {
+    enum { BUFFER_SIZE = 1024 };
+    TextLineReader text_lines(file);
+    scoped_ptr<char> line_buffer(new char[BUFFER_SIZE]);
 
-    text.reserve(2048);
-    if (!file_util::ReadFileToString(file, &text)) {
-        DLOG(ERROR) << "Failed to read string file" << "(" << file.value() << ")\n";
-        return false;
-    }
+    for (size_t n = 0; n < text_lines.size(); n++) {
+        const char* src = text_lines[n];
+        const char *pstr = strstr(src, "STR_");
+        bool okay = false;
+        if (pstr != nullptr) {
+            StringCopy(line_buffer.get(), src, BUFFER_SIZE);
+            char* str = line_buffer.get() + (pstr - src);
+            char* p = str + 4;
 
-    LineParser parser(text);
-    Text* ptext = nullptr;
-    int line = 0;
-    while (parser.ToNextLine()) {
-        for (const char* p = parser.line_start; p < parser.line_end;) {
-            if (!ptext && *p == 'S') {
-                scoped_refptr<Text> text(new Text(p));
-                current_->strings.push_back(text);
-                ptext = text.get();
-                p += ptext->text.size();
-            } else if (ptext && isdigit((int)*p)) {
-                ptext->font_height = atoi(p);
-                ptext = nullptr;
-                break;
-            } else {
+            while (*p != '\0') {
+                if (*p == ',' || isspace(*p)) {
+                    *p = '\0';
+                    p++;
+                    break;
+                }
                 p++;
             }
+            while (*p != '\0') {
+                if (isdigit((int)*p)) {
+                    scoped_refptr<Text> text(new Text(str));
+                    text.get()->font_height = atoi(p);
+                    current_->strings.push_back(text);
+                    okay = true;
+                    break;
+                }
+                p++;
+            }
+
+            if (!okay) {
+                printf("Failed to parser file(%s) content(%s)\n", file.AsUTF8Unsafe().c_str(), src);
+                return false;
+            }
         }
-        if (ptext && ptext->font_height == 0) {
-            DLOG(ERROR) << "Failed to parse line: " << line;
-            ptext = nullptr;
-        }
-        line++;
     }
 
     return true;
