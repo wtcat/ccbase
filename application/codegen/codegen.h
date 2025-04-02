@@ -13,6 +13,7 @@
 #include "base/file_util.h"
 #include "base/callback.h"
 #include "base/memory/scoped_ptr.h"
+#include "base/memory/ref_counted.h"
 #include "base/json/json_file_value_serializer.h"
 
 #include "application/helper/helper.h"
@@ -27,6 +28,8 @@ public:
         std::string resource_fnname;
         std::string resource_namespace;
         std::string default_font;
+        std::string ui_ids_filename;
+        std::string ui_res_filename;
         FilePath    outpath;
         int         id_base;
     };
@@ -107,6 +110,12 @@ public:
     const std::string& resource_namespace() const {
         return options_->resource_namespace;
     }
+    const std::string& ids_filename() const {
+        return options_->ui_ids_filename;
+    }
+    const std::string& res_filename() const {
+        return options_->ui_res_filename;
+    }
 
 private:
     ResourceParser() = default;
@@ -123,7 +132,7 @@ private:
 };
 
 // Class CodeBuilder
-class CodeBuilder: public base::RefCounted<CodeBuilder> {
+class CodeBuilder: public base::RefCountedThreadSafe<CodeBuilder> {
 public:
     enum { BUFFER_SIZE = 4096 };
     CodeBuilder(const FilePath& file) : file_(file) {}

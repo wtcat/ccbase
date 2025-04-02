@@ -11,9 +11,25 @@
 #include "base/file_util.h"
 #include "base/bind.h"
 #include "base/memory/scoped_ptr.h"
+#include "base/threading/simple_thread.h"
+
 #include "application/codegen/codegen.h"
 
 namespace app {
+
+class GenerateWork : public base::DelegateSimpleThread::Delegate {
+public:
+    GenerateWork(scoped_refptr<app::CodeBuilder>& builder, bool overwrite) 
+        : builder_(builder), overwrite_(overwrite) {}
+    ~GenerateWork() = default;
+    void Run() OVERRIDE {
+        builder_->GenerateCode(overwrite_);
+        delete this;
+    }
+private:
+    scoped_refptr<app::CodeBuilder> builder_;
+    bool overwrite_;
+};
 
 //Class ViewPresenterBuilder
 bool ViewPresenterBuilder::CodeWriteHeader(std::string& code) {
@@ -115,13 +131,17 @@ bool ViewCodeFactory::GenerateViewCode(const FilePath &in, bool overwrite) {
     //Create resource code builder
     builders_.push_back(
         new app::ResourceCodeBuilder(
-            re_parser->output_path().Append(L"ui_template_resource.c"))
+            re_parser->output_path().Append(
+                FilePath::FromUTF8Unsafe(re_parser->res_filename()))
+        )
     );
 
     //Create resource id builder
     builders_.push_back(
         new app::ViewIDCodeBuilder(
-            re_parser->output_path().Append(L"ui_template_ids.h"))
+            re_parser->output_path().Append(
+                FilePath::FromUTF8Unsafe(re_parser->ids_filename()))
+        )
     );
 
     //Create view template code builder 
@@ -130,17 +150,20 @@ bool ViewCodeFactory::GenerateViewCode(const FilePath &in, bool overwrite) {
     );
 
     //Generate all code
-    for (auto builder : builders_) {
-        if (!builder->GenerateCode(overwrite))
-            return false;
-    }
-
+    base::DelegateSimpleThreadPool thread_pool("codegen", 4);
+    for (auto builder : builders_)
+        thread_pool.AddWork(new GenerateWork(builder, overwrite));
+    thread_pool.Start();
+    
     //Create cmake project file
     scoped_refptr<CodeBuilder> cmake(
         new CMakeBuiler(
             ResourceParser::GetInstance()->output_path().Append(L"CMakeLists.txt"),
             builders_));
     cmake->GenerateCode(overwrite);
+
+    //Waiting for worker complete
+    thread_pool.JoinAll();
     
     return true;
 }
