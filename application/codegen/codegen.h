@@ -214,11 +214,23 @@ private:
 // Class ViewIDCodeBuilder
 class ViewIDCodeBuilder : public CodeBuilder {
 public:
-    ViewIDCodeBuilder(const FilePath& file) : CodeBuilder(file) {}
+    enum { 
+        kMaxFileName = 256,
+        kTempBufferSize = 1024
+    };
+    ViewIDCodeBuilder(const FilePath& file);
+    ~ViewIDCodeBuilder() = default;
+
 private:
     bool CodeWriteHeader(std::string& code) override;
     bool CodeWriteBody(std::string& code) override;
     bool CodeWriteFoot(std::string& code) override;
+    const char* guard_name() const {
+        return guard_name_;
+    }
+
+private:
+    char guard_name_[kMaxFileName];
 };
 
 //Class ViewCodeBuiler

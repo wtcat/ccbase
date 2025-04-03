@@ -31,6 +31,7 @@ private:
     bool overwrite_;
 };
 
+
 //Class ViewPresenterBuilder
 bool ViewPresenterBuilder::CodeWriteHeader(std::string& code) {
     scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
@@ -72,6 +73,7 @@ bool ViewPresenterBuilder::CodeWriteFoot(std::string& code) {
     code.append(buffer.get());
     return true;
 }
+
 
 //Class CMakeBuilder
 bool CMakeBuiler::CodeWriteHeader(std::string& code) {
@@ -117,6 +119,7 @@ void CMakeBuiler::AddCMakeOption(std::string& code, const char* function,
         .append("(\n");
     fill(this, code).append(")\n\n");
 }
+
 
 //Class ViewCodeFactory
 bool ViewCodeFactory::GenerateViewCode(const FilePath &in, bool overwrite) {
@@ -191,6 +194,7 @@ void ViewCodeFactory::CallBack(const ResourceParser::ViewData& view) {
         new ViewPresenterBuilder(hdr_path, name)
     );
 }
+
 
 //Class ViewCodeBuilder
 void ViewCodeBuilder::AddEnumList(std::string& code) {
@@ -544,20 +548,38 @@ void ViewCodeBuilder::AddExampleCode(std::string& code) {
     code.append(buffer.get());
 }
 
+
 //Class ViewIDCodeBuilder
+ViewIDCodeBuilder::ViewIDCodeBuilder(const FilePath& file) : 
+    CodeBuilder(file) {
+    std::string org_name(file.BaseName().RemoveExtension().AsUTF8Unsafe());
+    StringCopy(guard_name_, org_name.c_str(), kMaxFileName);
+}
+
 bool ViewIDCodeBuilder::CodeWriteHeader(std::string& code) {
+    scoped_ptr<char> buffer(new char[kTempBufferSize]);
     code.append(
         "/*\n"
         " * Copyright 2025 wtcat (Don't edit it)\n"
         " */\n"
-        "#ifndef UI_TEMPLATE_IDS_H_\n"
-        "#define UI_TEMPLATE_IDS_H_\n\n"
     );
+    snprintf(buffer.get(), kTempBufferSize,
+        "#ifndef %s__h_\n"
+        "#define %s__h_\n\n",
+        guard_name(),
+        guard_name()
+    );
+    code.append(buffer.get());
     return true;
 }
 
 bool ViewIDCodeBuilder::CodeWriteFoot(std::string& code) {
-    code.append("\n#endif /* UI_TEMPLATE_IDS_H_ */\n");
+    scoped_ptr<char> buffer(new char[kTempBufferSize]);
+    snprintf(buffer.get(), kTempBufferSize,
+        "\n#endif /* %s__h_ */\n",
+        guard_name()
+    );
+    code.append(buffer.get());
     return true;
 }
 
@@ -575,6 +597,7 @@ bool ViewIDCodeBuilder::CodeWriteBody(std::string& code) {
     }
     return true;
 }
+
 
 //Class ResourceCodeBuilder
 bool ResourceCodeBuilder::CodeWriteHeader(std::string& code) {
@@ -669,6 +692,7 @@ void ResourceCodeBuilder::ResourceTableFill(std::string& code) {
     //Append resource table foot
     code.append("};\n\n\n");
 }
+
 
 //Class ResourceParser
 bool ResourceParser::ParseInput(const FilePath& path) {
