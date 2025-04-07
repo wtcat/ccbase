@@ -24,12 +24,14 @@ int main(int argc, char* argv[]) {
             printf(
                 "rescan "
                 "[--input_dir=path] "
+                "[--new_entry=name] "
                 "[--compatible_file=project file] "
                 "[--output_dir=output file] "
                 "[--sceen_width=width] "
                 "[--sceen_height=height]\n"
                 "Options:\n"
                 "\t--input_dir         Resource directory path\n"
+                "\t--new_entry         New resource directory name\n"
                 "\t--compatible_file   Old project file\n"
                 "\t--output_dir        Output directory path\n"
                 "\t--sceen_width       Screen width\n"
@@ -39,6 +41,7 @@ int main(int argc, char* argv[]) {
         }
 
         FilePath input_dir(L"TemplateNew");
+        FilePath::StringType entry(L"@new");
         bool compatible = cmdline->HasSwitch("compatible_file");
         int  width  = 466;
         int  height = 466;
@@ -53,13 +56,19 @@ int main(int argc, char* argv[]) {
             std::string str = cmdline->GetSwitchValueASCII("sceen_width");
             width = std::strtol(str.c_str(), NULL, 10);
         }
+
         if (cmdline->HasSwitch("sceen_height")) {
             std::string str = cmdline->GetSwitchValueASCII("sceen_height");
             height = std::strtol(str.c_str(), NULL, 10);
         }
 
+        if (cmdline->HasSwitch("new_entry")) {
+            entry.clear();
+            entry = cmdline->GetSwitchValueNative("new_entry");
+        }
+
         scoped_refptr<app::ResourceScan> scanner = new app::ResourceScan();
-        if (scanner->ScanResource(input_dir, compatible)) {
+        if (scanner->ScanResource(input_dir, entry, compatible)) {
             scoped_refptr<app::UIEditorProject> ui = new app::UIEditorProject(scanner.get(), input_dir);
             if (compatible) {
                 if (!ui->SetCompatibleFile(cmdline->GetSwitchValuePath("compatible_file"))) {

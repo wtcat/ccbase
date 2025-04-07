@@ -45,7 +45,7 @@ bool ResourceScan::IsPicture(const std::string& extname) {
     return extname == ".jpg" || extname == ".png" || extname == ".bmp";
 }
 
-bool ResourceScan::ScanResource(const FilePath& dir, bool compatible) {
+bool ResourceScan::ScanResource(const FilePath& dir, const FilePath::StringType &name, bool compatible) {
     FilePath path(dir);
 
     if (!file_util::AbsolutePath(&path)) {
@@ -55,7 +55,7 @@ bool ResourceScan::ScanResource(const FilePath& dir, bool compatible) {
 
     //Find '@new' directory when in compatible mode 
     if (compatible)
-        return Scan(path.Append(FilePath::StringType(L"@new")));
+        return Scan(path.Append(name));
 
     return Scan(path);
 }

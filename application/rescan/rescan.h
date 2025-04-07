@@ -156,7 +156,7 @@ public:
     }
     ~ResourceScan();
 
-    bool ScanResource(const FilePath& dir, bool compatible);
+    bool ScanResource(const FilePath& dir, const FilePath::StringType &name, bool compatible);
     template<typename Function>
     void ForeachView(base::Callback<Function>&& callback) const {
         for (const auto iter : views_)
