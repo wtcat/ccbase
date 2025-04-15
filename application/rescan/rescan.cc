@@ -180,19 +180,43 @@ bool ResourceScan::ParserString(const FilePath& file) {
             StringCopy(line_buffer.get(), src, BUFFER_SIZE);
             char* str = line_buffer.get() + (pstr - src);
             char* p = str + 4;
+            char* alias = nullptr;
 
+            //Get string name
             while (*p != '\0') {
                 if (*p == ',' || isspace(*p)) {
                     *p = '\0';
                     p++;
                     break;
                 }
+                if (*p == '@') {
+                    *p++ = '\0';
+                    alias = p;
+                    break;
+                }
                 p++;
             }
+
+            //Get text alias 
+            if (alias) {
+                char* p_alias = alias;
+                while (*p_alias != '\0') {
+                    if (*p_alias == ',' || isspace(*p_alias)) {
+                        *p_alias++ = '\0';
+                        p = p_alias;
+                        break;
+                    }
+                    p_alias++;
+                }
+            }
+
+            //Get font height
             while (*p != '\0') {
                 if (isdigit((int)*p)) {
                     scoped_refptr<Text> text(new Text(str));
                     text.get()->font_height = atoi(p);
+                    if (alias != nullptr)
+                        text.get()->alias.append(alias);
                     current_->strings.push_back(text);
                     okay = true;
                     break;

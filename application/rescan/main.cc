@@ -10,7 +10,7 @@
 #include "base/memory/scoped_ptr.h"
 
 #include "application/rescan/rescan.h"
-#include "application/rescan/xml_generator.h"
+#include "application/rescan/doc_generator.h"
 
 
 int main(int argc, char* argv[]) {
@@ -77,21 +77,25 @@ int main(int argc, char* argv[]) {
                 }
             } else {
                 ui->SetSceenSize(width, height);
-                if (cmdline->HasSwitch("output_dir")) {
-                    FilePath dir = cmdline->GetSwitchValuePath("output_dir");
-                    if (!file_util::PathExists(dir)) {
-                        if (!file_util::CreateDirectory(dir)) {
-                            DLOG(ERROR) << "Failed to create directory: " << dir.value();
-                            return false;
-                        }
-                    }
-                    ui->SetResourceOutputPath(dir);
-                }
             }
-            
+
+            if (cmdline->HasSwitch("output_dir")) {
+                FilePath dir = cmdline->GetSwitchValuePath("output_dir");
+                if (!file_util::PathExists(dir)) {
+                    if (!file_util::CreateDirectory(dir)) {
+                        DLOG(ERROR) << "Failed to create directory: " << dir.value();
+                        return false;
+                    }
+                }
+                ui->SetResourceOutputPath(dir);
+            } else {
+                ui->SetResourceOutputPath(FilePath(L"."));
+            }
+
+            ui->GenerateJsonDoc(*scanner.get(), FilePath(L"re_output_new.json"));
             okay = ui->GenerateXMLDoc(
                 input_dir.Append(FilePath::StringType(L"bt_watch_new.ui")).AsUTF8Unsafe().c_str());
-            
+
             return okay ? 0 : -1;
         }
     }

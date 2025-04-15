@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
         }
 
         scoped_refptr<app::ViewCodeFactory> factory(new app::ViewCodeFactory);
-        scoped_ptr<app::ResourceParser::ResourceOptions> option(new app::ResourceParser::ResourceOptions);
+        scoped_refptr<app::ResourceParser::ResourceOptions> option(new app::ResourceParser::ResourceOptions);
         FilePath file(L"re_output.json");
         bool overwrite;
 
@@ -99,7 +99,7 @@ int main(int argc, char* argv[]) {
         }
         
         //Inject generate options
-        factory->SetOptions(std::move(option));
+        factory->SetOptions(option);
 
         //Generate template code
         if (!factory->GenerateViewCode(file, overwrite)) {

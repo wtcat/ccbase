@@ -9,6 +9,7 @@
 #include <string>
 
 #include "base/file_path.h"
+#include "base/file_util.h"
 #include "base/callback.h"
 #include "base/memory/ref_counted.h"
 
@@ -116,6 +117,7 @@ public:
     struct Text : public base::RefCountedThreadSafe<Text> {
         Text(const char* s) : text(s), font_height(0) {}
         std::string text;
+        std::string alias;
         int font_height;
     };
     struct Picture : public base::RefCountedThreadSafe<Picture> {

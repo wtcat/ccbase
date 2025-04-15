@@ -4,7 +4,7 @@ set(TARGET_NAME rescan)
 add_executable(${TARGET_NAME}
     main.cc
     rescan.cc
-    xml_generator.cc
+    doc_generator.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/../helper/helper.cc
 )
 

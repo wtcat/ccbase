@@ -23,8 +23,9 @@ namespace app {
 // Class ResourceParser
 class ResourceParser {
 public:
-    struct ResourceOptions {
+    struct ResourceOptions: public base::RefCounted<ResourceOptions> {
         ResourceOptions() : id_base(0) {}
+        ~ResourceOptions()  {}
         std::string resource_fnname;
         std::string resource_namespace;
         std::string default_font;
@@ -47,13 +48,25 @@ public:
         std::string value;
     };
 
+    struct TextResourceType : public ResourceType {
+        TextResourceType(size_t namelen, size_t valuelen) :
+            ResourceType(namelen, valuelen) {
+            alias.reserve(namelen);
+        }
+        void Clear() {
+            alias.clear();
+            ResourceType::Clear();
+        }
+        std::string alias;
+    };
+
     struct ViewData {
         std::string name;
         std::string value;
         std::vector<ResourceType> pictures;
-        std::vector<ResourceType> strings;
         std::vector<ResourceType> picgroups;
         std::vector<ResourceType> fonts;
+        std::vector<TextResourceType> strings;
     };
 
     struct ResourceLess {
@@ -67,7 +80,7 @@ public:
         return &generator;
     }
     bool ParseInput(const FilePath& path);
-    void SetOptions(scoped_ptr<ResourceOptions> &&option) {
+    void SetOptions(scoped_refptr<ResourceParser::ResourceOptions>& option) {
         options_ = option;
     }
 
@@ -123,11 +136,31 @@ private:
         const std::string& key,
         std::vector<ResourceType>& vector);
 
+    template<typename Function>
+    bool ForeachListTemplate(const base::DictionaryValue* value,
+        const std::string& key, Function&& process) {
+        const base::ListValue* list_value;
+        if (!value->GetList(key, &list_value))
+            return false;
+
+        for (auto iter = list_value->begin();
+            iter != list_value->end(); ++iter) {
+            const base::DictionaryValue* dict_value;
+            if (!(*iter)->GetAsDictionary(&dict_value)) {
+                printf("Invalid \"views\" value\n");
+                return false;
+            }
+            if (!process(dict_value))
+                return false;
+        }
+        return true;
+    }
+
 private:
     std::vector<std::unique_ptr<ViewData>> resources_;
     std::vector<std::string> ids_;
     std::string null_str_;
-    scoped_ptr<ResourceOptions> options_;
+    scoped_refptr<ResourceOptions> options_;
     DISALLOW_COPY_AND_ASSIGN(ResourceParser);
 };
 
@@ -142,10 +175,10 @@ public:
             return false;
 
         //Don't overwrite file if it exists
-        if (!overwrite) {
-            if (file_util::PathExists(file_))
-                return true;
-        }
+        //if (!overwrite) {
+        //    if (file_util::PathExists(file_))
+        //        return true;
+        //}
 
         std::string code;
         code.reserve(40960);
@@ -286,9 +319,8 @@ public:
     }
     ~ViewCodeFactory() = default;
     bool GenerateViewCode(const FilePath& in, bool overwrite = false);
-    void SetOptions(scoped_ptr<ResourceParser::ResourceOptions>&& option) {
-        ResourceParser::GetInstance()->SetOptions(
-            std::forward<scoped_ptr<ResourceParser::ResourceOptions>>(option));
+    void SetOptions(scoped_refptr<ResourceParser::ResourceOptions> &option) {
+        ResourceParser::GetInstance()->SetOptions(option);
     }
 
 private:

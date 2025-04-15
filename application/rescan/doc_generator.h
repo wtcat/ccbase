@@ -12,6 +12,10 @@
 
 #include "application/rescan/rescan.h"
 
+namespace base {
+    class Value;
+} //namespace base
+
 namespace app {
 
 namespace xml = tinyxml2;
@@ -31,6 +35,7 @@ public:
     void SetResourceOutputPath(const FilePath& opath);
     bool SetCompatibleFile(const FilePath& file);
     bool GenerateXMLDoc(const std::string& filename);
+    bool GenerateJsonDoc(const ResourceScan& re, const FilePath& path);
 
 private:
     bool compatible() const {
@@ -65,6 +70,12 @@ private:
     const char* AddCount(int &left, int right);
     const char* ToHexString(int value);
     xml::XMLElement* FindChild(xml::XMLElement* parent, const char *elem);
+
+    //For json generator
+    void ViewCallback(base::Value* parent, std::string* buffer,
+        const scoped_refptr<ResourceScan::ViewResource> view);
+    size_t NormalizeFileName(const std::string& name, char* buffer, size_t maxsize);
+    uint32_t NameHash(const unsigned char* key, unsigned int len);
 
 private:
     xml::XMLDocument doc_;

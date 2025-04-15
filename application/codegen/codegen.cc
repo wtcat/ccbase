@@ -220,11 +220,14 @@ void ViewCodeBuilder::AddEnumList(std::string& code) {
         "/* Text index list */\n"
         "enum text_index {\n"
     );
-    for (size_t i = 0, size = view_.strings.size();
-        i < size; i++) {
-        snprintf(buffer.get(), BUFFER_SIZE,
-            "\tK_%s,\n",
-            view_.strings[i].name.c_str());
+    for (const auto& iter : view_.strings) {
+        if (iter.alias.size() > 0) {
+            snprintf(buffer.get(), BUFFER_SIZE, "\tK_%s,\n",
+                iter.alias.c_str());
+        } else {
+            snprintf(buffer.get(), BUFFER_SIZE, "\tK_%s,\n",
+                iter.name.c_str());
+        }
         code.append(buffer.get());
     }
     code.append("};\n\n");
@@ -736,6 +739,7 @@ bool ResourceParser::ParseInput(const FilePath& path) {
     }
 
     //Walk around resource node list
+    TextResourceType text_re(64, 32);
     ids_.reserve(80);
     resources_.reserve(50);
     for (const auto iter: *list_value) {
@@ -764,7 +768,20 @@ bool ResourceParser::ParseInput(const FilePath& path) {
             view_ptr.get()->pictures.end(), ResourceLess());
 
         //Get all strings of the view
-        ForeachListValue(dict_value, "strings", view_ptr.get()->strings);
+        ForeachListTemplate(dict_value, "strings", [&](const base::DictionaryValue* dict_value)->bool {
+            text_re.Clear();
+            if (!dict_value->GetString("name", &text_re.name)) {
+                printf("Not found key: \"name\"\n");
+                return false;
+            }
+            if (!dict_value->GetString("value", &text_re.value)) {
+                printf("Not found key: \"value\"\n");
+                return false;
+            }
+            dict_value->GetString("alias", &text_re.alias);
+            view_ptr.get()->strings.push_back(text_re);
+            return true;
+            });
         std::sort(view_ptr.get()->strings.begin(),
             view_ptr.get()->strings.end(), ResourceLess());
 
@@ -782,34 +799,23 @@ bool ResourceParser::ParseInput(const FilePath& path) {
 }
 
 bool ResourceParser::ForeachListValue(const base::DictionaryValue* value,
-    const std::string& key,
-    std::vector<ResourceType>& vector) {
-    const base::ListValue* list_value;
-    if (!value->GetList(key, &list_value))
-        return false;
+    const std::string& key, std::vector<ResourceType>& vector) {
+    ResourceType re(64, 32);
 
-    //Walk around resource node list
-    ResourceType resource(64, 32);
-    for (auto iter = list_value->begin();
-        iter != list_value->end();
-        ++iter) {
-        const base::DictionaryValue* dict_value;
-        if (!(*iter)->GetAsDictionary(&dict_value)) {
-            printf("Invalid \"views\" value\n");
-            return false;
-        }
-
-        resource.Clear();
-        if (!dict_value->GetString("name", &resource.name)) {
+    return ForeachListTemplate(value, key, [&](const base::DictionaryValue* dict_value)->bool {
+        re.Clear();
+        if (!dict_value->GetString("name", &re.name)) {
             printf("Not found key: \"name\"\n");
             return false;
         }
-        if (!dict_value->GetString("value", &resource.value)) {
+        if (!dict_value->GetString("value", &re.value)) {
             printf("Not found key: \"value\"\n");
             return false;
         }
-        vector.push_back(resource);
-    }
+        vector.push_back(re);
+        return true;
+        });
+
     return true;
 }
 

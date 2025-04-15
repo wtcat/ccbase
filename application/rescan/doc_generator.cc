@@ -5,16 +5,18 @@
 #include <stdlib.h>
 #include <string>
 #include <algorithm>
+#include <set>
 
 #include "base/logging.h"
 #include "base/file_path.h"
 #include "base/file_util.h"
 #include "base/bind.h"
 #include "base/memory/scoped_ptr.h"
+#include "base/json/json_file_value_serializer.h"
 
 #include "application/helper/helper.h"
 #include "application/rescan/rescan.h"
-#include "application/rescan/xml_generator.h"
+#include "application/rescan/doc_generator.h"
 
 #define PICTURE_PERFIX "PIC_"
 #define GROUP_PREFIX   "GRP_"
@@ -527,6 +529,141 @@ xml::XMLElement* UIEditorProject::FindChild(xml::XMLElement* parent,
             return node;
     }
     return nullptr;
+}
+
+//
+// Json Doc generator
+//
+bool UIEditorProject::GenerateJsonDoc(const ResourceScan& re, const FilePath& path) {
+    JSONFileValueSerializer json(resource_output_path_.Append(path));
+    scoped_ptr<base::DictionaryValue> root(new base::DictionaryValue);
+    base::ListValue* views = new base::ListValue;
+    std::string buffer;
+
+    buffer.reserve(512);
+    root->SetString("signature", "ResourceInterface");
+    root->SetWithoutPathExpansion("views", views);
+
+    re.ForeachView(base::Bind(&UIEditorProject::ViewCallback, this, views, &buffer));
+
+    return json.Serialize(*root.get());
+}
+
+void UIEditorProject::ViewCallback(base::Value* parent, std::string* buffer,
+    const scoped_refptr<ResourceScan::ViewResource> view) {
+    base::ListValue* root;
+    if (!parent->GetAsList(&root))
+        return;
+
+    auto addValue = [&](base::DictionaryValue* dict, const char* prefix,
+        const char* name, const char* scene_name) -> void {
+            char value_buffer[64];
+
+            buffer->clear();
+            buffer->append(prefix);
+            if (scene_name != nullptr)
+                buffer->append(scene_name).append("_");
+            if (name != nullptr)
+                buffer->append(name);
+            snprintf(value_buffer, sizeof(value_buffer), "0x%08x",
+                NameHash((unsigned char*)buffer->c_str(), (unsigned int)buffer->size()));
+            dict->SetString("name", *buffer);
+            dict->SetString("value", value_buffer);
+        };
+
+    //Add scene resource
+    char name_buffer[256];
+    char scene_name[128];
+
+    base::DictionaryValue* scene = new base::DictionaryValue;
+    size_t len = StringToUpper(view->name.c_str(), scene_name, sizeof(scene_name));
+    scene_name[len] = '\0';
+    addValue(scene, SCENE_PREFIX, scene_name, nullptr);
+
+    //Add picture group
+    if (view->groups.size() > 0) {
+        base::ListValue* groups = new base::ListValue;
+        scene->SetWithoutPathExpansion("groups", groups);
+        for (auto iter : view->groups) {
+            base::DictionaryValue* group_item = new base::DictionaryValue;
+            groups->Append(group_item);
+            NormalizeFileName(iter->name, name_buffer, sizeof(name_buffer) - 1);
+            addValue(group_item, GROUP_PREFIX, name_buffer, scene_name);
+        }
+    }
+
+    //Add picture resource
+    if (view->pictures.size() > 0) {
+        base::ListValue* pictures = new base::ListValue;
+        scene->SetWithoutPathExpansion("pictures", pictures);
+        for (auto iter : view->pictures) {
+            base::DictionaryValue* picture_item = new base::DictionaryValue;
+            pictures->Append(picture_item);
+            NormalizeFileName(iter->path.BaseName().RemoveExtension().AsUTF8Unsafe(),
+                name_buffer, sizeof(name_buffer) - 1);
+            addValue(picture_item, PICTURE_PERFIX, name_buffer, scene_name);
+        }
+    }
+
+    //Add string resource
+    if (view->strings.size() > 0) {
+        base::ListValue* strings = new base::ListValue;
+        scene->SetWithoutPathExpansion("strings", strings);
+        for (auto iter : view->strings) {
+            base::DictionaryValue* string_item = new base::DictionaryValue;
+            strings->Append(string_item);
+            snprintf(name_buffer, sizeof(name_buffer) - 1, "%s_%d",
+                iter->text.c_str(), iter->font_height);
+            addValue(string_item, name_buffer, nullptr, nullptr);
+            if (iter->alias.size() > 0)
+                string_item->SetString("alias", iter->alias);
+        }
+
+        //Add font resource
+        std::set<int> fonts_set;
+        base::ListValue* fonts = new base::ListValue;
+        scene->SetWithoutPathExpansion("fonts", fonts);
+
+        for (auto iter : view->strings)
+            fonts_set.insert(iter->font_height);
+ 
+        for (auto iter : fonts_set) {
+            base::DictionaryValue* font_item = new base::DictionaryValue;
+            fonts->Append(font_item);
+            snprintf(name_buffer, sizeof(name_buffer) - 1, "FONT_%d", iter);
+            font_item->SetString("name", name_buffer);
+            font_item->SetString("value", itoa(iter, name_buffer, 10));
+        }
+    }
+
+    // Append scene to parent
+    root->Append(scene);
+}
+
+size_t UIEditorProject::NormalizeFileName(const std::string& name,
+    char* buffer, size_t maxsize) {
+    const char* pstr = name.c_str();
+    size_t len = min(maxsize - 1, name.size());
+    size_t i;
+
+    for (i = 0; i < len; i++) {
+        if (pstr[i] == '-')
+            buffer[i] = '_';
+        else
+            buffer[i] = toupper(pstr[i]);
+    }
+    buffer[i] = '\0';
+    return len;
+}
+
+uint32_t UIEditorProject::NameHash(const unsigned char* key, unsigned int len) {
+    uint32_t hash = 0;
+    for (const unsigned char* end = key + len;
+        key < end; key++) {
+        hash *= 16777619;
+        hash ^= (uint32_t)(*key);
+    }
+    return hash;
 }
 
 } //namespace app
