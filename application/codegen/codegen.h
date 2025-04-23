@@ -175,10 +175,10 @@ public:
             return false;
 
         //Don't overwrite file if it exists
-        //if (!overwrite) {
-        //    if (file_util::PathExists(file_))
-        //        return true;
-        //}
+        if (!overwrite) {
+            if (file_util::PathExists(file_))
+                return true;
+        }
 
         std::string code;
         code.reserve(40960);

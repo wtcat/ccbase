@@ -37,6 +37,10 @@ public:
     bool GenerateXMLDoc(const std::string& filename);
     bool GenerateJsonDoc(const ResourceScan& re, const FilePath& path);
 
+    const FilePath& output_path() const {
+        return resource_output_path_;
+    }
+
 private:
     bool compatible() const {
         return compatible_old_;

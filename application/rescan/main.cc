@@ -19,7 +19,6 @@ int main(int argc, char* argv[]) {
     //Parse command line
     if (CommandLine::Init(argc, argv)) {
         CommandLine* cmdline = CommandLine::ForCurrentProcess();
-
         if (cmdline->HasSwitch("help")) {
             printf(
                 "rescan "
@@ -51,17 +50,14 @@ int main(int argc, char* argv[]) {
             input_dir.clear();
             input_dir = cmdline->GetSwitchValuePath("input_dir");
         }
-
         if (cmdline->HasSwitch("sceen_width")) {
             std::string str = cmdline->GetSwitchValueASCII("sceen_width");
             width = std::strtol(str.c_str(), NULL, 10);
         }
-
         if (cmdline->HasSwitch("sceen_height")) {
             std::string str = cmdline->GetSwitchValueASCII("sceen_height");
             height = std::strtol(str.c_str(), NULL, 10);
         }
-
         if (cmdline->HasSwitch("new_entry")) {
             entry.clear();
             entry = cmdline->GetSwitchValueNative("new_entry");
@@ -70,34 +66,42 @@ int main(int argc, char* argv[]) {
         scoped_refptr<app::ResourceScan> scanner = new app::ResourceScan();
         if (scanner->ScanResource(input_dir, entry, compatible)) {
             scoped_refptr<app::UIEditorProject> ui = new app::UIEditorProject(scanner.get(), input_dir);
+            FilePath output_file(L"bt_watch.ui");
             if (compatible) {
-                if (!ui->SetCompatibleFile(cmdline->GetSwitchValuePath("compatible_file"))) {
-                    DLOG(ERROR) << "Invalid compatible file!";
+                output_file.clear();
+                output_file = cmdline->GetSwitchValuePath("compatible_file");
+                if (!ui->SetCompatibleFile(output_file)) {
+                    printf("Invalid compatible file(%s)\n", output_file.AsUTF8Unsafe().c_str());
                     return -1;
                 }
+                ui->SetResourceOutputPath(output_file.DirName());
             } else {
                 ui->SetSceenSize(width, height);
-            }
-
-            if (cmdline->HasSwitch("output_dir")) {
-                FilePath dir = cmdline->GetSwitchValuePath("output_dir");
-                if (!file_util::PathExists(dir)) {
-                    if (!file_util::CreateDirectory(dir)) {
-                        DLOG(ERROR) << "Failed to create directory: " << dir.value();
-                        return false;
+                if (cmdline->HasSwitch("output_dir")) {
+                    FilePath dir = cmdline->GetSwitchValuePath("output_dir");
+                    if (!file_util::PathExists(dir)) {
+                        if (!file_util::CreateDirectory(dir)) {
+                            printf("Failed to create directory: %s\n", dir.AsUTF8Unsafe().c_str());
+                            return false;
+                        }
                     }
+                    ui->SetResourceOutputPath(dir);
+                } else {
+                    ui->SetResourceOutputPath(FilePath(L"."));
                 }
-                ui->SetResourceOutputPath(dir);
-            } else {
-                ui->SetResourceOutputPath(FilePath(L"."));
             }
 
-            ui->GenerateJsonDoc(*scanner.get(), FilePath(L"re_output_new.json"));
-            okay = ui->GenerateXMLDoc(
-                input_dir.Append(FilePath::StringType(L"bt_watch_new.ui")).AsUTF8Unsafe().c_str());
-
-            return okay ? 0 : -1;
+            FilePath json_path(ui->output_path().Append(L"re_doc.json"));
+            if (ui->GenerateJsonDoc(*scanner.get(), json_path)) {
+                printf("Generated json-ui document(%s)\n", json_path.AsUTF8Unsafe().c_str());
+                okay = ui->GenerateXMLDoc(
+                    input_dir.Append(output_file.BaseName().InsertBeforeExtension(L"_autogen")).AsUTF8Unsafe().c_str());
+                return okay ? 0 : -1;
+            }
+            printf("Failed to generate json-ui document\n");
         }
+
+        return -1;
     }
 
     return 0;

@@ -101,11 +101,11 @@ bool UIEditorProject::GenerateXMLDoc(const std::string& filename) {
 
     //Save doc
     if (doc_.SaveFile(filename.c_str()) == xml::XML_SUCCESS) {
-        DLOG(INFO) << "Generate " << filename << "success\n";
+        printf("Generated UI file(%s)\n", filename.c_str());
         return true;
     }
 
-    DLOG(ERROR) << "Generate XML failed!\n";
+    printf("Generate failed!\n");
     return false;
 }
 
@@ -535,7 +535,7 @@ xml::XMLElement* UIEditorProject::FindChild(xml::XMLElement* parent,
 // Json Doc generator
 //
 bool UIEditorProject::GenerateJsonDoc(const ResourceScan& re, const FilePath& path) {
-    JSONFileValueSerializer json(resource_output_path_.Append(path));
+    JSONFileValueSerializer json(path);
     scoped_ptr<base::DictionaryValue> root(new base::DictionaryValue);
     base::ListValue* views = new base::ListValue;
     std::string buffer;

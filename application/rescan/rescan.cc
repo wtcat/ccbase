@@ -49,7 +49,7 @@ bool ResourceScan::ScanResource(const FilePath& dir, const FilePath::StringType 
     FilePath path(dir);
 
     if (!file_util::AbsolutePath(&path)) {
-        DLOG(ERROR) << "Invalid path: " << path.value();
+        printf("Invalid path: %s\n", path.AsUTF8Unsafe().c_str());
         return false;
     }
 
@@ -63,7 +63,7 @@ bool ResourceScan::ScanResource(const FilePath& dir, const FilePath::StringType 
 bool ResourceScan::Scan(const FilePath& path) {
     //Check whether the resource path is valid
     if (!CheckPath(path)) {
-        DLOG(ERROR) << "Invalid resource directory!";
+        printf("Invalid resource directory(%s)\n", path.AsUTF8Unsafe().c_str());
         return false;
     }
 
@@ -156,8 +156,6 @@ bool ResourceScan::ScanDirectory(const FilePath& dir) {
             } else {
                 DCHECK(current_ != nullptr);
             }
-
-            DLOG(INFO) << "Regular file: " << entry.path() << std::endl;
         }
     }
 
