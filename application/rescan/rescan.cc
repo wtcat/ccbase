@@ -130,26 +130,33 @@ bool ResourceScan::ScanDirectory(const FilePath& dir) {
                 return false;
      
         } else if (fs::is_regular_file(entry)) {
-            if (path_depth_ == LEVEL_RESOURCE) {
+            fs::path file_realpath;
 
-                if (entry.path().filename() == "@view")
+            // Get real target path if it is a symbol link
+            if (IsSymbolFile(entry))
+                file_realpath = ReadSymbolPath(entry);
+            else
+                file_realpath = entry.path();
+
+            if (path_depth_ == LEVEL_RESOURCE) {
+                if (file_realpath.filename() == "@view")
                     continue;
 
                 //The string database file 
-                if (entry.path().filename().extension() == ".xls")
-                    string_file_ = FilePath::FromUTF8Unsafe(entry.path().string());
+                if (file_realpath.filename().extension() == ".xls")
+                    string_file_ = FilePath::FromUTF8Unsafe(file_realpath.string());
 
             } else if (path_depth_ >= LEVEL_VIEW) {
                 DCHECK(current_ != nullptr);
-                std::string path_ext = entry.path().filename().extension().string();
-                FilePath filepath = FilePath::FromUTF8Unsafe(entry.path().string());
+                std::string path_ext = file_realpath.filename().extension().string();
+                FilePath filepath = FilePath::FromUTF8Unsafe(file_realpath.string());
 
                 if (IsPicture(path_ext)) {
                     if (path_depth_ == LEVEL_VIEW)
                         current_->pictures.push_back(new Picture(filepath));
                     else
                         current_group_->pictures.push_back(new Picture(filepath));
-                } else if (entry.path().filename().string() == "@STR.txt") {
+                } else if (file_realpath.filename().string() == "@STR.txt") {
                     //Load and parse string from text file
                     ParserString(filepath);
                 }

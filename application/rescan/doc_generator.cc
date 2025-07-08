@@ -507,17 +507,14 @@ const char* UIEditorProject::ToHexString(int value) {
 }
 
 const char* UIEditorProject::GetRelativePath(const FilePath& path) {
+    /* Get relative path */
+    std::filesystem::path relpath(std::filesystem::relative(path.AsUTF8Unsafe(), resource_abspath_));
+
+    /* Copy path to string buffer */
     rel_path_.clear();
-    rel_path_.append(path.AsUTF8Unsafe());
+    rel_path_.append(relpath.string().c_str());
 
-    if (rel_path_.size() == resource_abspath_.size())
-        return ".\\";
-
-    char* cpath = rel_path_.data();
-    cpath += resource_abspath_.size();
-    if (*cpath == '/' || *cpath == '\\')
-        *--cpath = '.';
-    return cpath;
+    return rel_path_.c_str();
 }
 
 xml::XMLElement* UIEditorProject::FindChild(xml::XMLElement* parent, 
