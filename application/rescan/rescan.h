@@ -39,6 +39,11 @@ public:
     }
 
 private:
+    static inline int IsSpace(int c) {
+        return c == ' ' || c == '\t' || c == '\n' || c == '\r' ||
+            c == '\f' || c == '\v';
+    }
+
     void Parse(std::string& text) {
         char* start = text.data();
         char* end = start + text.size();
@@ -62,8 +67,11 @@ private:
 
             // Look for a comment
             char* comment = strchr(marker, '#');
-            if (comment != NULL) {
-                *comment = '\0';
+            if (comment != nullptr) {
+                do {
+                    *comment++ = ' ';
+                } while (*comment != '\0');
+
                 if (*marker == '\0') {
                     while (*marker == '\0' && marker < end) marker++;
                     marker += strlen(marker);
@@ -75,14 +83,14 @@ private:
                 size_t length = strlen(marker);
                 size_t skip = length;
 
-                while (*marker != '\0' && isspace(*marker))
+                while (*marker != '\0' && IsSpace(*marker))
                     memmove(marker, marker + 1, length--);
                 if (*marker == '\0')
                     continue;
 
                 // Remove trailing whitespace
                 length = strlen(marker) - 1;
-                while (length > 0 && (isspace(marker[length]) || marker[length] == '\r'))
+                while (length > 0 && (IsSpace(marker[length]) || marker[length] == '\r'))
                     marker[length--] = '\0';
                 if (*marker == '\0')
                     continue;
@@ -206,6 +214,7 @@ private:
     ViewResource* current_;
     PictureGroup* current_group_;
     FilePath string_file_;
+    FilePath resource_rootpath_;
     int path_depth_;
 };
 

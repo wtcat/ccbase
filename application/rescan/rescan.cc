@@ -53,6 +53,9 @@ bool ResourceScan::ScanResource(const FilePath& dir, const FilePath::StringType 
         return false;
     }
 
+    //Initialize resource root path(Just only for symbol link)
+    resource_rootpath_ = path;
+
     //Find '@new' directory when in compatible mode 
     if (compatible)
         return Scan(path.Append(name));
@@ -134,7 +137,7 @@ bool ResourceScan::ScanDirectory(const FilePath& dir) {
 
             // Get real target path if it is a symbol link
             if (IsSymbolFile(entry))
-                file_realpath = ReadSymbolPath(entry);
+                file_realpath = ReadSymbolPath(entry, resource_rootpath_);
             else
                 file_realpath = entry.path();
 

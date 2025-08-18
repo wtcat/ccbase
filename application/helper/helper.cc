@@ -109,17 +109,31 @@ bool IsSymbolFile(const std::filesystem::path &path) {
 #endif /* _WIN32 */
 }
 
-const std::filesystem::path ReadSymbolPath(const std::filesystem::path& path) {
+const std::filesystem::path ReadSymbolPath(const std::filesystem::path& path,
+    const FilePath& base) {
 #ifndef _WIN32
     return std::filesystem::read_symlink(path);
 #else
-    FilePath target(GetShortcutTarget(FilePath::FromUTF8Unsafe(path.string()).LossyDisplayName()));
-    return target.AsUTF8Unsafe();
+    // Get target path for symbol link
+    FilePath target_path(GetShortcutTarget(FilePath::FromUTF8Unsafe(path.string()).LossyDisplayName()));
+
+    // Extract path nodes
+    std::vector<FilePath::StringType> components;
+    target_path.GetComponents(&components);
+
+    // Convert absolute path to relative path
+    FilePath::StringType basename = base.BaseName().value();
+    for (int i = (int)components.size() - 2; i > 0; i--) {
+        if (components[i] == basename) {
+            FilePath path(base);
+            while (++i < (int)components.size())
+                path = path.Append(components[i]);
+            return path.AsUTF8Unsafe();
+        }
+    }
+
+    return target_path.AsUTF8Unsafe();
 #endif /* _WIN32 */
 }
-
-
-
-
 
 } //namespace app
