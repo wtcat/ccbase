@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<lvgl>
+	<types>
+		<lv_event_code_t>
+			<prop name="all" value="LV_EVENT_ALL"/>
+			<prop name="pressed" value="LV_EVENT_PRESSED"/>
+			<prop name="pressing" value="LV_EVENT_PRESSING"/>
+			<prop name="press_lost" value="LV_EVENT_PRESS_LOST"/>
+			<prop name="short_clicked" value="LV_EVENT_SHORT_CLICKED"/>
+			<prop name="single_clicked" value="LV_EVENT_SINGLE_CLICKED"/>
+			<prop name="double_clicked" value="LV_EVENT_DOUBLE_CLICKED"/>
+			<prop name="triple_clicked" value="LV_EVENT_TRIPLE_CLICKED"/>
+			<prop name="long_pressed" value="LV_EVENT_LONG_PRESSED"/>
+			<prop name="long_pressed_repeat" value="LV_EVENT_LONG_PRESSED_REPEAT"/>
+			<prop name="clicked" value="LV_EVENT_CLICKED"/>
+			<prop name="released" value="LV_EVENT_RELEASED"/>
+			<prop name="scroll_begin" value="LV_EVENT_SCROLL_BEGIN"/>
+			<prop name="scroll_throw_begin" value="LV_EVENT_SCROLL_THROW_BEGIN"/>
+			<prop name="scroll_end" value="LV_EVENT_SCROLL_END"/>
+			<prop name="scroll" value="LV_EVENT_SCROLL"/>
+			<prop name="gesture" value="LV_EVENT_GESTURE"/>
+			<prop name="key" value="LV_EVENT_KEY"/>
+			<prop name="rotary" value="LV_EVENT_ROTARY"/>
+			<prop name="focused" value="LV_EVENT_FOCUSED"/>
+			<prop name="defocused" value="LV_EVENT_DEFOCUSED"/>
+			<prop name="hit_test" value="LV_EVENT_HIT_TEST"/>
+			<prop name="indev_reset" value="LV_EVENT_INDEV_RESET"/>
+			<prop name="hover_over" value="LV_EVENT_HOVER_OVER"/>
+			<prop name="hover_leave" value="LV_EVENT_HOVER_LEAVE"/>
+			<prop name="cover_check" value="LV_EVENT_COVER_CHECK"/>
+			<prop name="refr_ext_draw_size" value="LV_EVENT_REFR_EXT_DRAW_SIZE"/>
+			<prop name="draw_main_begin" value="LV_EVENT_DRAW_MAIN_BEGIN"/>
+			<prop name="draw_main" value="LV_EVENT_DRAW_MAIN"/>
+			<prop name="draw_main_end" value="LV_EVENT_DRAW_MAIN_END"/>
+			<prop name="draw_post_begin" value="LV_EVENT_DRAW_POST_BEGIN"/>
+			<prop name="draw_post" value="LV_EVENT_DRAW_POST"/>
+			<prop name="draw_post_end" value="LV_EVENT_DRAW_POST_END"/>
+			<prop name="draw_task_added" value="LV_EVENT_DRAW_TASK_ADDED"/>
+			<prop name="value_changed" value="LV_EVENT_VALUE_CHANGED"/>
+			<prop name="insert" value="LV_EVENT_INSERT"/>
+			<prop name="refresh" value="LV_EVENT_REFRESH"/>
+			<prop name="ready" value="LV_EVENT_READY"/>
+			<prop name="cancel" value="LV_EVENT_CANCEL"/>
+			<prop name="create" value="LV_EVENT_CREATE"/>
+			<prop name="delete" value="LV_EVENT_DELETE"/>
+			<prop name="child_changed" value="LV_EVENT_CHILD_CHANGED"/>
+			<prop name="child_created" value="LV_EVENT_CHILD_CREATED"/>
+			<prop name="child_deleted" value="LV_EVENT_CHILD_DELETED"/>
+			<prop name="screen_unload_start" value="LV_EVENT_SCREEN_UNLOAD_START"/>
+			<prop name="screen_load_start" value="LV_EVENT_SCREEN_LOAD_START"/>
+			<prop name="screen_loaded" value="LV_EVENT_SCREEN_LOADED"/>
+			<prop name="screen_unloaded" value="LV_EVENT_SCREEN_UNLOADED"/>
+			<prop name="size_changed" value="LV_EVENT_SIZE_CHANGED"/>
+			<prop name="style_changed" value="LV_EVENT_STYLE_CHANGED"/>
+			<prop name="layout_changed" value="LV_EVENT_LAYOUT_CHANGED"/>
+			<prop name="get_self_size" value="LV_EVENT_GET_SELF_SIZE"/>
+			<prop name="invalidate_area" value="LV_EVENT_INVALIDATE_AREA"/>
+			<prop name="resolution_changed" value="LV_EVENT_RESOLUTION_CHANGED"/>
+			<prop name="color_format_changed" value="LV_EVENT_COLOR_FORMAT_CHANGED"/>
+			<prop name="refr_request" value="LV_EVENT_REFR_REQUEST"/>
+			<prop name="refr_start" value="LV_EVENT_REFR_START"/>
+			<prop name="refr_ready" value="LV_EVENT_REFR_READY"/>
+			<prop name="render_start" value="LV_EVENT_RENDER_START"/>
+			<prop name="render_ready" value="LV_EVENT_RENDER_READY"/>
+			<prop name="flush_finish" value="LV_EVENT_FLUSH_FINISH"/>
+			<prop name="flush_wait_start" value="LV_EVENT_FLUSH_WAIT_START"/>
+			<prop name="flush_wait_finish" value="LV_EVENT_FLUSH_WAIT_FINISH"/>
+			<prop name="vsync" value="LV_EVENT_VSYNC"/>
+		</lv_event_code_t>
+		
+		<lv_obj_flag_t>
+			<prop name="hidden" value="LV_OBJ_FLAG_HIDDEN"/>
+			<prop name="clickable" value="LV_OBJ_FLAG_CLICKABLE"/>
+			<prop name="click_focusable" value="LV_OBJ_FLAG_CLICK_FOCUSABLE"/>
+			<prop name="checkable" value="LV_OBJ_FLAG_CHECKABLE"/>
+			<prop name="scrollable" value="LV_OBJ_FLAG_SCROLLABLE"/>
+			<prop name="scroll_elastic" value="LV_OBJ_FLAG_SCROLL_ELASTIC"/>
+			<prop name="scroll_momentum" value="LV_OBJ_FLAG_SCROLL_MOMENTUM"/>
+			<prop name="scroll_one" value="LV_OBJ_FLAG_SCROLL_ONE"/>
+			<prop name="scroll_chain_hor" value="LV_OBJ_FLAG_SCROLL_CHAIN_HOR"/>
+			<prop name="scroll_chain_ver" value="LV_OBJ_FLAG_SCROLL_CHAIN_VER"/>
+			<prop name="scroll_chain" value="LV_OBJ_FLAG_SCROLL_CHAIN"/>
+			<prop name="scroll_on_focus" value="LV_OBJ_FLAG_SCROLL_ON_FOCUS"/>
+			<prop name="scroll_with_arrow" value="LV_OBJ_FLAG_SCROLL_WITH_ARROW"/>
+			<prop name="snappable" value="LV_OBJ_FLAG_SNAPPABLE"/>
+			<prop name="press_lock" value="LV_OBJ_FLAG_PRESS_LOCK"/>
+			<prop name="event_bubble" value="LV_OBJ_FLAG_EVENT_BUBBLE"/>
+			<prop name="gesture_bubble" value="LV_OBJ_FLAG_GESTURE_BUBBLE"/>
+			<prop name="adv_hittest" value="LV_OBJ_FLAG_ADV_HITTEST"/>
+			<prop name="ignore_layout" value="LV_OBJ_FLAG_IGNORE_LAYOUT"/>
+			<prop name="floating" value="LV_OBJ_FLAG_FLOATING"/>
+			<prop name="send_draw_task_evenTS" value="LV_OBJ_FLAG_SEND_DRAW_TASK_EVENTS"/>
+			<prop name="overflow_visible" value="LV_OBJ_FLAG_OVERFLOW_VISIBLE"/>
+			<prop name="flex_in_new_track" value="LV_OBJ_FLAG_FLEX_IN_NEW_TRACK"/>
+			<prop name="layout_1" value="LV_OBJ_FLAG_LAYOUT_1"/>
+			<prop name="layout_2" value="LV_OBJ_FLAG_LAYOUT_2"/>
+			<prop name="widget_1" value="LV_OBJ_FLAG_WIDGET_1"/>
+			<prop name="widget_2" value="LV_OBJ_FLAG_WIDGET_2"/>
+			<prop name="user_1" value="LV_OBJ_FLAG_USER_1"/>
+			<prop name="user_2" value="LV_OBJ_FLAG_USER_2"/>
+			<prop name="user_3" value="LV_OBJ_FLAG_USER_3"/>
+			<prop name="user_4" value="LV_OBJ_FLAG_USER_4"/>
+		</lv_obj_flag_t>
+
+		<lv_part_t>
+			<prop name="main" value="LV_PART_MAIN"/>
+			<prop name="scrollbar" value="LV_PART_SCROLLBAR"/>
+			<prop name="indicator" value="LV_PART_INDICATOR"/>
+			<prop name="knob" value="LV_PART_KNOB"/>
+			<prop name="selected" value="LV_PART_SELECTED"/>
+			<prop name="items" value="LV_PART_ITEMS"/>
+			<prop name="cursor" value="LV_PART_CURSOR"/>
+		</lv_part_t>
+		
+		<lv_state_t>
+			<prop name="default" value="LV_STATE_DEFAULT"/>
+			<prop name="pressed" value="LV_STATE_PRESSED"/>
+			<prop name="checked" value="LV_STATE_CHECKED"/>
+			<prop name="hovered" value="LV_STATE_HOVERED"/>
+			<prop name="scrolled" value="LV_STATE_SCROLLED"/>
+			<prop name="disabled" value="LV_STATE_DISABLED"/>
+			<prop name="focused" value="LV_STATE_FOCUSED"/>
+			<prop name="focus_key" value="LV_STATE_FOCUS_KEY"/>
+			<prop name="edited" value="LV_STATE_EDITED"/>
+			<prop name="user_1" value="LV_STATE_USER_1"/>
+			<prop name="user_2" value="LV_STATE_USER_2"/>
+			<prop name="user_3" value="LV_STATE_USER_3"/>
+			<prop name="user_4" value="LV_STATE_USER_4"/>
+		</lv_state_t>
+		
+		<lv_align_t>
+			<prop name="top_left" value="LV_ALIGN_TOP_LEFT"/>
+			<prop name="top_mid" value="LV_ALIGN_TOP_MID"/>
+			<prop name="top_right" value="LV_ALIGN_TOP_RIGHT"/>
+			<prop name="bottom_left" value="LV_ALIGN_BOTTOM_LEFT"/>
+			<prop name="bottom_mid" value="LV_ALIGN_BOTTOM_MID"/>
+			<prop name="bottom_right" value="LV_ALIGN_BOTTOM_RIGHT"/>
+			<prop name="right_mid" value="LV_ALIGN_RIGHT_MID"/>
+			<prop name="left_mid" value="LV_ALIGN_LEFT_MID"/>
+			<prop name="center" value="LV_ALIGN_CENTER"/>
+		</lv_align_t>
+		
+		<lv_dir_t>
+			<prop name="none" value="LV_DIR_NONE"/>
+			<prop name="top" value="LV_DIR_TOP"/>
+			<prop name="bottom" value="LV_DIR_BOTTOM"/>
+			<prop name="left" value="LV_DIR_LEFT"/>
+			<prop name="right" value="LV_DIR_RIGHT"/>
+			<prop name="hor" value="LV_DIR_HOR"/>
+			<prop name="ver" value="LV_DIR_VER"/>
+			<prop name="all" value="LV_DIR_ALL"/>
+		</lv_dir_t>
+		
+		<lv_border_side_t>
+			<prop name="none" value="LV_BORDER_SIDE_NONE"/>
+			<prop name="top" value="LV_BORDER_SIDE_TOP"/>
+			<prop name="bottom" value="LV_BORDER_SIDE_BOTTOM"/>
+			<prop name="left" value="LV_BORDER_SIDE_LEFT"/>
+			<prop name="right" value="LV_BORDER_SIDE_RIGHT"/>
+			<prop name="full" value="LV_BORDER_SIDE_FULL"/>
+		</lv_border_side_t>
+		
+		<lv_base_dir_t>
+			<prop name="auto" value="LV_BASE_DIR_AUTO"/>
+			<prop name="ltr" value="LV_BASE_DIR_LTR"/>
+			<prop name="rtl" value="LV_BASE_DIR_RTL"/>
+		</lv_base_dir_t>
+		
+		<lv_grad_dir_t>
+			<prop name="none" value="LV_GRAD_DIR_NONE"/>
+			<prop name="hor" value="LV_GRAD_DIR_HOR"/>
+			<prop name="ver" value="LV_GRAD_DIR_VER"/>
+		</lv_grad_dir_t>
+	
+		<lv_text_align_t>
+			<prop name="left" value="LV_TEXT_ALIGN_LEFT"/>
+			<prop name="right" value="LV_TEXT_ALIGN_RIGHT"/>
+			<prop name="center" value="LV_TEXT_ALIGN_CENTER"/>
+			<prop name="auto" value="LV_TEXT_ALIGN_AUTO"/>
+		</lv_text_align_t>
+		
+		<lv_text_decor_t>
+			<prop name="none" value="LV_TEXT_DECOR_NONE"/>
+			<prop name="underline" value="LV_TEXT_DECOR_UNDERLINE"/>
+			<prop name="strikethrough" value="LV_TEXT_DECOR_STRIKETHROUGH"/>
+		</lv_text_decor_t>
+		
+		<lv_flex_flow_t>
+			<prop name="column" value="LV_FLEX_FLOW_COLUMN"/>
+			<prop name="column_reverse" value="LV_FLEX_FLOW_COLUMN_REVERSE"/>
+			<prop name="column_wrap" value="LV_FLEX_FLOW_COLUMN_WRAP"/>
+			<prop name="column_wrap_reverse" value="LV_FLEX_FLOW_COLUMN_WRAP_REVERSE"/>
+			<prop name="row" value="LV_FLEX_FLOW_ROW"/>
+			<prop name="row_reverse" value="LV_FLEX_FLOW_ROW_REVERSE"/>
+			<prop name="row_wrap" value="LV_FLEX_FLOW_ROW_WRAP"/>
+			<prop name="row_wrap_reverse" value="LV_FLEX_FLOW_ROW_WRAP_REVERSE"/>
+		</lv_flex_flow_t>
+		
+		<lv_flex_align_t>
+			<prop name="center" value="LV_FLEX_ALIGN_CENTER"/>
+			<prop name="end" value="LV_FLEX_ALIGN_END"/>
+			<prop name="start" value="LV_FLEX_ALIGN_START"/>
+			<prop name="space_around" value="LV_FLEX_ALIGN_SPACE_AROUND"/>
+			<prop name="space_between" value="LV_FLEX_ALIGN_SPACE_BETWEEN"/>
+			<prop name="space_evenly" value="LV_FLEX_ALIGN_SPACE_EVENLY"/>
+		</lv_flex_align_t>
+		
+		<lv_grid_align_t>
+			<prop name="center" value="LV_GRID_ALIGN_CENTER"/>
+			<prop name="end" value="LV_GRID_ALIGN_END"/>
+			<prop name="start" value="LV_GRID_ALIGN_START"/>
+			<prop name="stretch" value="LV_GRID_ALIGN_STRETCH"/>
+			<prop name="space_around" value="LV_GRID_ALIGN_SPACE_AROUND"/>
+			<prop name="space_between" value="LV_GRID_ALIGN_SPACE_BETWEEN"/>
+			<prop name="space_evenly" value="LV_GRID_ALIGN_SPACE_EVENLY"/>
+		</lv_grid_align_t>
+		
+		<lv_layout_t>
+			<prop name="none" value="LV_LAYOUT_NONE"/>
+			<prop name="flex" value="LV_LAYOUT_FLEX"/>
+			<prop name="grid" value="LV_LAYOUT_GRID"/>
+		</lv_layout_t>
+		
+		<lv_blend_mode_t>
+			<prop name="normal" value="LV_BLEND_MODE_NORMAL"/>
+			<prop name="additive" value="LV_BLEND_MODE_ADDITIVE"/>
+			<prop name="subtractive" value="LV_BLEND_MODE_SUBTRACTIVE"/>
+			<prop name="multiply" value="LV_BLEND_MODE_MULTIPLY"/>
+			<prop name="difference" value="LV_BLEND_MODE_DIFFERENCE"/>
+		</lv_blend_mode_t>
+	</types>
+	
+	<styles>
+		<prop name="width" value="LV_STYLE_WIDTH" type="size"/>
+		<prop name="min_width" value="LV_STYLE_MIN_WIDTH" type="size"/>
+		<prop name="max_width" value="LV_STYLE_MAX_WIDTH" type="size"/>
+		<prop name="height" value="LV_STYLE_HEIGHT" type="size"/>
+		<prop name="min_height" value="LV_STYLE_MIN_HEIGHT" type="size"/>
+		<prop name="max_height" value="LV_STYLE_MAX_HEIGHT" type="size"/>
+		<prop name="length" value="LV_STYLE_LENGTH" type="size"/>
+		<prop name="radius" value="LV_STYLE_RADIUS" type="size"/>
+		
+		<prop name="pad_left" value="LV_STYLE_PAD_LEFT" type="int"/>
+		<prop name="pad_right" value="LV_STYLE_PAD_RIGHT" type="int"/>
+		<prop name="pad_top" value="LV_STYLE_PAD_TOP" type="int"/>
+		<prop name="pad_bottom" value="LV_STYLE_PAD_BOTTOM" type="int"/>
+		<prop name="pad_hor" value="?" type="int"/>
+		<prop name="pad_ver" value="?" type="int"/>
+		<prop name="pad_all" value="?" type="int"/>
+		<prop name="pad_row" value="LV_STYLE_PAD_ROW" type="int"/>
+		<prop name="pad_column" value="LV_STYLE_PAD_COLUMN" type="int"/>
+		<prop name="pad_gap" value="?" type="int"/>
+		<prop name="pad_radial" value="LV_STYLE_PAD_RADIAL" type="int"/>
+		
+		<prop name="margin_left" value="LV_STYLE_MARGIN_LEFT" type="int"/>
+		<prop name="margin_right" value="LV_STYLE_MARGIN_RIGHT" type="int"/>
+		<prop name="margin_top" value="LV_STYLE_MARGIN_TOP" type="int"/>
+		<prop name="margin_bottom" value="LV_STYLE_MARGIN_BOTTOM" type="int"/>
+		<prop name="margin_hor" value="?" type="int"/>
+		<prop name="margin_ver" value="?" type="int"/>
+		<prop name="margin_all" value="?" type="int"/>
+		
+		<prop name="base_dir" value="LV_STYLE_BASE_DIR" type="lv_base_dir_t"/>
+		<prop name="clip_corner" value="LV_STYLE_CLIP_CORNER" type="bool"/>
+		
+		<prop name="bg_opa" value="LV_STYLE_BG_OPA" type="opa"/>
+		<prop name="bg_color" value="LV_STYLE_BG_COLOR" type="color"/>
+		<prop name="bg_grad_dir" value="LV_STYLE_BG_GRAD_DIR" type="lv_grad_dir_t"/>
+		<prop name="bg_grad_color" value="LV_STYLE_BG_GRAD_COLOR" type="color"/>
+		<prop name="bg_main_stop" value="LV_STYLE_BG_MAIN_STOP" type="int"/>
+		<prop name="bg_grad_stop" value="LV_STYLE_BG_GRAD_STOP" type="int"/>
+		<prop name="bg_grad" value="LV_STYLE_BG_GRAD" type="grad"/>
+		
+		<prop name="bg_image_src" value="LV_STYLE_BG_IMAGE_SRC" type="image"/>
+		<prop name="bg_image_tiled" value="LV_STYLE_BG_IMAGE_TILED" type="bool"/>
+		<prop name="bg_image_recolor" value="LV_STYLE_BG_IMAGE_RECOLOR" type="color"/>
+		<prop name="bg_image_recolor_opa" value="LV_STYLE_BG_IMAGE_RECOLOR_OPA" type="opa"/>
+		
+		<prop name="border_color" value="LV_STYLE_BORDER_COLOR" type="color"/>
+		<prop name="border_width" value="LV_STYLE_BORDER_WIDTH" type="int"/>
+		<prop name="border_opa" value="LV_STYLE_BORDER_OPA" type="opa"/>
+		<prop name="border_side" value="LV_STYLE_BORDER_SIDE" type="side"/>
+		<prop name="border_post" value="LV_STYLE_BORDER_POST" type="bool"/>
+		
+		<prop name="outline_color" value="LV_STYLE_OUTLINE_COLOR" type="color"/>
+		<prop name="outline_width" value="LV_STYLE_OUTLINE_WIDTH" type="int"/>
+		<prop name="outline_opa" value="LV_STYLE_OUTLINE_OPA" type="opa"/>
+		<prop name="outline_pad" value="LV_STYLE_OUTLINE_PAD" type="int"/>
+		
+		<prop name="shadow_width" value="LV_STYLE_SHADOW_WIDTH" type="int"/>
+		<prop name="shadow_color" value="LV_STYLE_SHADOW_COLOR" type="color"/>
+		<prop name="shadow_offset_x" value="LV_STYLE_SHADOW_OFFSET_X" type="int"/>
+		<prop name="shadow_offset_y" value="LV_STYLE_SHADOW_OFFSET_Y" type="int"/>
+		<prop name="shadow_spread" value="LV_STYLE_SHADOW_SPREAD" type="int"/>
+		<prop name="shadow_opa" value="LV_STYLE_SHADOW_OPA" type="opa"/>
+		
+		<prop name="text_color" value="LV_STYLE_TEXT_COLOR" type="color"/>
+		<prop name="text_font" value="LV_STYLE_TEXT_FONT" type="font"/>
+		<prop name="text_opa" value="LV_STYLE_TEXT_OPA" type="opa"/>
+		<prop name="text_align" value="LV_STYLE_TEXT_ALIGN" type="lv_text_align_t"/>
+		<prop name="text_letter_space" value="LV_STYLE_TEXT_LETTER_SPACE" type="int"/>
+		<prop name="text_line_space" value="LV_STYLE_TEXT_LINE_SPACE" type="int"/>
+		<prop name="text_decor" value="LV_STYLE_TEXT_DECOR" type="lv_text_decor_t"/>
+		
+		<prop name="image_opa" value="LV_STYLE_IMAGE_OPA" type="opa"/>
+		<prop name="image_recolor" value="LV_STYLE_IMAGE_RECOLOR" type="color"/>
+		<prop name="image_recolor_opa" value="LV_STYLE_IMAGE_RECOLOR_OPA" type="opa"/>
+		
+		<prop name="line_color" value="LV_STYLE_LINE_COLOR" type="color"/>
+		<prop name="line_opa" value="LV_STYLE_LINE_OPA" type="opa"/>
+		<prop name="line_width" value="LV_STYLE_LINE_WIDTH" type="int"/>
+		<prop name="line_dash_width" value="LV_STYLE_LINE_DASH_WIDTH" type="int"/>
+		<prop name="line_dash_gap" value="LV_STYLE_LINE_DASH_GAP" type="int"/>
+		<prop name="line_rounded" value="LV_STYLE_LINE_ROUNDED" type="bool"/>
+		
+		<prop name="arc_color" value="LV_STYLE_ARC_COLOR" type="color"/>
+		<prop name="arc_opa" value="LV_STYLE_ARC_OPA" type="opa"/>
+		<prop name="arc_width" value="LV_STYLE_ARC_WIDTH" type="int"/>
+		<prop name="arc_rounded" value="LV_STYLE_ARC_ROUNDED" type="bool"/>
+		<prop name="arc_image_src" value="LV_STYLE_ARC_IMAGE_SRC" type="image"/>
+		
+		<prop name="opa" value="LV_STYLE_OPA" type="opa"/>
+		<prop name="opa_layered" value="LV_STYLE_OPA_LAYERED" type="opa"/>
+		<prop name="color_filter_opa" value="LV_STYLE_COLOR_FILTER_OPA" type="opa"/>
+		<prop name="anim_duration" value="LV_STYLE_ANIM_DURATION" type="int"/>
+		<prop name="blend_mode" value="LV_STYLE_BLEND_MODE" type="lv_blend_mode_t"/>
+		<prop name="transform_width" value="LV_STYLE_TRANSFORM_WIDTH" type="int"/>
+		<prop name="transform_height" value="LV_STYLE_TRANSFORM_HEIGHT" type="int"/>
+		<prop name="translate_x" value="LV_STYLE_TRANSLATE_X" type="int"/>
+		<prop name="translate_y" value="LV_STYLE_TRANSLATE_Y" type="int"/>
+		<prop name="translate_radial" value="LV_STYLE_TRANSLATE_RADIAL" type="int"/>
+		<prop name="transform_scale_x" value="LV_STYLE_TRANSFORM_SCALE_X" type="int"/>
+		<prop name="transform_scale_y" value="LV_STYLE_TRANSFORM_SCALE_Y" type="int"/>
+		<prop name="transform_rotation" value="LV_STYLE_TRANSFORM_ROTATION" type="int"/>
+		<prop name="transform_pivot_x" value="LV_STYLE_TRANSFORM_PIVOT_X" type="int"/>
+		<prop name="transform_pivot_y" value="LV_STYLE_TRANSFORM_PIVOT_Y" type="int"/>
+		<prop name="transform_skew_x" value="LV_STYLE_TRANSFORM_SKEW_X" type="int"/>
+		<prop name="bitmap_mask_src" value="LV_STYLE_BITMAP_MASK_SRC" type="image"/>
+		<prop name="rotary_sensitivity" value="LV_STYLE_ROTARY_SENSITIVITY" type="int"/>
+		<prop name="recolor" value="LV_STYLE_RECOLOR" type="color"/>
+		<prop name="recolor_opa" value="LV_STYLE_RECOLOR_OPA" type="opa"/>
+		
+		<prop name="layout" value="LV_STYLE_LAYOUT" type="lv_layout_t"/>
+		
+		<prop name="flex_flow" value="LV_STYLE_FLEX_FLOW" type="lv_flex_flow_t"/>
+		<prop name="flex_grow" value="LV_STYLE_FLEX_GROW" type="int"/>
+		<prop name="flex_main_place" value="LV_STYLE_FLEX_MAIN_PLACE" type="enum_flex_align"/>
+		<prop name="flex_cross_place" value="LV_STYLE_FLEX_CROSS_PLACE" type="enum_flex_align"/>
+		<prop name="flex_track_place" value="LV_STYLE_FLEX_TRACK_PLACE" type="enum_flex_align"/>
+		
+		<prop name="grid_column_align" value="LV_STYLE_GRID_COLUMN_ALIGN" type="lv_grid_align_t"/>
+		<prop name="grid_row_align" value="LV_STYLE_GRID_ROW_ALIGN" type="lv_grid_align_t"/>
+		<prop name="grid_cell_column_pos" value="LV_STYLE_GRID_CELL_COLUMN_POS" type="int"/>
+		<prop name="grid_cell_column_span" value="LV_STYLE_GRID_CELL_COLUMN_SPAN" type="int"/>
+		<prop name="grid_cell_x_align" value="LV_STYLE_GRID_CELL_X_ALIGN" type="lv_grid_align_t"/>
+		<prop name="grid_cell_row_pos" value="LV_STYLE_GRID_CELL_ROW_POS" type="int"/>
+		<prop name="grid_cell_row_span" value="LV_STYLE_GRID_CELL_ROW_SPAN" type="int"/>
+		<prop name="grid_cell_y_align" value="LV_STYLE_GRID_CELL_Y_ALIGN" type="lv_grid_align_t"/>
+	</styles>
+</lvgl>
