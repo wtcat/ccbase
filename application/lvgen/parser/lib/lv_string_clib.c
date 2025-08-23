@@ -130,4 +130,3 @@ char * lv_strchr(const char * str, int c)
 {
     return strchr(str, c);
 }
-

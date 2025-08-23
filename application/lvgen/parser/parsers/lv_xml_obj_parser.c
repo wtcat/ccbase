@@ -9,8 +9,6 @@
 #include "lv_xml_obj_parser.h"
 #if LV_USE_XML
 
-#include "../../../lvgl.h"
-#include "../../../lvgl_private.h"
 
 /*********************
  *      DEFINES

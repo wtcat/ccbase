@@ -14,7 +14,10 @@ target_sources(lv_parser
 	${CMAKE_CURRENT_SOURCE_DIR}/lv_xml_parser.c
 #	${CMAKE_CURRENT_SOURCE_DIR}/lv_xml_style.c
 	${CMAKE_CURRENT_SOURCE_DIR}/lv_xml_utils.c
+	${CMAKE_CURRENT_SOURCE_DIR}/lv_xml_widget.c
+	${CMAKE_CURRENT_SOURCE_DIR}/lv_xml_base_types.c
 
 )
 
 add_subdirectory(lib)
+add_subdirectory(expat)

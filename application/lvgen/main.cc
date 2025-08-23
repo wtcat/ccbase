@@ -44,9 +44,9 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        app::LvCodeGenerator lvgen;
+        app::LvCodeGenerator *lvgen = app::LvCodeGenerator::GetInstance();
 
-        lvgen.LoadAttributes(FilePath(L"lvdb.xml"));
+        lvgen->LoadAttributes(FilePath(L"lvdb.xml"));
 
         //scoped_refptr<app::ViewCodeFactory> factory(new app::ViewCodeFactory);
         //scoped_refptr<app::ResourceParser::ResourceOptions> option(new app::ResourceParser::ResourceOptions);

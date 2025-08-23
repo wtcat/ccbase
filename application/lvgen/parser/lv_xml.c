@@ -41,7 +41,10 @@
 #include "parsers/lv_xml_calendar_parser.h"
 #include "parsers/lv_xml_event_parser.h"
 
-#include "application/lvgen/expat/expat.h"
+#include "expat/expat.h"
+
+#define _LV_SOURCE_CODE
+#include "lvgen_cinsn.h"
 
 
 /*********************
@@ -75,8 +78,6 @@ void lv_xml_init(void)
     lv_xml_component_init();
 
 #if 0
-    lv_xml_register_font(NULL, "lv_font_default", lv_font_get_default());
-
     lv_xml_widget_register("lv_obj", lv_xml_obj_create, lv_xml_obj_apply);
     lv_xml_widget_register("lv_button", lv_xml_button_create, lv_xml_button_apply);
     lv_xml_widget_register("lv_label", lv_xml_label_create, lv_xml_label_apply);
@@ -113,6 +114,8 @@ void lv_xml_init(void)
                            lv_xml_calendar_header_dropdown_apply);
 
     lv_xml_widget_register("lv_event-call_function", lv_xml_event_call_function_create, lv_xml_event_call_function_apply);
+
+    lv_xml_register_font(NULL, "lv_font_default", lv_font_get_default());
 #endif
 }
 
@@ -141,7 +144,7 @@ void * lv_xml_create_in_scope(lv_obj_t * parent, lv_xml_component_scope_t * pare
     XML_SetElementHandler(parser, view_start_element_handler, view_end_element_handler);
 
     /* Parse the XML */
-    if(XML_Parse(parser, scope->view_def, lv_strlen(scope->view_def), XML_TRUE) == XML_STATUS_ERROR) {
+    if(XML_Parse(parser, scope->view_def, (int)lv_strlen(scope->view_def), XML_TRUE) == XML_STATUS_ERROR) {
         LV_LOG_WARN("XML parsing error: %s on line %lu", XML_ErrorString(XML_GetErrorCode(parser)),
                     XML_GetCurrentLineNumber(parser));
         XML_ParserFree(parser);
@@ -257,7 +260,7 @@ const lv_font_t * lv_xml_get_font(lv_xml_component_scope_t * scope, const char *
     }
 
     LV_LOG_WARN("No font was found with name \"%s\". Using LV_FONT_DEFAULT instead.", name);
-    return lv_font_get_default();
+    return NULL; // lv_font_get_default();
 }
 
 lv_result_t lv_xml_register_subject(lv_xml_component_scope_t * scope, const char * name, lv_subject_t * subject)

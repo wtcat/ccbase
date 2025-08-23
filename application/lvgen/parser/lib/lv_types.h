@@ -5,13 +5,10 @@
 #ifndef LIB_LV_TYPES_H_
 #define LIB_LV_TYPES_H_
 
-#include <stddef.h>
-#include <stdint.h>
-#include <stdbool.h>
-
 #ifdef __cplusplus
 extern "C"{
 #endif
+#include "parser/lib/lv_types.h"
 #include "lv_ll.h"
 
     /**********************
@@ -36,6 +33,37 @@ extern "C"{
 #define LV_MAX_OF(t) ((unsigned long)(LV_IS_SIGNED(t) ? LV_SMAX_OF(t) : LV_UMAX_OF(t)))
 
 
+
+#define LV_COORD_TYPE_SHIFT    (29U)
+#define LV_COORD_TYPE_MASK     (3 << LV_COORD_TYPE_SHIFT)
+#define LV_COORD_TYPE(x)       ((x) & LV_COORD_TYPE_MASK)  /*Extract type specifiers*/
+#define LV_COORD_PLAIN(x)      ((x) & ~LV_COORD_TYPE_MASK) /*Remove type specifiers*/
+
+#define LV_COORD_TYPE_PX       (0 << LV_COORD_TYPE_SHIFT)
+#define LV_COORD_TYPE_SPEC     (1 << LV_COORD_TYPE_SHIFT)
+#define LV_COORD_TYPE_PX_NEG   (3 << LV_COORD_TYPE_SHIFT)
+
+#define LV_COORD_IS_PX(x)       (LV_COORD_TYPE(x) == LV_COORD_TYPE_PX || LV_COORD_TYPE(x) == LV_COORD_TYPE_PX_NEG)
+#define LV_COORD_IS_SPEC(x)     (LV_COORD_TYPE(x) == LV_COORD_TYPE_SPEC)
+
+#define LV_COORD_SET_SPEC(x)    ((x) | LV_COORD_TYPE_SPEC)
+
+     /** Max coordinate value */
+#define LV_COORD_MAX            ((1 << LV_COORD_TYPE_SHIFT) - 1)
+#define LV_COORD_MIN            (-LV_COORD_MAX)
+
+/*Special coordinates*/
+#define LV_SIZE_CONTENT         LV_COORD_SET_SPEC(LV_COORD_MAX)
+#define LV_PCT_STORED_MAX       (LV_COORD_MAX - 1)
+#if LV_PCT_STORED_MAX % 2 != 0
+#error LV_PCT_STORED_MAX should be an even number
+#endif
+#define LV_PCT_POS_MAX          (LV_PCT_STORED_MAX / 2)
+#define LV_PCT(x)               (LV_COORD_SET_SPEC(((x) < 0 ? (LV_PCT_POS_MAX - LV_MAX((x), -LV_PCT_POS_MAX)) : LV_MIN((x), LV_PCT_POS_MAX))))
+#define LV_COORD_IS_PCT(x)      ((LV_COORD_IS_SPEC(x) && LV_COORD_PLAIN(x) <= LV_PCT_STORED_MAX))
+#define LV_COORD_GET_PCT(x)     (LV_COORD_PLAIN(x) > LV_PCT_POS_MAX ? LV_PCT_POS_MAX - LV_COORD_PLAIN(x) : LV_COORD_PLAIN(x))
+
+
 struct _lv_xml_parser_state_t;
 typedef struct _lv_xml_parser_state_t lv_xml_parser_state_t;
 
@@ -47,24 +75,24 @@ typedef struct _lv_xml_component_scope_t lv_xml_component_scope_t;
 typedef int lv_result_t;
 
 typedef void * lv_event_cb_t; //TODO
-typedef int lv_color_t; //TODO
-typedef int lv_opa_t; //TODO
+typedef const char* lv_color_t; //TODO
+typedef uint8_t lv_opa_t; //TODO
 
-typedef int lv_state_t;
-typedef int lv_align_t;
-typedef int lv_dir_t;
-typedef int lv_border_side_t;
-typedef int lv_base_dir_t;
-typedef int lv_grad_dir_t;
-typedef int lv_text_align_t;
-typedef int lv_text_decor_t;
-typedef int lv_flex_flow_t;
-typedef int lv_flex_align_t;
-typedef int lv_grid_align_t;
-typedef int lv_layout_t;
-typedef int lv_blend_mode_t;
-typedef int lv_part_t;
-typedef int lv_style_selector_t;
+typedef const char* lv_state_t;
+typedef const char* lv_align_t;
+typedef const char* lv_dir_t;
+typedef const char* lv_border_side_t;
+typedef const char* lv_base_dir_t;
+typedef const char* lv_grad_dir_t;
+typedef const char* lv_text_align_t;
+typedef const char* lv_text_decor_t;
+typedef const char* lv_flex_flow_t;
+typedef const char* lv_flex_align_t;
+typedef const char* lv_grid_align_t;
+typedef const char* lv_layout_t;
+typedef const char* lv_blend_mode_t;
+typedef const char* lv_part_t;
+typedef const char* lv_style_selector_t;
 
 typedef char* lv_style_t;
 
@@ -144,19 +172,21 @@ typedef struct {
                                           * start notifying from the beginning. */
 } lv_subject_t;
 
-
+typedef struct {
+    char reserved;
+} lv_observer_t;
 
 /**
  * The direction of the gradient.
  */
-typedef enum {
-    LV_GRAD_DIR_NONE,       /**< No gradient (the `grad_color` property is ignored)*/
-    LV_GRAD_DIR_VER,        /**< Simple vertical (top to bottom) gradient*/
-    LV_GRAD_DIR_HOR,        /**< Simple horizontal (left to right) gradient*/
-    LV_GRAD_DIR_LINEAR,     /**< Linear gradient defined by start and end points. Can be at any angle.*/
-    LV_GRAD_DIR_RADIAL,     /**< Radial gradient defined by start and end circles*/
-    LV_GRAD_DIR_CONICAL,    /**< Conical gradient defined by center point, start and end angles*/
-} lv_grad_dir_t;
+//typedef enum {
+//    LV_GRAD_DIR_NONE,       /**< No gradient (the `grad_color` property is ignored)*/
+//    LV_GRAD_DIR_VER,        /**< Simple vertical (top to bottom) gradient*/
+//    LV_GRAD_DIR_HOR,        /**< Simple horizontal (left to right) gradient*/
+//    LV_GRAD_DIR_LINEAR,     /**< Linear gradient defined by start and end points. Can be at any angle.*/
+//    LV_GRAD_DIR_RADIAL,     /**< Radial gradient defined by start and end circles*/
+//    LV_GRAD_DIR_CONICAL,    /**< Conical gradient defined by center point, start and end angles*/
+//} lv_grad_dir_t;
 
 /**
  * Gradient behavior outside the defined range.
@@ -183,7 +213,7 @@ typedef struct {
 typedef struct {
     lv_grad_stop_t   stops[LV_GRADIENT_MAX_STOPS];  /**< A gradient stop array */
     uint8_t          stops_count;                   /**< The number of used stops in the array */
-    lv_grad_dir_t    dir : 4;                       /**< The gradient direction.
+    lv_grad_dir_t    dir;                       /**< The gradient direction.
                                                          * Any of LV_GRAD_DIR_NONE, LV_GRAD_DIR_VER, LV_GRAD_DIR_HOR,
                                                          * LV_GRAD_TYPE_LINEAR, LV_GRAD_TYPE_RADIAL, LV_GRAD_TYPE_CONICAL */
     lv_grad_extend_t     extend : 3;                    /**< Behaviour outside the defined range.

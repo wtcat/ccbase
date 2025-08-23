@@ -37,6 +37,7 @@ int32_t lv_xml_atoi(const char * str);
 int32_t lv_xml_atoi_split(const char ** str, char delimiter);
 
 lv_color_t lv_xml_to_color(const char * str);
+int lv_xml_to_color_int(const char* str);
 
 /**
  * Concert percentage or integer opacity value from string to integer.

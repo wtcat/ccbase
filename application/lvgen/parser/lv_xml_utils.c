@@ -6,6 +6,8 @@
 /*********************
  *      INCLUDES
  *********************/
+#include <stdio.h>
+
 #include "lv_xml_utils.h"
 
 #if LV_USE_XML
@@ -52,10 +54,25 @@ const char * lv_xml_get_value_of(const char ** attrs, const char * name)
 
 lv_color_t lv_xml_to_color(const char * str)
 {
+    static char buf[48];
+
     /*fff, #fff, 0xfff*/
-    if(lv_strlen(str) <= 5) return lv_color_hex3(lv_xml_strtol(str, NULL, 16));
+    if (lv_strlen(str) <= 5)
+        snprintf(buf, sizeof(buf), "lv_color_hex3(0x%x)", lv_xml_strtol(str, NULL, 16));
     /*ffffff, #ffffff, 0xffffff*/
-    else return lv_color_hex(lv_xml_strtol(str, NULL, 16));
+    else
+        snprintf(buf, sizeof(buf), "lv_color_hex(0x%x)", lv_xml_strtol(str, NULL, 16));
+
+    return buf;
+}
+
+int lv_xml_to_color_int(const char* str)
+{
+    /*fff, #fff, 0xfff*/
+    //if (lv_strlen(str) <= 5) return lv_color_hex3(lv_xml_strtol(str, NULL, 16));
+    /*ffffff, #ffffff, 0xffffff*/
+    //else 
+        return lv_xml_strtol(str, NULL, 16);
 }
 
 lv_opa_t lv_xml_to_opa(const char * str)
@@ -67,7 +84,7 @@ lv_opa_t lv_xml_to_opa(const char * str)
     }
 
     v = LV_CLAMP(0, v, 255);
-    return (lv_opa_t)v;
+    return v;
 }
 
 bool lv_xml_to_bool(const char * str)

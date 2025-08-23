@@ -40,7 +40,8 @@ lv_state_t lv_xml_state_to_enum(const char * txt);
  * @param txt       the input string
  * @return          the integer size
  */
-int32_t lv_xml_to_size(const char * txt);
+const char *lv_xml_to_size(const char * txt);
+int lv_xml_to_size_int(const char* txt);
 
 
 /**

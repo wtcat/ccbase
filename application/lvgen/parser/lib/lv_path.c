@@ -2,6 +2,8 @@
  * Copyright 2025 wtcat 
  */
 
+#include "lv_string.h"
+
 const char* lv_basename(const char* path)
 {
     size_t len = lv_strlen(path);

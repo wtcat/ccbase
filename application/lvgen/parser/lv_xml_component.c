@@ -22,6 +22,8 @@
 #include "parser/lib/lv_path.h"
 #include "expat/expat.h"
 
+#include "lvgen_cinsn.h"
+
 
 /*********************
  *      DEFINES
@@ -51,6 +53,41 @@ static lv_ll_t component_scope_ll;
 /**********************
  *      MACROS
  **********************/
+
+
+ // Addition
+void lv_subject_init_int(lv_subject_t* subject, int32_t value)
+{
+    lv_memzero(subject, sizeof(lv_subject_t));
+    subject->type = LV_SUBJECT_TYPE_INT;
+    subject->value.num = value;
+    subject->prev_value.num = value;
+    lv_ll_init(&(subject->subs_ll), sizeof(lv_observer_t));
+}
+
+void lv_subject_init_color(lv_subject_t* subject, lv_color_t color)
+{
+    lv_memzero(subject, sizeof(lv_subject_t));
+    subject->type = LV_SUBJECT_TYPE_COLOR;
+    subject->value.color = color;
+    subject->prev_value.color = color;
+    lv_ll_init(&(subject->subs_ll), sizeof(lv_observer_t));
+}
+
+void lv_subject_init_string(lv_subject_t* subject, char* buf, char* prev_buf, size_t size, const char* value)
+{
+    lv_memzero(subject, sizeof(lv_subject_t));
+    lv_strlcpy(buf, value, size);
+    if (prev_buf) lv_strlcpy(prev_buf, value, size);
+
+    subject->type = LV_SUBJECT_TYPE_STRING;
+    subject->size = (uint32_t)size;
+    subject->value.pointer = buf;
+    subject->prev_value.pointer = prev_buf;
+
+    lv_ll_init(&(subject->subs_ll), sizeof(lv_observer_t));
+}
+
 
 /**********************
  *   GLOBAL FUNCTIONS
@@ -146,7 +183,7 @@ lv_result_t lv_xml_component_register_from_data(const char * name, const char * 
     XML_SetUserData(parser, &state);
     XML_SetElementHandler(parser, start_metadata_handler, end_metadata_handler);
 
-    if(XML_Parse(parser, xml_def, lv_strlen(xml_def), XML_TRUE) == XML_STATUS_ERROR) {
+    if(XML_Parse(parser, xml_def, (int)lv_strlen(xml_def), XML_TRUE) == XML_STATUS_ERROR) {
         LV_LOG_ERROR("XML parsing error: %s on line %lu",
                      XML_ErrorString(XML_GetErrorCode(parser)),
                      (unsigned long)XML_GetCurrentLineNumber(parser));
@@ -217,7 +254,7 @@ lv_result_t lv_xml_component_register_from_file(const char * path)
     xml_buf[file_size] = '\0';
 
     /* Remove extension name and just only use base name */
-    char* filename = lv_strup(lv_basename(path));
+    char* filename = lv_strdup(lv_basename(path));
     size_t namelen = lv_strlen(filename);
     filename[namelen - 4] = '\0';
 
@@ -276,7 +313,7 @@ lv_result_t lv_xml_component_unregister(const char * name)
     LV_LL_READ(&scope->style_ll, style) {
         lv_free((char *)style->name);
         lv_free((char *)style->long_name);
-        lv_style_reset(&style->style);
+        //lv_style_reset(&style->style);
     }
     lv_ll_clear(&scope->style_ll);
 
@@ -387,16 +424,16 @@ static void process_font_element(lv_xml_parser_state_t * state, const char * typ
 #endif
     }
     else if(lv_streq(type, "bin")) {
-        lv_font_t * font = lv_binfont_create(src_path);
-        if(font == NULL) {
-            LV_LOG_WARN("Couldn't load `%s` bin font", name);
-            return;
-        }
+        lv_font_t* font = NULL; // lv_binfont_create(src_path);
+        //if(font == NULL) {
+        //    LV_LOG_WARN("Couldn't load `%s` bin font", name);
+        //    return;
+        //}
 
         lv_result_t res = lv_xml_register_font(&state->scope, name, font);
         if(res == LV_RESULT_INVALID) {
             LV_LOG_WARN("Failed to register `%s` bin font", name);
-            lv_binfont_destroy(font);
+            //lv_binfont_destroy(font);
             return;
         }
 
@@ -452,8 +489,12 @@ static void process_subject_element(lv_xml_parser_state_t * state, const char * 
 
     lv_subject_t * subject = lv_malloc(sizeof(lv_subject_t));
 
-    if(lv_streq(type, "int")) lv_subject_init_int(subject, lv_xml_atoi(value));
-    else if(lv_streq(type, "color")) lv_subject_init_color(subject, lv_xml_to_color(value));
+    if (lv_streq(type, "int")) {
+        lv_subject_init_int(subject, lv_xml_atoi(value));
+    }
+    else if (lv_streq(type, "color")) {
+        lv_subject_init_color(subject, lv_xml_to_color(value));
+    }
     else if(lv_streq(type, "string")) {
         /*Simple solution for now. Will be improved later*/
         char * buf_prev = lv_malloc(256);
@@ -473,44 +514,44 @@ static void process_grad_element(lv_xml_parser_state_t * state, const char * tag
     dsc->extend = LV_GRAD_EXTEND_PAD;
 
     if(lv_streq(tag_name, "linear")) {
-        dsc->dir = LV_GRAD_DIR_LINEAR;
+        dsc->dir = "LV_GRAD_DIR_LINEAR";
         char buf[64];
         char * buf_p = buf;
         const char * start = lv_xml_get_value_of(attrs, "start");
         lv_strlcpy(buf, start, sizeof(buf));
-        dsc->params.linear.start.x = lv_xml_to_size(lv_xml_split_str(&buf_p, ' '));
-        dsc->params.linear.start.y = lv_xml_to_size(buf_p);
+        dsc->params.linear.start.x = lv_xml_to_size_int(lv_xml_split_str(&buf_p, ' '));
+        dsc->params.linear.start.y = lv_xml_to_size_int(buf_p);
 
         buf_p = buf;
         const char * end = lv_xml_get_value_of(attrs, "end");
         lv_strlcpy(buf, end, sizeof(buf));
-        dsc->params.linear.end.x = lv_xml_to_size(lv_xml_split_str(&buf_p, ' '));
-        dsc->params.linear.end.y = lv_xml_to_size(buf_p);
+        dsc->params.linear.end.x = lv_xml_to_size_int(lv_xml_split_str(&buf_p, ' '));
+        dsc->params.linear.end.y = lv_xml_to_size_int(buf_p);
     }
     else if(lv_streq(tag_name, "radial")) {
-        dsc->dir = LV_GRAD_DIR_RADIAL;
+        dsc->dir = "LV_GRAD_DIR_RADIAL";
         char buf[64];
         char * buf_p = buf;
         const char * center = lv_xml_get_value_of(attrs, "center");
         if(center) {
             lv_strlcpy(buf, center, sizeof(buf));
-            dsc->params.radial.end.x = lv_xml_to_size(lv_xml_split_str(&buf_p, ' '));
-            dsc->params.radial.end.y = lv_xml_to_size(buf_p);
+            dsc->params.radial.end.x = lv_xml_to_size_int(lv_xml_split_str(&buf_p, ' '));
+            dsc->params.radial.end.y = lv_xml_to_size_int(buf_p);
         }
         else {
-            dsc->params.radial.end.x = lv_pct(50);
-            dsc->params.radial.end.y = lv_pct(50);
+            dsc->params.radial.end.x = LV_PCT(50);
+            dsc->params.radial.end.y = LV_PCT(50);
         }
         buf_p = buf;
         const char * center_edge = lv_xml_get_value_of(attrs, "edge");
         if(center_edge) {
             lv_strlcpy(buf, center_edge, sizeof(buf));
-            dsc->params.radial.end_extent.x = lv_xml_to_size(lv_xml_split_str(&buf_p, ' '));
-            dsc->params.radial.end_extent.y = lv_xml_to_size(buf_p);
+            dsc->params.radial.end_extent.x = lv_xml_to_size_int(lv_xml_split_str(&buf_p, ' '));
+            dsc->params.radial.end_extent.y = lv_xml_to_size_int(buf_p);
         }
         else {
-            dsc->params.radial.end_extent.x = lv_pct(100);
-            dsc->params.radial.end_extent.y = lv_pct(100);
+            dsc->params.radial.end_extent.x = LV_PCT(100);
+            dsc->params.radial.end_extent.y = LV_PCT(100);
         }
 
         buf_p = buf;
@@ -526,8 +567,8 @@ static void process_grad_element(lv_xml_parser_state_t * state, const char * tag
         const char * focal = lv_xml_get_value_of(attrs, "focal_center");
         if(focal) {
             lv_strlcpy(buf, focal, sizeof(buf));
-            dsc->params.radial.focal.x = lv_xml_to_size(lv_xml_split_str(&buf_p, ' '));
-            dsc->params.radial.focal.y = lv_xml_to_size(buf_p);
+            dsc->params.radial.focal.x = lv_xml_to_size_int(lv_xml_split_str(&buf_p, ' '));
+            dsc->params.radial.focal.y = lv_xml_to_size_int(buf_p);
         }
         else {
             dsc->params.radial.focal.x = dsc->params.radial.end.x;
@@ -538,8 +579,8 @@ static void process_grad_element(lv_xml_parser_state_t * state, const char * tag
         const char * focal_edge = lv_xml_get_value_of(attrs, "focal_edge");
         if(focal_edge) {
             lv_strlcpy(buf, focal_edge, sizeof(buf));
-            dsc->params.radial.focal_extent.x = lv_xml_to_size(lv_xml_split_str(&buf_p, ' '));
-            dsc->params.radial.focal_extent.y = lv_xml_to_size(buf_p);
+            dsc->params.radial.focal_extent.x = lv_xml_to_size_int(lv_xml_split_str(&buf_p, ' '));
+            dsc->params.radial.focal_extent.y = lv_xml_to_size_int(buf_p);
         }
         else {
             dsc->params.radial.focal_extent.x = dsc->params.radial.focal.x;
@@ -558,18 +599,18 @@ static void process_grad_element(lv_xml_parser_state_t * state, const char * tag
     }
 
     else if(lv_streq(tag_name, "conical")) {
-        dsc->dir = LV_GRAD_DIR_CONICAL;
+        dsc->dir = "LV_GRAD_DIR_CONICAL";
         char buf[64];
         char * buf_p = buf;
         const char * center = lv_xml_get_value_of(attrs, "center");
         if(center) {
             lv_strlcpy(buf, center, sizeof(buf));
-            dsc->params.conical.center.x = lv_xml_to_size(lv_xml_split_str(&buf_p, ' '));
-            dsc->params.conical.center.y = lv_xml_to_size(buf_p);
+            dsc->params.conical.center.x = lv_xml_to_size_int(lv_xml_split_str(&buf_p, ' '));
+            dsc->params.conical.center.y = lv_xml_to_size_int(buf_p);
         }
         else {
-            dsc->params.conical.center.x = lv_pct(50);
-            dsc->params.conical.center.y = lv_pct(50);
+            dsc->params.conical.center.x = LV_PCT(50);
+            dsc->params.conical.center.y = LV_PCT(50);
         }
         buf_p = buf;
         const char * angle = lv_xml_get_value_of(attrs, "angle");
@@ -584,10 +625,10 @@ static void process_grad_element(lv_xml_parser_state_t * state, const char * tag
         }
     }
     else if(lv_streq(tag_name, "horizontal")) {
-        dsc->dir = LV_GRAD_DIR_HOR;
+        dsc->dir = "LV_GRAD_DIR_HOR";
     }
     else if(lv_streq(tag_name, "vertical")) {
-        dsc->dir = LV_GRAD_DIR_VER;
+        dsc->dir = "LV_GRAD_DIR_VER";
     }
     else {
         LV_LOG_WARN("Unknown gradient type: %s", tag_name);
@@ -610,7 +651,7 @@ static void process_grad_stop_element(lv_xml_parser_state_t * state, const char 
     const char * opa_value = lv_xml_get_value_of(attrs, "opa");
     const char * offset_value = lv_xml_get_value_of(attrs, "offset");
 
-    dsc->stops[idx].color = color_value ? lv_xml_to_color(color_value) : lv_color_black();
+    dsc->stops[idx].color = color_value ? lv_xml_to_color(color_value) : "lv_color_black()";
     dsc->stops[idx].opa = opa_value ? lv_xml_to_opa(opa_value) : LV_OPA_COVER;
     dsc->stops[idx].frac = offset_value ? lv_xml_to_opa(offset_value) : (uint8_t)((int32_t)idx * 255 /
                                                                                   (LV_GRADIENT_MAX_STOPS - 1));
@@ -732,3 +773,4 @@ static char * extract_view_content(const char * xml_definition)
 }
 
 #endif /* LV_USE_XML */
+

@@ -5,6 +5,8 @@ include_directories(.)
 add_executable(${TARGET_NAME}
     main.cc
     lvgen.cc
+	lvgen_c.cc
+	lvgen_cinsn.c
 )
 
 add_compile_definitions(
@@ -12,13 +14,12 @@ add_compile_definitions(
 )
 
 if (CMAKE_HOST_WIN32)
-    target_compile_options(${TARGET_NAME} PRIVATE
+    add_compile_options(
         /wd4996
     )
 endif()
 
-#add_subdirectory(expat)
-#add_subdirectory(parser)
+add_subdirectory(parser)
 
 collect_link_libraries(libs ${TARGET_NAME})
 target_link_libraries(${TARGET_NAME}
