@@ -50,13 +50,20 @@ public:
     bool LoadAttributes(const FilePath& file);
     const LvAttribute* FindAttribute(const std::string& ns, const std::string& key);
     bool LoadViews(const FilePath& dir);
-    bool Generate();
+    bool Generate() const;
 
 private:
-    LvCodeGenerator() = default;
+    LvCodeGenerator();
 
     bool ScanDirectory(const FilePath& dir, int level);
     bool ParseView(const std::string& file, bool is_view);
+
+    bool GenerateModule(const LvModuleContext *mod, std::string& buf) const;
+    bool GenerateModuleHeader(const LvModuleContext* mod, std::string &buf) const;
+    bool GenerateModuleSource(const LvModuleContext* mod, std::string &buf) const;
+    bool GenerateFunction(const LvFunctionContext* fn, std::string& buf) const;
+    bool GenerateFunctionSignature(const LvFunctionContext* fn, char* tbuf, size_t maxsize) const;
+    bool GenerateFunctionInstruction(const LvFunctionContext* fn, std::string &buf, const char* indent) const;
 
     xml::XMLElement* FindChild(xml::XMLElement* parent, const char* elem);
     template<typename Func>

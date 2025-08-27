@@ -40,10 +40,10 @@
 #include "parsers/lv_xml_canvas_parser.h"
 #include "parsers/lv_xml_calendar_parser.h"
 #include "parsers/lv_xml_event_parser.h"
+#include "parser/lib/lv_stdio.h"
 
 #include "expat/expat.h"
 
-#define _LV_SOURCE_CODE
 #include "lvgen_cinsn.h"
 
 
@@ -77,8 +77,8 @@ void lv_xml_init(void)
 {
     lv_xml_component_init();
 
-#if 0
     lv_xml_widget_register("lv_obj", lv_xml_obj_create, lv_xml_obj_apply);
+#if 0
     lv_xml_widget_register("lv_button", lv_xml_button_create, lv_xml_button_apply);
     lv_xml_widget_register("lv_label", lv_xml_label_create, lv_xml_label_apply);
     lv_xml_widget_register("lv_image", lv_xml_image_create, lv_xml_image_apply);
@@ -130,6 +130,8 @@ void * lv_xml_create_in_scope(lv_obj_t * parent, lv_xml_component_scope_t * pare
     state.parent = parent;
     state.parent_attrs = attrs;
     state.parent_scope = parent_scope;
+    if (parent_scope != NULL)
+        state.scope.active_func = parent_scope->active_func;
 
     lv_obj_t ** parent_node = lv_ll_ins_head(&state.parent_ll);
     *parent_node = parent;
@@ -170,7 +172,12 @@ void * lv_xml_create_in_scope(lv_obj_t * parent, lv_xml_component_scope_t * pare
 
 void * lv_xml_create(lv_obj_t * parent, const char * name, const char ** attrs)
 {
+    struct func_context* fn = lvgen_new_module_func(lvgen_get_module());
     lv_obj_t * item = NULL;
+
+    lvgen_add_func_argument(fn, LV_PTYPE(lv_obj_t), "parent");
+    lv_snprintf(fn->signature, sizeof(fn->signature), "ui__%s_create", name);
+    fn->rtype = LV_PTYPE(lv_obj_t);
 
     /* Select the widget specific parser type based on the name */
     lv_widget_processor_t * p = lv_xml_widget_get_processor(name);
@@ -178,6 +185,7 @@ void * lv_xml_create(lv_obj_t * parent, const char * name, const char ** attrs)
         lv_xml_parser_state_t state;
         lv_xml_parser_state_init(&state);
         state.parent = parent;
+        state.scope.active_func = fn;
 
         /* When a component is just created there is no scope where
          * its styles, constants, etc are stored.
@@ -192,6 +200,7 @@ void * lv_xml_create(lv_obj_t * parent, const char * name, const char ** attrs)
 
     lv_xml_component_scope_t * scope = lv_xml_component_get_scope(name);
     if(scope) {
+        scope->active_func = fn;
         item = lv_xml_create_in_scope(parent, NULL, scope, attrs);
 
         if(attrs) {
@@ -603,7 +612,9 @@ static void view_start_element_handler(void * user_data, const char * name, cons
          *now it has the button theme styles. However if it were a real widget
          *it had e.g. `my_widget_class` so the button's theme wouldn't apply on it.
          *Removing the style will ensure a better preview*/
-        if(state->scope.is_widget && is_view) lv_obj_remove_style_all(item);
+        if (state->scope.is_widget && is_view) {
+            //lv_obj_remove_style_all(item);
+        }
 
         /*Apply the attributes from e.g. `<lv_slider value="30" x="20">`*/
         if(item) {

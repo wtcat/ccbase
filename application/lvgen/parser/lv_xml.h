@@ -27,10 +27,10 @@ extern "C" {
 /*********************
  *      DEFINES
  *********************/
-#define LV_LOG_WARN(fmt, ...) printf("%s:" fmt "\n", __func__, ##__VA_ARGS__)
-#define LV_LOG_ERROR LV_LOG_WARN
-#define LV_LOG_INFO(...)
-#define LV_UNUSED(x) (void)(x)
+//#define LV_LOG_WARN(fmt, ...) printf("%s:" fmt "\n", __func__, ##__VA_ARGS__)
+//#define LV_LOG_ERROR LV_LOG_WARN
+//#define LV_LOG_INFO(...)
+//#define LV_UNUSED(x) (void)(x)
 
 /**********************
  *      TYPEDEFS

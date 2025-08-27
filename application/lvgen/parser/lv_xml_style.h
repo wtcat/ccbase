@@ -28,6 +28,7 @@ typedef struct _lv_xml_style_t {
     const char * name;
     const char * long_name;
     lv_style_t style;
+    void* link_fn;
 } lv_xml_style_t;
 
 /**********************

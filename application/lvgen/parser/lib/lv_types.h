@@ -5,15 +5,22 @@
 #ifndef LIB_LV_TYPES_H_
 #define LIB_LV_TYPES_H_
 
+#include <stdio.h>
+
 #ifdef __cplusplus
 extern "C"{
 #endif
-#include "parser/lib/lv_types.h"
 #include "lv_ll.h"
 
-    /**********************
-     *      MACROS
-     **********************/
+/**********************
+ *      MACROS
+ **********************/
+#define LV_LOG_WARN(fmt, ...) printf("%s:" fmt "\n", __func__, ##__VA_ARGS__)
+#define LV_LOG_ERROR LV_LOG_WARN
+#define LV_LOG_INFO(...)
+#define LV_UNUSED(x) (void)(x)
+
+
 #define LV_MIN(a, b) ((a) < (b) ? (a) : (b))
 #define LV_MIN3(a, b, c) (LV_MIN(LV_MIN(a,b), c))
 #define LV_MIN4(a, b, c, d) (LV_MIN(LV_MIN(a,b), LV_MIN(c,d)))
@@ -78,6 +85,7 @@ typedef void * lv_event_cb_t; //TODO
 typedef const char* lv_color_t; //TODO
 typedef uint8_t lv_opa_t; //TODO
 
+typedef const char* lv_style_prop_t;
 typedef const char* lv_state_t;
 typedef const char* lv_align_t;
 typedef const char* lv_dir_t;
@@ -93,14 +101,18 @@ typedef const char* lv_layout_t;
 typedef const char* lv_blend_mode_t;
 typedef const char* lv_part_t;
 typedef const char* lv_style_selector_t;
+typedef const char* lv_obj_flag_t;
+typedef const char* lv_label_long_mode_t;
 
 typedef char* lv_style_t;
 
+#define LV_MAX_VNAME 64
 typedef struct {
-	const char *name;
+	char name[LV_MAX_VNAME];
 } lv_base_t;
 
 typedef struct {
+#define LV_OBJNAME(_obj) ((lv_obj_t *)(_obj))->base.name
 	lv_base_t base;
 } lv_obj_t;
 

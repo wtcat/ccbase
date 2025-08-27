@@ -13,8 +13,8 @@ extern "C" {
 /*********************
  *      INCLUDES
  *********************/
-#include "lv_xml.h"
-#include "lv_xml_private.h"
+#include "parser/lv_xml.h"
+#include "parser/lv_xml_private.h"
 #if LV_USE_XML
 
 /**********************
@@ -25,8 +25,8 @@ extern "C" {
  * GLOBAL PROTOTYPES
  **********************/
 
-//void * lv_xml_obj_create(lv_xml_parser_state_t * state, const char ** attrs);
-//void lv_xml_obj_apply(lv_xml_parser_state_t * state, const char ** attrs);
+void * lv_xml_obj_create(lv_xml_parser_state_t * state, const char ** attrs);
+void lv_xml_obj_apply(lv_xml_parser_state_t * state, const char ** attrs);
 
 /**********************
  *      MACROS

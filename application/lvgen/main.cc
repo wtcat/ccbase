@@ -19,34 +19,36 @@ int main(int argc, char* argv[]) {
         CommandLine* cmdline = CommandLine::ForCurrentProcess();
 
         if (cmdline->HasSwitch("help")) {
-            printf(
-                "codegen "
-                "[--view_base=value] "
-                "[--resource_fnname = name] "
-                "[--input_file = filename] "
-                "[--output_dir = output path] "
-                "[--defaut_fontfile = fontfile] "
-                "[--resource_namespace = namespace] "
-                "[--resource_ids_cfile = filename] "
-                "[--resource_list_cfile = filename] "
-                "[--overwrite]\n"
-                "Options:\n"
-                "  --view_base               The base ID for views. (default: 0)\n"
-                "  --resource_fnname         The function name that get resource by view ID. (default: _sdk_view_get_resource)\n"
-                "  --input_file              The resource information file. (default: re_output.json)\n"
-                "  --output_dir              The output directory\n"
-                "  --defaut_fontfile         The default font file\n"
-                "  --resource_namespace      Current resource namespace\n"
-                "  --resource_ids_cfile      Resource IDs c header file name\n"
-                "  --resource_list_cfile     Resource list c source file name\n"
-                "  --overwrite               Overwrite files that has exists\n"
-            );
+            //printf(
+            //    "codegen "
+            //    "[--view_base=value] "
+            //    "[--resource_fnname = name] "
+            //    "[--input_file = filename] "
+            //    "[--output_dir = output path] "
+            //    "[--defaut_fontfile = fontfile] "
+            //    "[--resource_namespace = namespace] "
+            //    "[--resource_ids_cfile = filename] "
+            //    "[--resource_list_cfile = filename] "
+            //    "[--overwrite]\n"
+            //    "Options:\n"
+            //    "  --view_base               The base ID for views. (default: 0)\n"
+            //    "  --resource_fnname         The function name that get resource by view ID. (default: _sdk_view_get_resource)\n"
+            //    "  --input_file              The resource information file. (default: re_output.json)\n"
+            //    "  --output_dir              The output directory\n"
+            //    "  --defaut_fontfile         The default font file\n"
+            //    "  --resource_namespace      Current resource namespace\n"
+            //    "  --resource_ids_cfile      Resource IDs c header file name\n"
+            //    "  --resource_list_cfile     Resource list c source file name\n"
+            //    "  --overwrite               Overwrite files that has exists\n"
+            //);
             return 0;
         }
 
         app::LvCodeGenerator *lvgen = app::LvCodeGenerator::GetInstance();
-
-        lvgen->LoadAttributes(FilePath(L"lvdb.xml"));
+        if (lvgen->LoadAttributes(FilePath(L"lvdb.xml"))) {
+            if (lvgen->LoadViews(FilePath(L"source")))
+                lvgen->Generate();
+        }
 
         //scoped_refptr<app::ViewCodeFactory> factory(new app::ViewCodeFactory);
         //scoped_refptr<app::ResourceParser::ResourceOptions> option(new app::ResourceParser::ResourceOptions);

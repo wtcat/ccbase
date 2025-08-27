@@ -15,6 +15,10 @@
 namespace app {
 namespace fs = std::filesystem;
 
+LvCodeGenerator::LvCodeGenerator() {
+    lvgen_context_init();
+}
+
 LvCodeGenerator::~LvCodeGenerator() {
     for (auto iter : lv_props_)
         delete iter.second;
@@ -33,8 +37,22 @@ bool LvCodeGenerator::LoadViews(const FilePath& dir) {
     return ScanDirectory(dir, 0);
 }
 
-bool LvCodeGenerator::Generate() {
-    return lvgen_generate();
+bool LvCodeGenerator::Generate() const{
+    if (lvgen_generate()) {
+        std::string buf;
+        buf.reserve(8192);
+
+        LvGlobalContext* ctx = lvgen_get_context();
+        void* ll_ptr;
+        LV_LL_READ(&ctx->ll_modules, ll_ptr) {
+            buf.clear();
+            GenerateModule((const LvModuleContext*)ll_ptr, buf);
+        }
+
+        return true;
+    }
+
+    return false;
 }
 
 bool LvCodeGenerator::LoadAttributes(const FilePath& file) {
@@ -153,6 +171,252 @@ bool LvCodeGenerator::ParseView(const std::string& file, bool is_view) {
     return lvgen_parse(file.c_str(), is_view) == 0;
 }
 
+bool LvCodeGenerator::GenerateModule(const LvModuleContext* mod, std::string &buf) const {
+    if (lv_ll_get_head(&mod->ll_funs) != nullptr) {
+        if (GenerateModuleHeader(mod, buf)) {
+            FilePath dir(FilePath::FromUTF8Unsafe(mod->path).DirName());
+            char tbuf[128];
+
+            //Generate header file
+            snprintf(tbuf, sizeof(tbuf), "%s.h", mod->name);
+            if (file_util::WriteFile(dir.Append(FilePath::FromUTF8Unsafe(tbuf)), 
+                buf.data(), (int)buf.size()) < 0)
+                return false;
+
+            //Generate source file
+            buf.clear();
+            if (GenerateModuleSource(mod, buf)) {
+                snprintf(tbuf, sizeof(tbuf), "%s.c", mod->name);
+                return file_util::WriteFile(dir.Append(FilePath::FromUTF8Unsafe(tbuf)),
+                    buf.data(), (int)buf.size()) > 0;
+            }
+        }
+    }
+
+    return false;
+}
+
+bool LvCodeGenerator::GenerateModuleHeader(const LvModuleContext* mod, std::string &buf) const {
+    char tbuf[256];
+
+    buf.append("/*\n");
+    buf.append(" * Copyright(c) 2025 autogen \n");
+    buf.append(" */\n\n");
+
+    // Head begin
+    snprintf(tbuf, sizeof(tbuf), "#ifndef autogen_%s__h_\n#define autogen_%s__h_\n\n",
+        mod->name, mod->name);
+    buf.append(tbuf);
+    buf.append("#ifdef __cplusplus\n");
+    buf.append("extern \"C\"{\n");
+    buf.append("#endif\n\n");
+
+    // Function declare
+    void* ll_ptr;
+    LV_LL_READ(&mod->ll_funs, ll_ptr) {
+        LvFunctionContext* fn = (LvFunctionContext*)ll_ptr;
+        if (GenerateFunctionSignature(fn, tbuf, sizeof(tbuf)))
+            buf.append(tbuf).append(";\n");
+    }
+    buf.append("\n");
+
+    //Head end
+    buf.append("#ifdef __cplusplus\n");
+    buf.append("}\n");
+    buf.append("#endif\n");
+    snprintf(tbuf, sizeof(tbuf), "#endif /* autogen_%s__h_ */\n",
+        mod->name);
+    buf.append(tbuf);
+    
+    return true;
+}
+
+bool LvCodeGenerator::GenerateModuleSource(const LvModuleContext* mod, std::string& buf) const {
+    buf.append("/*\n");
+    buf.append(" * Copyright(c) 2025 Autogen \n");
+    buf.append(" */\n\n");
+
+    //Add header file
+    buf.append("#include \"lvgl.h\"\n\n\n");
+
+    //Add function definition
+    void* ll_ptr;
+    LV_LL_READ(&mod->ll_funs, ll_ptr) {
+        LvFunctionContext* fn = (LvFunctionContext*)ll_ptr;
+        GenerateFunction(fn, buf);
+    }
+
+    return true;
+}
+
+bool LvCodeGenerator::GenerateFunction(const LvFunctionContext* fn, std::string& buf) const  {
+    char tbuf[256];
+
+    if (!GenerateFunctionSignature(fn, tbuf, sizeof(tbuf)))
+        return false;
+
+    buf.append(tbuf).append(" {\n");
+
+    GenerateFunctionInstruction(fn, buf, "\t");
+
+    buf.append("}\n\n");
+
+    return true;
+}
+
+bool LvCodeGenerator::GenerateFunctionSignature(const LvFunctionContext* fn, char* tbuf, 
+    size_t maxsize) const  {
+    if (fn == nullptr || tbuf == nullptr)
+        return false;
+
+    // Format function signature
+    int remain = (int)maxsize;
+    int offset = 0;
+
+    offset += snprintf(tbuf + offset, remain - offset, "%s %s",
+        lv_type_to_name(fn->rtype), fn->signature);
+
+    switch (fn->args_num) {
+    case 0:
+        offset += snprintf(tbuf + offset, remain - offset, "(void)");
+        break;
+    case 1:
+        offset += snprintf(tbuf + offset, remain - offset, "(%s %s)",
+            lv_type_to_name(fn->args[0].type), fn->args[0].name
+        );
+        break;
+    case 2:
+        offset += snprintf(tbuf + offset, remain - offset, "(%s %s, %s %s)",
+            lv_type_to_name(fn->args[0].type), fn->args[0].name,
+            lv_type_to_name(fn->args[1].type), fn->args[1].name
+        );
+        break;
+    case 3:
+        offset += snprintf(tbuf + offset, remain - offset, "(%s %s, %s %s, %s %s)",
+            lv_type_to_name(fn->args[0].type), fn->args[0].name,
+            lv_type_to_name(fn->args[1].type), fn->args[1].name,
+            lv_type_to_name(fn->args[2].type), fn->args[2].name
+        );
+        break;
+    case 4:
+        offset += snprintf(tbuf + offset, remain - offset, "(%s %s, %s %s, %s %s, %s %s)",
+            lv_type_to_name(fn->args[0].type), fn->args[0].name,
+            lv_type_to_name(fn->args[1].type), fn->args[1].name,
+            lv_type_to_name(fn->args[2].type), fn->args[2].name,
+            lv_type_to_name(fn->args[3].type), fn->args[3].name
+        );
+        break;
+    case 5:
+        offset += snprintf(tbuf + offset, remain - offset, "(%s %s, %s %s, %s %s, %s %s, %s %s)",
+            lv_type_to_name(fn->args[0].type), fn->args[0].name,
+            lv_type_to_name(fn->args[1].type), fn->args[1].name,
+            lv_type_to_name(fn->args[2].type), fn->args[2].name,
+            lv_type_to_name(fn->args[3].type), fn->args[3].name,
+            lv_type_to_name(fn->args[4].type), fn->args[4].name
+        );
+        break;
+    case 6:
+        offset += snprintf(tbuf + offset, remain - offset, "(%s %s, %s %s, %s %s, %s %s, %s %s, %s %s)",
+            lv_type_to_name(fn->args[0].type), fn->args[0].name,
+            lv_type_to_name(fn->args[1].type), fn->args[1].name,
+            lv_type_to_name(fn->args[2].type), fn->args[2].name,
+            lv_type_to_name(fn->args[3].type), fn->args[3].name,
+            lv_type_to_name(fn->args[4].type), fn->args[4].name,
+            lv_type_to_name(fn->args[5].type), fn->args[5].name
+        );
+        break;
+    default:
+        return false;
+    }
+
+    return true;
+}
+
+bool LvCodeGenerator::GenerateFunctionInstruction(const LvFunctionContext* fn, std::string &buf, 
+    const char *indent) const  {
+    char tbuf[256];
+    void* ll_ptr;
+
+    // Format function instruction
+    LV_LL_READ(&fn->ll_insn, ll_ptr) {
+        LvFunctionCallInsn* ins = (LvFunctionCallInsn*)ll_ptr;
+        int remain = sizeof(tbuf);
+        int offset = 0;
+
+        if (indent) {
+            if (ins->lvalue != nullptr)
+                offset += snprintf(tbuf + offset, remain - offset, "\n");
+            offset += snprintf(tbuf + offset, remain - offset, indent);
+        }
+
+        if (ins->lvalue != nullptr) {
+            offset += snprintf(tbuf + offset, remain - offset, "%s %s = ",
+                lv_type_to_name(ins->rtype), ins->lvalue);
+        }
+
+        switch (ins->args_num) {
+        case 0:
+            offset += snprintf(tbuf + offset, remain - offset, "%s();\n",
+                ins->insn);
+            break;
+        case 1:
+            offset += snprintf(tbuf + offset, remain - offset, "%s(%s);\n",
+                ins->insn,
+                ins->args[0]
+            );
+            break;
+        case 2:
+            offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s);\n",
+                ins->insn,
+                ins->args[0],
+                ins->args[1]
+            );
+            break;
+        case 3:
+            offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s, %s);\n",
+                ins->insn,
+                ins->args[0],
+                ins->args[1],
+                ins->args[2]
+            );
+            break;
+        case 4:
+            offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s, %s, %s);\n",
+                ins->insn,
+                ins->args[0],
+                ins->args[1],
+                ins->args[2],
+                ins->args[3]
+            );
+            break;
+        case 5:
+            offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s, %s, %s, %s);\n",
+                ins->insn,
+                ins->args[0],
+                ins->args[1],
+                ins->args[2],
+                ins->args[3],
+                ins->args[4]
+            );
+            break;
+        case 6:
+            offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s, %s, %s, %s, %s);\n",
+                ins->insn,
+                ins->args[0],
+                ins->args[1],
+                ins->args[2],
+                ins->args[3],
+                ins->args[4],
+                ins->args[5]
+            );
+            break;
+        default:
+            return false;
+        }
+        buf.append(tbuf);
+    }
+    return true;
+}
 
 
 } //namespace app

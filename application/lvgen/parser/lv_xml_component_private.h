@@ -24,7 +24,7 @@ extern "C" {
 /**********************
  *      TYPEDEFS
  **********************/
-
+struct module_context;
 typedef  void * (*lv_xml_component_process_cb_t)(lv_obj_t * parent, const char * data, const char ** attrs);
 
 typedef struct _lv_xml_component_scope_t {
@@ -41,6 +41,7 @@ typedef struct _lv_xml_component_scope_t {
     const char * extends;
     uint32_t is_widget : 1;                         /*1: not component but widget registered as a component for preview*/
     struct _lv_xml_component_scope_t * next;
+    void* active_func;
 } lv_xml_component_scope_t;
 
 typedef struct {

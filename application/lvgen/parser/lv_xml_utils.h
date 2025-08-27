@@ -25,6 +25,7 @@ extern "C" {
 const char * lv_xml_get_value_of(const char ** attrs, const char * name);
 
 int32_t lv_xml_atoi(const char * str);
+const char* lv_xml_atoi_string(const char* str);
 
 
 /**
@@ -45,8 +46,10 @@ int lv_xml_to_color_int(const char* str);
  * @return      0..255
  */
 lv_opa_t lv_xml_to_opa(const char * str);
+const char *lv_xml_to_opa_string(const char* str);
 
 bool lv_xml_to_bool(const char * str);
+const char* lv_xml_to_bool_string(const char* str);
 
 int32_t lv_xml_strtol(const char * str, char ** endptr, int32_t base);
 
@@ -58,6 +61,10 @@ int32_t lv_xml_strtol(const char * str, char ** endptr, int32_t base);
  * @return              the beginning of next section in the string closed at the delimiter
  */
 char * lv_xml_split_str(char ** src, char delimiter);
+
+
+const void* lv_xml_get_image(lv_xml_component_scope_t* scope, const char* name);
+const lv_font_t* lv_xml_get_font(lv_xml_component_scope_t* scope, const char* name);
 
 #endif /* LV_USE_XML */
 

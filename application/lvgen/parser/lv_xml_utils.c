@@ -13,6 +13,7 @@
 #if LV_USE_XML
 #include <stdlib.h>
 #include "parser/lib/lv_string.h"
+#include "parser/lib/lv_stdio.h"
 
 /*********************
  *      DEFINES
@@ -61,7 +62,7 @@ lv_color_t lv_xml_to_color(const char * str)
         snprintf(buf, sizeof(buf), "lv_color_hex3(0x%x)", lv_xml_strtol(str, NULL, 16));
     /*ffffff, #ffffff, 0xffffff*/
     else
-        snprintf(buf, sizeof(buf), "lv_color_hex(0x%x)", lv_xml_strtol(str, NULL, 16));
+        snprintf(buf, sizeof(buf), "lv_color_hex(0x%08x)", lv_xml_strtol(str, NULL, 16));
 
     return buf;
 }
@@ -87,9 +88,22 @@ lv_opa_t lv_xml_to_opa(const char * str)
     return v;
 }
 
+const char *lv_xml_to_opa_string(const char* str)
+{
+    static char opabuf[4];
+
+    lv_snprintf(opabuf, sizeof(opabuf), "%d", (int)lv_xml_to_opa(str));
+    return opabuf;
+}
+
 bool lv_xml_to_bool(const char * str)
 {
     return lv_streq(str, "false") ? false : true;
+}
+
+const char *lv_xml_to_bool_string(const char* str)
+{
+    return lv_streq(str, "false")? "false" : "true";
 }
 
 int32_t lv_xml_atoi_split(const char ** str, char delimiter)
@@ -134,9 +148,17 @@ int32_t lv_xml_atoi_split(const char ** str, char delimiter)
 
 int32_t lv_xml_atoi(const char * str)
 {
-
     return lv_xml_atoi_split(&str, '\0');
+}
 
+const char *lv_xml_atoi_string(const char* str)
+{
+    static char numbuf[20];
+
+    int32_t v = lv_xml_atoi_split(&str, '\0');
+    lv_snprintf(numbuf, sizeof(numbuf), "%d", str);
+
+    return numbuf;
 }
 
 int32_t lv_xml_strtol(const char * str, char ** endptr, int32_t base)
