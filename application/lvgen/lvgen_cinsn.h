@@ -29,7 +29,7 @@ enum lv_types {
     type__lv_obj_t,
     type__lv_style_t,
 
-    type__lvgen_styles_t,
+    type__lv_view__private_t,
     type__lv__end,
 };
 
@@ -45,7 +45,7 @@ static const struct type_name {
     _LV_TYPE_MAP(void),
     _LV_TYPE_MAP(lv_obj_t),
     _LV_TYPE_MAP(lv_style_t),
-    _LV_TYPE_MAP(lvgen_styles_t),
+    _LV_TYPE_MAP(lv_view__private_t),
 };
 
 const char* lv_type_to_name(int type) {
@@ -106,6 +106,8 @@ struct func_context {
     int             rtype;
     int             args_num;
     int             style_num;
+    int             image_num;
+    int             font_num;
     int             export_cnt;
     lv_ll_t         ll_insn;
     lv_ll_t         ll_objs;

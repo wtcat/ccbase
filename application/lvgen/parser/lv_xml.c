@@ -195,7 +195,7 @@ void * lv_xml_create(lv_obj_t * parent, const char * name, const char ** attrs)
     lv_obj_t * item = NULL;
 
     lvgen_add_func_argument(fn, LV_PTYPE(lv_obj_t), "parent");
-    lvgen_add_func_argument(fn, LV_PTYPE(lvgen_styles_t), "sty");
+    lvgen_add_func_argument(fn, LV_PTYPE(lv_view__private_t), LV_VFN_PARAM2);
     lv_snprintf(fn->signature, sizeof(fn->signature), LV_FN_PREFIX "%s_create", name);
     fn->rtype = LV_PTYPE(lv_obj_t);
 

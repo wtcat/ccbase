@@ -198,9 +198,8 @@ bool LvCodeGenerator::GenerateModule(const LvModuleContext* mod, std::string &bu
 bool LvCodeGenerator::GenerateModuleHeader(const LvModuleContext* mod, std::string &buf) const {
     char tbuf[256];
 
-    buf.append("/*\n");
-    buf.append(" * Copyright(c) 2025 Autogen \n");
-    buf.append(" */\n\n");
+    //Add copyright information
+    GenerateCopyright(buf);
 
     // Head file begin marker
     snprintf(tbuf, sizeof(tbuf), "#ifndef autogen_%s__h_\n#define autogen_%s__h_\n\n",
@@ -231,27 +230,66 @@ bool LvCodeGenerator::GenerateModuleHeader(const LvModuleContext* mod, std::stri
 }
 
 bool LvCodeGenerator::GenerateModuleSource(const LvModuleContext* mod, std::string& buf) const {
+    scoped_ptr<char> strbuf(new char[kStringBufferSize]);
     void* ll_ptr;
 
-    buf.append("/*\n");
-    buf.append(" * Copyright(c) 2025 Autogen \n");
-    buf.append(" */\n\n");
+    //Add copyright information
+    GenerateCopyright(buf);
 
     //Add header file depends
     buf.append("#include \"lvgl.h\"\n");
     LV_LL_READ(&mod->ll_deps, ll_ptr) {
         LvModuleDepend* mdep = (LvModuleDepend*)ll_ptr;
-        char iname[256];
-        snprintf(iname, sizeof(iname), "#include \"%s.h\"\n", mdep->mod->name);
-        buf.append(iname);
+        snprintf(strbuf.get(), kStringBufferSize, "#include \"%s.h\"\n", mdep->mod->name);
+        buf.append(strbuf.get());
     }
     buf.append("\n\n");
 
     //Add function definition
+    int max_styles = 1, max_images = 0, max_fonts = 0;
+    std::string fn_text;
+    fn_text.reserve(8192);
+
     LV_LL_READ(&mod->ll_funs, ll_ptr) {
         LvFunctionContext* fn = (LvFunctionContext*)ll_ptr;
-        GenerateFunction(fn, buf);
+
+        GenerateFunction(fn, fn_text);
+
+        if (fn->style_num > max_styles)
+            max_styles = fn->style_num;
+
+        if (fn->font_num > max_fonts)
+            max_fonts = fn->font_num;
+
+        if (fn->image_num > max_images)
+            max_images = fn->image_num;
     }
+
+    //Add type definition
+    snprintf(strbuf.get(), kStringBufferSize,
+        "#define MAX_STYLES %d\n"
+        "#define MAX_FONTS  %d\n"
+        "#define MAX_IMAGES %d\n"
+        "\n"
+        "typedef struct {\n"
+        "#if MAX_STYLES > 0\n"
+        "\tlv_style_t     styles[MAX_STYLES];\n"
+        "#endif\n"
+
+        "#if MAX_FONTS > 0\n"
+        "\tlv_font_t      fonts[MAX_FONTS];\n"
+        "#endif\n"
+
+        "#if MAX_IMAGES > 0\n"
+        "\tlv_image_dsc_t images[MAX_IMAGES];\n"
+        "#endif\n"
+        "} lv_view__private_t;"
+        "\n\n\n",
+        max_styles, 
+        max_fonts, 
+        max_images);
+    buf.append(strbuf.get());
+    buf.append(fn_text);
 
     return true;
 }
@@ -440,6 +478,19 @@ bool LvCodeGenerator::GenerateFunctionInstruction(const LvFunctionContext* fn, s
     return true;
 }
 
+void LvCodeGenerator::GenerateCopyright(std::string& buf) const {
+    base::Time time = base::Time::NowFromSystemTime();
+    base::Time::Exploded explod;
+    time.LocalExplode(&explod);
+
+    char tbuf[256];
+    snprintf(tbuf, sizeof(tbuf), 
+        "/*\n"
+        " * Copyright(c) %d Autogen @wtcat\n"
+        " */\n\n",
+        explod.year);
+    buf.append(tbuf);
+}
 
 } //namespace app
 

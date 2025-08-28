@@ -22,6 +22,7 @@ namespace xml = tinyxml2;
 
 class LvCodeGenerator {
 public:
+    enum { kStringBufferSize = 1024 };
     struct LvAttribute {
         LvAttribute(const char* n, const char* v, const char *t) :
             name(n), value(v), type(t) {
@@ -64,6 +65,7 @@ private:
     bool GenerateFunction(const LvFunctionContext* fn, std::string& buf) const;
     bool GenerateFunctionSignature(const LvFunctionContext* fn, char* tbuf, size_t maxsize) const;
     bool GenerateFunctionInstruction(const LvFunctionContext* fn, std::string &buf, const char* indent) const;
+    void GenerateCopyright(std::string& buf) const;
 
     xml::XMLElement* FindChild(xml::XMLElement* parent, const char* elem);
     template<typename Func>

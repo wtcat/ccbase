@@ -15,7 +15,9 @@ extern "C"{
 /**********************
  *      MACROS
  **********************/
-#define LV_FN_PREFIX "ui_lvgen__"
+#define LV_FN_PREFIX  "ui_lvgen__"
+#define LV_VFN_PARAM2 "priv"
+#define LV_VFN_STYLE_AT(n)  "&" LV_VFN_PARAM2 "->styles[" #n "]"
 
 
 #define LV_LOG_WARN(fmt, ...) printf("%s:" fmt "\n", __func__, ##__VA_ARGS__)

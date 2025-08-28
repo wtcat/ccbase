@@ -379,15 +379,13 @@ void lv_xml_style_add_to_obj(lv_xml_parser_state_t * state, lv_obj_t * obj, cons
             if(xml_style) {
                 /* Apply with the selector */
                 //lv_obj_add_style(obj, &xml_style->style, selector);
-                //struct func_context* fn = xml_style->link_fn;
-                //lvgen_new_callinsn(fn, LV_TYPE(void), "lv_obj_add_style", LV_OBJNAME(obj), "style", selector, NULL);
 
                 struct func_context* fn = obj->scope_fn;
                 if (fn != NULL) {
                     struct func_context* callee = xml_style->link_fn;
                     char stybuf[64];
 
-                    lv_snprintf(stybuf, sizeof(stybuf), "&sty->styles[%d]", fn->style_num++);
+                    lv_snprintf(stybuf, sizeof(stybuf), LV_VFN_STYLE_AT(%d), fn->style_num++);
                     lvgen_new_callinsn(fn, LV_TYPE(void), callee->signature, stybuf, NULL);
                     lvgen_new_callinsn(fn, LV_TYPE(void), "lv_obj_add_style", LV_OBJNAME(obj), stybuf, selector, NULL);
                     lvgen_new_module_depend(fn->owner, callee);
