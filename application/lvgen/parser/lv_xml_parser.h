@@ -65,6 +65,8 @@ void * lv_xml_state_get_parent(lv_xml_parser_state_t * state);
 
 void * lv_xml_state_get_item(lv_xml_parser_state_t * state);
 
+void * lv_xml_state_get_active_fn(lv_xml_parser_state_t* state);
+
 /**********************
  *      MACROS
  **********************/

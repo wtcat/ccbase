@@ -60,20 +60,20 @@ lv_state_t lv_xml_style_state_to_enum(const char * txt)
 {
     char* pv = NULL;
 
-    if (lvgen_cc_find_sym("lv_state_t", "txt", &pv, NULL))
+    if (lvgen_cc_find_sym("lv_state_t", txt, &pv, NULL))
         return pv;
 
-    return NULL;
+    return "LV_STATE_DEFAULT";
 }
 
 lv_part_t lv_xml_style_part_to_enum(const char * txt)
 {
     char* pv = NULL;
 
-    if (lvgen_cc_find_sym("lv_part_t", "txt", &pv, NULL))
+    if (lvgen_cc_find_sym("lv_part_t", txt, &pv, NULL))
         return pv;
 
-    return NULL;
+    return "LV_PART_MAIN";
 }
 
 lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char ** attrs)
@@ -117,7 +117,7 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
         xml_style->long_name = lv_malloc(long_name_len);
         lv_snprintf((char *)xml_style->long_name, long_name_len, "%s.%s", scope->name, style_name); /*E.g. my_button.style1*/
 
-        lv_snprintf(fn->signature, sizeof(fn->signature), "%s_%s_style_init", scope->name, style_name);
+        lv_snprintf(fn->signature, sizeof(fn->signature), LV_FN_PREFIX "%s_%s_style_init", scope->name, style_name);
         lvgen_add_func_argument(fn, LV_PTYPE(lv_style_t), "style");
         lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_init", "style", NULL);
         xml_style->link_fn = fn;
@@ -379,8 +379,18 @@ void lv_xml_style_add_to_obj(lv_xml_parser_state_t * state, lv_obj_t * obj, cons
             if(xml_style) {
                 /* Apply with the selector */
                 //lv_obj_add_style(obj, &xml_style->style, selector);
-                struct func_context* fn = xml_style->link_fn;
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_obj_add_style", LV_OBJNAME(obj), "style", selector, NULL);
+                //struct func_context* fn = xml_style->link_fn;
+                //lvgen_new_callinsn(fn, LV_TYPE(void), "lv_obj_add_style", LV_OBJNAME(obj), "style", selector, NULL);
+
+                struct func_context* fn = obj->scope_fn;
+                if (fn != NULL) {
+                    struct func_context* callee = xml_style->link_fn;
+                    char stybuf[64];
+
+                    lv_snprintf(stybuf, sizeof(stybuf), "&sty->styles[%d]", fn->style_num++);
+                    lvgen_new_callinsn(fn, LV_TYPE(void), callee->signature, stybuf, NULL);
+                    lvgen_new_callinsn(fn, LV_TYPE(void), "lv_obj_add_style", LV_OBJNAME(obj), stybuf, selector, NULL);
+                }
             }
         }
         onestyle_str = lv_xml_split_str(&str, ' ');
@@ -436,7 +446,9 @@ lv_grad_dsc_t * lv_xml_component_get_grad(lv_xml_component_scope_t * scope, cons
 {
     lv_xml_grad_t * d;
     LV_LL_READ(&scope->gradient_ll, d) {
-        if (lv_streq(d->name, name)) return (lv_grad_dsc_t*)"none"; // return &d->grad_dsc;
+        if (lv_streq(d->name, name)) {
+            return (lv_grad_dsc_t*)"none"; // return &d->grad_dsc;
+        }
     }
 
     return NULL;
@@ -451,7 +463,7 @@ static lv_style_prop_t style_prop_text_to_enum(const char * txt)
 {
     char* pv = NULL;
 
-    if (lvgen_cc_find_sym("styles", "txt", &pv, NULL))
+    if (lvgen_cc_find_sym("styles", txt, &pv, NULL))
         return pv;
 
     return NULL;

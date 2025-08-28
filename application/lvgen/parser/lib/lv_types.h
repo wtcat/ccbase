@@ -15,6 +15,9 @@ extern "C"{
 /**********************
  *      MACROS
  **********************/
+#define LV_FN_PREFIX "ui_lvgen__"
+
+
 #define LV_LOG_WARN(fmt, ...) printf("%s:" fmt "\n", __func__, ##__VA_ARGS__)
 #define LV_LOG_ERROR LV_LOG_WARN
 #define LV_LOG_INFO(...)
@@ -103,6 +106,7 @@ typedef const char* lv_part_t;
 typedef const char* lv_style_selector_t;
 typedef const char* lv_obj_flag_t;
 typedef const char* lv_label_long_mode_t;
+typedef char lv_font_t;
 
 typedef char* lv_style_t;
 
@@ -114,11 +118,8 @@ typedef struct {
 typedef struct {
 #define LV_OBJNAME(_obj) ((lv_obj_t *)(_obj))->base.name
 	lv_base_t base;
+    void* scope_fn;
 } lv_obj_t;
-
-typedef struct {
-	lv_base_t base;
-} lv_font_t;
 
 /*
  * OPA 

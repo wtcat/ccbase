@@ -50,17 +50,7 @@ static void apply_styles(lv_xml_parser_state_t * state, lv_obj_t * obj, const ch
 
 void * lv_xml_obj_create(lv_xml_parser_state_t * state, const char ** attrs)
 {
-    lv_obj_t* parent = lv_xml_state_get_parent(state);
-    const char* parent_name;
-    struct func_callinsn* insn;
-    LV_UNUSED(attrs);
-
-    //void * item = lv_obj_create(lv_xml_state_get_parent(state));
-    parent_name = (parent == NULL) ? "parent" : LV_OBJNAME(parent);
-    insn = lvgen_new_callinsn(state->scope.active_func, LV_PTYPE(lv_obj_t), "lv_obj_create", 
-        parent_name, NULL);
-
-    return lvgen_new_lvalue(state->scope.active_func, "obj", insn);
+    return lv_xml_default_widget_create(state, attrs, "lv_obj_create", "obj");
 }
 
 void lv_xml_obj_apply(lv_xml_parser_state_t * state, const char ** attrs)
@@ -264,7 +254,7 @@ static lv_obj_flag_t flag_to_enum(const char * txt)
         return pv;
 
     LV_LOG_WARN("%s is an unknown value for flag", txt);
-    return NULL;
+    return "0";
 }
 
 

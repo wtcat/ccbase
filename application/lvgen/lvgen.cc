@@ -200,7 +200,7 @@ bool LvCodeGenerator::GenerateModuleHeader(const LvModuleContext* mod, std::stri
     char tbuf[256];
 
     buf.append("/*\n");
-    buf.append(" * Copyright(c) 2025 autogen \n");
+    buf.append(" * Copyright(c) 2025 Autogen \n");
     buf.append(" */\n\n");
 
     // Head begin
@@ -415,6 +415,18 @@ bool LvCodeGenerator::GenerateFunctionInstruction(const LvFunctionContext* fn, s
         }
         buf.append(tbuf);
     }
+
+    // Generate return instruction
+    if (fn->rvar != nullptr) {
+        int offset = 0;
+
+        tbuf[offset++] = '\n';
+        if (indent != nullptr)
+            offset += snprintf(tbuf + offset, sizeof(tbuf) - offset, "%s", indent);
+        snprintf(tbuf + offset, sizeof(tbuf) - offset, "return %s;\n", fn->rvar);
+        buf.append(tbuf);
+    }
+
     return true;
 }
 

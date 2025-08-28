@@ -37,26 +37,16 @@ static lv_label_long_mode_t long_mode_text_to_enum_value(const char * txt);
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
-
 void * lv_xml_label_create(lv_xml_parser_state_t * state, const char ** attrs)
 {
-    lv_obj_t* parent = lv_xml_state_get_parent(state);
-    const char* parent_name;
-    struct func_callinsn* insn;
-    LV_UNUSED(attrs);
-
-    //void * item = lv_label_create(lv_xml_state_get_parent(state));
-    parent_name = (parent == NULL) ? "parent" : LV_OBJNAME(parent);
-    insn = lvgen_new_callinsn(state->scope.active_func, LV_PTYPE(lv_obj_t), "lv_label_create",
-        parent_name, NULL);
-
-    return lvgen_new_lvalue(state->scope.active_func, "label", insn);
+    return lv_xml_default_widget_create(state, attrs, "lv_label_create", "label");
 }
 
 void lv_xml_label_apply(lv_xml_parser_state_t * state, const char ** attrs)
 {
     void * item = lv_xml_state_get_item(state);
-    struct func_context* fn = state->scope.active_func;
+    struct func_context* fn = lv_xml_state_get_active_fn(state);
+    char strbuf[256];
 
     lv_xml_obj_apply(state, attrs); /*Apply the common properties, e.g. width, height, styles flags etc*/
 
@@ -64,10 +54,14 @@ void lv_xml_label_apply(lv_xml_parser_state_t * state, const char ** attrs)
         const char * name = attrs[i];
         const char * value = attrs[i + 1];
 
-        if(lv_streq("text", name)) //lv_label_set_text(item, value);
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_label_set_text", LV_OBJNAME(item), value, NULL);
-        if(lv_streq("long_mode", name)) //lv_label_set_long_mode(item, long_mode_text_to_enum_value(value));
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_label_set_long_mode", LV_OBJNAME(item), long_mode_text_to_enum_value(value), NULL);
+        if (lv_streq("text", name)) {
+            snprintf(strbuf, sizeof(strbuf), "\"%s\"", value);
+            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_label_set_text", LV_OBJNAME(item), strbuf, NULL);
+        }
+        if (lv_streq("long_mode", name)) {
+            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_label_set_long_mode", LV_OBJNAME(item), 
+                long_mode_text_to_enum_value(value), NULL);
+        }
 #if 0
         if(lv_streq("bind_text", name)) {
             char buf[256];
@@ -103,14 +97,12 @@ void lv_xml_label_apply(lv_xml_parser_state_t * state, const char ** attrs)
 
 static lv_label_long_mode_t long_mode_text_to_enum_value(const char * txt)
 {
-    char* pv = NULL;
+    char* pv = (char *)"LV_LABEL_LONG_MODE_WRAP";
 
-    if (lvgen_cc_find_sym("lv_label_long_mode_t", "txt", &pv, NULL)) {
+    if (!lvgen_cc_find_sym("lv_label_long_mode_t", "txt", &pv, NULL))
         LV_LOG_WARN("%s is an unknown value for label's long_mode", txt);
-        return pv;
-    }
 
-    return NULL;
+    return pv;
 }
 
 //static void free_fmt_event_cb(lv_event_t * e)

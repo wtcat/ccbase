@@ -116,6 +116,11 @@ void * lv_xml_state_get_item(lv_xml_parser_state_t * state)
     return state->item;
 }
 
+void* lv_xml_state_get_active_fn(lv_xml_parser_state_t* state)
+{
+    return state->scope.active_func;
+}
+
 /**********************
  *   STATIC FUNCTIONS
  **********************/

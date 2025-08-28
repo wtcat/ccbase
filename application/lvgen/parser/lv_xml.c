@@ -73,15 +73,34 @@ static void view_end_element_handler(void * user_data, const char * name);
  *   GLOBAL FUNCTIONS
  **********************/
 
+void* lv_xml_default_widget_create(lv_xml_parser_state_t* state, const char** attrs, 
+    const char *fnname, const char *varname)
+{
+    struct func_context* fn = lv_xml_state_get_active_fn(state);
+    lv_obj_t* parent = lv_xml_state_get_parent(state);
+    LV_UNUSED(attrs);
+
+    const char* parent_name = (parent == NULL) ? "parent" : LV_OBJNAME(parent);
+    struct func_callinsn* insn = lvgen_new_callinsn(fn, LV_PTYPE(lv_obj_t), fnname,
+        parent_name, NULL);
+
+    lv_obj_t* obj = lvgen_new_lvalue(fn, varname, insn);
+    obj->scope_fn = fn;
+    if (parent == NULL)
+        fn->rvar = LV_OBJNAME(obj);
+
+    return obj;
+}
+
 void lv_xml_init(void)
 {
     lv_xml_component_init();
 
     lv_xml_widget_register("lv_obj", lv_xml_obj_create, lv_xml_obj_apply);
-#if 0
-    lv_xml_widget_register("lv_button", lv_xml_button_create, lv_xml_button_apply);
     lv_xml_widget_register("lv_label", lv_xml_label_create, lv_xml_label_apply);
+    lv_xml_widget_register("lv_button", lv_xml_button_create, lv_xml_button_apply);
     lv_xml_widget_register("lv_image", lv_xml_image_create, lv_xml_image_apply);
+#if 0
     lv_xml_widget_register("lv_bar", lv_xml_bar_create, lv_xml_bar_apply);
     lv_xml_widget_register("lv_slider", lv_xml_slider_create, lv_xml_slider_apply);
     lv_xml_widget_register("lv_tabview", lv_xml_tabview_create, lv_xml_tabview_apply);
@@ -176,7 +195,8 @@ void * lv_xml_create(lv_obj_t * parent, const char * name, const char ** attrs)
     lv_obj_t * item = NULL;
 
     lvgen_add_func_argument(fn, LV_PTYPE(lv_obj_t), "parent");
-    lv_snprintf(fn->signature, sizeof(fn->signature), "ui__%s_create", name);
+    lvgen_add_func_argument(fn, LV_PTYPE(lvgen_styles_t), "sty");
+    lv_snprintf(fn->signature, sizeof(fn->signature), LV_FN_PREFIX "%s_create", name);
     fn->rtype = LV_PTYPE(lv_obj_t);
 
     /* Select the widget specific parser type based on the name */
@@ -269,7 +289,7 @@ const lv_font_t * lv_xml_get_font(lv_xml_component_scope_t * scope, const char *
     }
 
     LV_LOG_WARN("No font was found with name \"%s\". Using LV_FONT_DEFAULT instead.", name);
-    return NULL; // lv_font_get_default();
+    return "lv_font_get_default()";
 }
 
 lv_result_t lv_xml_register_subject(lv_xml_component_scope_t * scope, const char * name, lv_subject_t * subject)

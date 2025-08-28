@@ -40,6 +40,9 @@ extern "C" {
  * GLOBAL PROTOTYPES
  **********************/
 #if 1
+void* lv_xml_default_widget_create(lv_xml_parser_state_t* state, const char** attrs,
+    const char* fnname, const char* varname);
+
 void lv_xml_init(void);
 
 void * lv_xml_create(lv_obj_t * parent, const char * name, const char ** attrs);

@@ -228,6 +228,28 @@
 			<prop name="multiply" value="LV_BLEND_MODE_MULTIPLY"/>
 			<prop name="difference" value="LV_BLEND_MODE_DIFFERENCE"/>
 		</lv_blend_mode_t>
+	
+		<lv_image_align_t>
+			<prop name="top_left" value="LV_IMAGE_ALIGN_TOP_LEFT"/>
+			<prop name="top_mid" value="LV_IMAGE_ALIGN_TOP_MID"/>
+			<prop name="top_right" value="LV_IMAGE_ALIGN_TOP_RIGHT"/>
+			<prop name="bottom_left" value="LV_IMAGE_ALIGN_BOTTOM_LEFT"/>
+			<prop name="bottom_mid" value="LV_IMAGE_ALIGN_BOTTOM_MID"/>
+			<prop name="bottom_right" value="LV_IMAGE_ALIGN_BOTTOM_RIGHT"/>
+			<prop name="right_mid" value="LV_IMAGE_ALIGN_RIGHT_MID"/>
+			<prop name="left_mid" value="LV_IMAGE_ALIGN_LEFT_MID"/>
+			<prop name="center" value="LV_IMAGE_ALIGN_CENTER"/>
+			<prop name="stretch" value="LV_IMAGE_ALIGN_STRETCH"/>
+			<prop name="tile" value="LV_IMAGE_ALIGN_TILE"/>
+		</lv_image_align_t>
+		
+		<lv_label_long_mode_t>
+			<prop name="wrap" value="LV_LABEL_LONG_MODE_WRAP"/>
+			<prop name="dots" value="LV_LABEL_LONG_MODE_DOTS"/>
+			<prop name="scroll" value="LV_LABEL_LONG_MODE_SCROLL"/>
+			<prop name="scroll_circular" value="LV_LABEL_LONG_MODE_SCROLL_CIRCULAR"/>
+			<prop name="clip" value="LV_LABEL_LONG_MODE_CLIP"/>
+		</lv_label_long_mode_t>
 	</types>
 	
 	<styles>
