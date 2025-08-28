@@ -390,6 +390,7 @@ void lv_xml_style_add_to_obj(lv_xml_parser_state_t * state, lv_obj_t * obj, cons
                     lv_snprintf(stybuf, sizeof(stybuf), "&sty->styles[%d]", fn->style_num++);
                     lvgen_new_callinsn(fn, LV_TYPE(void), callee->signature, stybuf, NULL);
                     lvgen_new_callinsn(fn, LV_TYPE(void), "lv_obj_add_style", LV_OBJNAME(obj), stybuf, selector, NULL);
+                    lvgen_new_module_depend(fn->owner, callee);
                 }
             }
         }

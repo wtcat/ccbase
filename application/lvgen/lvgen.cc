@@ -173,17 +173,16 @@ bool LvCodeGenerator::ParseView(const std::string& file, bool is_view) {
 
 bool LvCodeGenerator::GenerateModule(const LvModuleContext* mod, std::string &buf) const {
     if (lv_ll_get_head(&mod->ll_funs) != nullptr) {
+        //Generate module header file
         if (GenerateModuleHeader(mod, buf)) {
             FilePath dir(FilePath::FromUTF8Unsafe(mod->path).DirName());
             char tbuf[128];
-
-            //Generate header file
             snprintf(tbuf, sizeof(tbuf), "%s.h", mod->name);
             if (file_util::WriteFile(dir.Append(FilePath::FromUTF8Unsafe(tbuf)), 
                 buf.data(), (int)buf.size()) < 0)
                 return false;
 
-            //Generate source file
+            //Generate module source file
             buf.clear();
             if (GenerateModuleSource(mod, buf)) {
                 snprintf(tbuf, sizeof(tbuf), "%s.c", mod->name);
@@ -203,7 +202,7 @@ bool LvCodeGenerator::GenerateModuleHeader(const LvModuleContext* mod, std::stri
     buf.append(" * Copyright(c) 2025 Autogen \n");
     buf.append(" */\n\n");
 
-    // Head begin
+    // Head file begin marker
     snprintf(tbuf, sizeof(tbuf), "#ifndef autogen_%s__h_\n#define autogen_%s__h_\n\n",
         mod->name, mod->name);
     buf.append(tbuf);
@@ -215,12 +214,12 @@ bool LvCodeGenerator::GenerateModuleHeader(const LvModuleContext* mod, std::stri
     void* ll_ptr;
     LV_LL_READ(&mod->ll_funs, ll_ptr) {
         LvFunctionContext* fn = (LvFunctionContext*)ll_ptr;
-        if (GenerateFunctionSignature(fn, tbuf, sizeof(tbuf)))
+        if (fn->export_cnt > 0 && GenerateFunctionSignature(fn, tbuf, sizeof(tbuf)))
             buf.append(tbuf).append(";\n");
     }
     buf.append("\n");
 
-    //Head end
+    //Head file end marker
     buf.append("#ifdef __cplusplus\n");
     buf.append("}\n");
     buf.append("#endif\n");
@@ -232,15 +231,23 @@ bool LvCodeGenerator::GenerateModuleHeader(const LvModuleContext* mod, std::stri
 }
 
 bool LvCodeGenerator::GenerateModuleSource(const LvModuleContext* mod, std::string& buf) const {
+    void* ll_ptr;
+
     buf.append("/*\n");
     buf.append(" * Copyright(c) 2025 Autogen \n");
     buf.append(" */\n\n");
 
-    //Add header file
-    buf.append("#include \"lvgl.h\"\n\n\n");
+    //Add header file depends
+    buf.append("#include \"lvgl.h\"\n");
+    LV_LL_READ(&mod->ll_deps, ll_ptr) {
+        LvModuleDepend* mdep = (LvModuleDepend*)ll_ptr;
+        char iname[256];
+        snprintf(iname, sizeof(iname), "#include \"%s.h\"\n", mdep->mod->name);
+        buf.append(iname);
+    }
+    buf.append("\n\n");
 
     //Add function definition
-    void* ll_ptr;
     LV_LL_READ(&mod->ll_funs, ll_ptr) {
         LvFunctionContext* fn = (LvFunctionContext*)ll_ptr;
         GenerateFunction(fn, buf);
@@ -272,6 +279,9 @@ bool LvCodeGenerator::GenerateFunctionSignature(const LvFunctionContext* fn, cha
     // Format function signature
     int remain = (int)maxsize;
     int offset = 0;
+
+    if (fn->export_cnt == 0)
+        offset += snprintf(tbuf + offset, remain - offset, "static ");
 
     offset += snprintf(tbuf + offset, remain - offset, "%s %s",
         lv_type_to_name(fn->rtype), fn->signature);

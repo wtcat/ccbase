@@ -30,8 +30,9 @@ static void lvgen_func_clear(lv_ll_t* fn_ll) {
 }
 
 static void lvgen_module_clear(struct module_context* mod) {
-    lv_ll_clear(&mod->ll_consts);
     lvgen_func_clear(&mod->ll_funs);
+    lv_ll_clear(&mod->ll_consts);
+    lv_ll_clear(&mod->ll_deps);
 }
 
 struct global_context* lvgen_get_context(void) {
@@ -48,6 +49,7 @@ static struct module_context* lvgen_new_module(const char* file, bool is_view) {
         lv_strlcpy(mod->path, file, sizeof(mod->path));
         lv_ll_init(&mod->ll_consts, sizeof(struct module_const));
         lv_ll_init(&mod->ll_funs, sizeof(struct func_context));
+        lv_ll_init(&mod->ll_deps, sizeof(struct module_depend));
         mod->is_view = is_view;
     }
     return mod;
@@ -57,20 +59,42 @@ struct module_context* lvgen_get_module(void) {
     return lv_ll_get_tail(&lvgen_get_context()->ll_modules);
 }
 
+struct module_depend *lvgen_new_module_depend(struct module_context* mod, 
+    struct func_context* depfn) {
+    struct module_depend* dep;
+
+    if (mod == depfn->owner)
+        return NULL;
+
+    LV_LL_READ(&mod->ll_deps, dep) {
+        if (dep->mod == depfn->owner)
+            return dep;
+    }
+
+    dep = lv_ll_ins_tail(&mod->ll_deps);
+    if (dep != NULL) {
+        dep->mod = depfn->owner;
+        depfn->export_cnt++;
+    }
+
+    return dep;
+}
+
 struct func_context* lvgen_new_global_func(void) {
-    return lvgen_new_func(&lvgen_get_context()->ll_funs);
+    return lvgen_new_func(&lvgen_get_context()->ll_funs, NULL);
 }
 
 struct func_context* lvgen_new_module_func(struct module_context* mod) {
-    return lvgen_new_func(&mod->ll_funs);
+    return lvgen_new_func(&mod->ll_funs, mod);
 }
 
-struct func_context* lvgen_new_func(lv_ll_t *fn_ll) {
+struct func_context* lvgen_new_func(lv_ll_t *fn_ll, struct module_context *mod) {
     struct func_context* fn = lv_ll_ins_tail(fn_ll);
     if (fn != NULL) {
         lv_memset(fn, 0, sizeof(*fn));
         lv_ll_init(&fn->ll_insn, sizeof(struct func_callinsn));
         lv_ll_init(&fn->ll_objs, sizeof(lv_obj_t));
+        fn->owner = mod;
     }
     return fn;
 }
