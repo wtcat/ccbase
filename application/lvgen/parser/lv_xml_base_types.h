@@ -77,7 +77,7 @@ lv_base_dir_t lv_xml_base_dir_to_enum(const char * txt);
  * @param txt       e.g. "hor"
  * @return          the related enum, e.g. `LV_GRAD_DIR_HOR`
  */
-lv_grad_dir_t lv_xml_grad_dir_to_enum(const char * txt);
+const char *lv_xml_grad_dir_to_enum(const char * txt);
 
 /**
  * Convert a text align string to enum

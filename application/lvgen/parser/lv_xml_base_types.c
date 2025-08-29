@@ -108,7 +108,7 @@ lv_border_side_t lv_xml_border_side_to_enum(const char * txt)
     return pv;
 }
 
-lv_grad_dir_t lv_xml_grad_dir_to_enum(const char * txt)
+const char *lv_xml_grad_dir_to_enum(const char * txt)
 {
     char* pv = (char*)"LV_GRAD_DIR_NONE";
 

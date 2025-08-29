@@ -15,9 +15,10 @@ extern "C"{
 /**********************
  *      MACROS
  **********************/
-#define LV_FN_PREFIX  "ui_lvgen__"
-#define LV_VFN_PARAM2 "priv"
+#define LV_FN_PREFIX        "ui_lvgen__"
+#define LV_VFN_PARAM2       "priv"
 #define LV_VFN_STYLE_AT(n)  "&" LV_VFN_PARAM2 "->styles[" #n "]"
+#define LV_FN_EXPR          "LV_CODE_EXPR"
 
 
 #define LV_LOG_WARN(fmt, ...) printf("%s:" fmt "\n", __func__, ##__VA_ARGS__)
@@ -96,7 +97,7 @@ typedef const char* lv_align_t;
 typedef const char* lv_dir_t;
 typedef const char* lv_border_side_t;
 typedef const char* lv_base_dir_t;
-typedef const char* lv_grad_dir_t;
+//typedef const char* lv_grad_dir_t;
 typedef const char* lv_text_align_t;
 typedef const char* lv_text_decor_t;
 typedef const char* lv_flex_flow_t;
@@ -108,6 +109,7 @@ typedef const char* lv_part_t;
 typedef const char* lv_style_selector_t;
 typedef const char* lv_obj_flag_t;
 typedef const char* lv_label_long_mode_t;
+typedef const char* lv_arc_mode_t;
 typedef char lv_font_t;
 
 typedef char* lv_style_t;
@@ -194,14 +196,14 @@ typedef struct {
 /**
  * The direction of the gradient.
  */
-//typedef enum {
-//    LV_GRAD_DIR_NONE,       /**< No gradient (the `grad_color` property is ignored)*/
-//    LV_GRAD_DIR_VER,        /**< Simple vertical (top to bottom) gradient*/
-//    LV_GRAD_DIR_HOR,        /**< Simple horizontal (left to right) gradient*/
-//    LV_GRAD_DIR_LINEAR,     /**< Linear gradient defined by start and end points. Can be at any angle.*/
-//    LV_GRAD_DIR_RADIAL,     /**< Radial gradient defined by start and end circles*/
-//    LV_GRAD_DIR_CONICAL,    /**< Conical gradient defined by center point, start and end angles*/
-//} lv_grad_dir_t;
+typedef enum {
+    LV_GRAD_DIR_NONE,       /**< No gradient (the `grad_color` property is ignored)*/
+    LV_GRAD_DIR_VER,        /**< Simple vertical (top to bottom) gradient*/
+    LV_GRAD_DIR_HOR,        /**< Simple horizontal (left to right) gradient*/
+    LV_GRAD_DIR_LINEAR,     /**< Linear gradient defined by start and end points. Can be at any angle.*/
+    LV_GRAD_DIR_RADIAL,     /**< Radial gradient defined by start and end circles*/
+    LV_GRAD_DIR_CONICAL,    /**< Conical gradient defined by center point, start and end angles*/
+} lv_grad_dir_t;
 
 /**
  * Gradient behavior outside the defined range.

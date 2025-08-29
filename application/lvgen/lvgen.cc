@@ -238,6 +238,7 @@ bool LvCodeGenerator::GenerateModuleSource(const LvModuleContext* mod, std::stri
 
     //Add header file depends
     buf.append("#include \"lvgl.h\"\n");
+    buf.append("#include \"lvgen_cdefs.h\"\n");
     LV_LL_READ(&mod->ll_deps, ll_ptr) {
         LvModuleDepend* mdep = (LvModuleDepend*)ll_ptr;
         snprintf(strbuf.get(), kStringBufferSize, "#include \"%s.h\"\n", mdep->mod->name);
@@ -253,8 +254,10 @@ bool LvCodeGenerator::GenerateModuleSource(const LvModuleContext* mod, std::stri
     LV_LL_READ(&mod->ll_funs, ll_ptr) {
         LvFunctionContext* fn = (LvFunctionContext*)ll_ptr;
 
-        GenerateFunction(fn, fn_text);
+        if (!mod->is_view && fn->ref_cnt == 0)
+            continue;
 
+        GenerateFunction(fn, fn_text);
         if (fn->style_num > max_styles)
             max_styles = fn->style_num;
 
@@ -266,29 +269,31 @@ bool LvCodeGenerator::GenerateModuleSource(const LvModuleContext* mod, std::stri
     }
 
     //Add type definition
-    snprintf(strbuf.get(), kStringBufferSize,
-        "#define MAX_STYLES %d\n"
-        "#define MAX_FONTS  %d\n"
-        "#define MAX_IMAGES %d\n"
-        "\n"
-        "typedef struct {\n"
-        "#if MAX_STYLES > 0\n"
-        "\tlv_style_t     styles[MAX_STYLES];\n"
-        "#endif\n"
+    if (mod->is_view) {
+        snprintf(strbuf.get(), kStringBufferSize,
+            "#define MAX_STYLES %d\n"
+            "#define MAX_FONTS  %d\n"
+            "#define MAX_IMAGES %d\n"
+            "\n"
+            "typedef struct {\n"
+            "#if MAX_STYLES > 0\n"
+            "\tlv_style_t     styles[MAX_STYLES];\n"
+            "#endif\n"
 
-        "#if MAX_FONTS > 0\n"
-        "\tlv_font_t      fonts[MAX_FONTS];\n"
-        "#endif\n"
+            "#if MAX_FONTS > 0\n"
+            "\tlv_font_t      fonts[MAX_FONTS];\n"
+            "#endif\n"
 
-        "#if MAX_IMAGES > 0\n"
-        "\tlv_image_dsc_t images[MAX_IMAGES];\n"
-        "#endif\n"
-        "} lv_view__private_t;"
-        "\n\n\n",
-        max_styles, 
-        max_fonts, 
-        max_images);
-    buf.append(strbuf.get());
+            "#if MAX_IMAGES > 0\n"
+            "\tlv_image_dsc_t images[MAX_IMAGES];\n"
+            "#endif\n"
+            "} lv_view__private_t;"
+            "\n\n\n",
+            max_styles,
+            max_fonts,
+            max_images);
+        buf.append(strbuf.get());
+    }
     buf.append(fn_text);
 
     return true;

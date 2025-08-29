@@ -86,7 +86,8 @@ lv_xml_style_t * lv_xml_get_style_by_name(lv_xml_component_scope_t * scope, cons
  * @param name  name of the gradient
  * @return      a gradient descriptor
  */
-lv_grad_dsc_t * lv_xml_component_get_grad(lv_xml_component_scope_t * scope, const char * name);
+const char* lv_xml_component_get_grad(lv_xml_component_scope_t* scope, const char* name,
+    void* parent_fn);
 
 /**********************
  *      MACROS

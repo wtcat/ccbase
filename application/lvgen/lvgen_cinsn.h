@@ -28,7 +28,7 @@ enum lv_types {
     type__void,
     type__lv_obj_t,
     type__lv_style_t,
-
+    type__lv_grad_dsc_t,
     type__lv_view__private_t,
     type__lv__end,
 };
@@ -45,6 +45,7 @@ static const struct type_name {
     _LV_TYPE_MAP(void),
     _LV_TYPE_MAP(lv_obj_t),
     _LV_TYPE_MAP(lv_style_t),
+    _LV_TYPE_MAP(lv_grad_dsc_t),
     _LV_TYPE_MAP(lv_view__private_t),
 };
 
@@ -68,7 +69,7 @@ enum var_scope {
 };
 
 struct func_callinsn {
-#define LV_MAX_ARGS 6
+#define LV_MAX_ARGS 7
     int   rtype;
     char* lvalue;
     char  insn[LV_SYMBOL_LEN];
@@ -109,6 +110,8 @@ struct func_context {
     int             image_num;
     int             font_num;
     int             export_cnt;
+    int             ref_cnt;
+    int             grad_cnt;
     lv_ll_t         ll_insn;
     lv_ll_t         ll_objs;
 

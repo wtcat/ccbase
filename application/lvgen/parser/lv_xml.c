@@ -100,6 +100,7 @@ void lv_xml_init(void)
     lv_xml_widget_register("lv_label", lv_xml_label_create, lv_xml_label_apply);
     lv_xml_widget_register("lv_button", lv_xml_button_create, lv_xml_button_apply);
     lv_xml_widget_register("lv_image", lv_xml_image_create, lv_xml_image_apply);
+    lv_xml_widget_register("lv_arc", lv_xml_arc_create, lv_xml_arc_apply);
 #if 0
     lv_xml_widget_register("lv_bar", lv_xml_bar_create, lv_xml_bar_apply);
     lv_xml_widget_register("lv_slider", lv_xml_slider_create, lv_xml_slider_apply);
@@ -123,7 +124,7 @@ void lv_xml_init(void)
     lv_xml_widget_register("lv_buttonmatrix", lv_xml_buttonmatrix_create, lv_xml_buttonmatrix_apply);
     lv_xml_widget_register("lv_textarea", lv_xml_textarea_create, lv_xml_textarea_apply);
     lv_xml_widget_register("lv_keyboard", lv_xml_keyboard_create, lv_xml_keyboard_apply);
-    lv_xml_widget_register("lv_arc", lv_xml_arc_create, lv_xml_arc_apply);
+    
     lv_xml_widget_register("lv_checkbox", lv_xml_checkbox_create, lv_xml_checkbox_apply);
     lv_xml_widget_register("lv_canvas", lv_xml_canvas_create, lv_xml_canvas_apply);
     lv_xml_widget_register("lv_calendar", lv_xml_calendar_create, lv_xml_calendar_apply);

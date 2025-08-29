@@ -21,6 +21,7 @@ target_sources(lv_parser
 	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_label_parser.c
 	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_button_parser.c
 	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_image_parser.c
+	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_arc_parser.c
 
 )
 

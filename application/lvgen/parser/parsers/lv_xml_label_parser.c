@@ -99,7 +99,7 @@ static lv_label_long_mode_t long_mode_text_to_enum_value(const char * txt)
 {
     char* pv = (char *)"LV_LABEL_LONG_MODE_WRAP";
 
-    if (!lvgen_cc_find_sym("lv_label_long_mode_t", "txt", &pv, NULL))
+    if (!lvgen_cc_find_sym("lv_label_long_mode_t", txt, &pv, NULL))
         LV_LOG_WARN("%s is an unknown value for label's long_mode", txt);
 
     return pv;

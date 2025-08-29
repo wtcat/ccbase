@@ -170,6 +170,9 @@
 			<prop name="none" value="LV_GRAD_DIR_NONE"/>
 			<prop name="hor" value="LV_GRAD_DIR_HOR"/>
 			<prop name="ver" value="LV_GRAD_DIR_VER"/>
+			<prop name="linear" value="LV_GRAD_DIR_LINEAR"/>
+			<prop name="radial" value="LV_GRAD_DIR_RADIAL"/>
+			<prop name="conical" value="LV_GRAD_DIR_CONICAL"/>
 		</lv_grad_dir_t>
 	
 		<lv_text_align_t>
@@ -250,6 +253,13 @@
 			<prop name="scroll_circular" value="LV_LABEL_LONG_MODE_SCROLL_CIRCULAR"/>
 			<prop name="clip" value="LV_LABEL_LONG_MODE_CLIP"/>
 		</lv_label_long_mode_t>
+		
+		<lv_arc_mode_t>
+			<prop name="normal" value="LV_ARC_MODE_NORMAL"/>
+			<prop name="symmetrical" value="LV_ARC_MODE_SYMMETRICAL"/>
+			<prop name="reverse" value="LV_ARC_MODE_REVERSE"/>
+		</lv_arc_mode_t>
+		
 	</types>
 	
 	<styles>

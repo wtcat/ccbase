@@ -63,8 +63,10 @@ struct module_depend *lvgen_new_module_depend(struct module_context* mod,
     struct func_context* depfn) {
     struct module_depend* dep;
 
-    if (mod == depfn->owner)
+    if (mod == depfn->owner) {
+        depfn->ref_cnt++;
         return NULL;
+    }
 
     LV_LL_READ(&mod->ll_deps, dep) {
         if (dep->mod == depfn->owner)
@@ -75,6 +77,7 @@ struct module_depend *lvgen_new_module_depend(struct module_context* mod,
     if (dep != NULL) {
         dep->mod = depfn->owner;
         depfn->export_cnt++;
+        depfn->ref_cnt++;
     }
 
     return dep;

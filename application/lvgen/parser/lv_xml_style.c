@@ -219,7 +219,7 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
         else SET_STYLE_IF(bg_grad_color, lv_xml_to_color(value));
         else SET_STYLE_IF(bg_main_stop, lv_xml_atoi_string(value));
         else SET_STYLE_IF(bg_grad_stop, lv_xml_atoi_string(value));
-        else SET_STYLE_IF(bg_grad, lv_xml_component_get_grad(scope, value));
+        else SET_STYLE_IF(bg_grad, lv_xml_component_get_grad(scope, value, fn));
 
         else SET_STYLE_IF(bg_image_src, lv_xml_get_image(scope, value));
         else SET_STYLE_IF(bg_image_tiled, lv_xml_to_bool_string(value));
@@ -441,16 +441,41 @@ lv_xml_style_t * lv_xml_get_style_by_name(lv_xml_component_scope_t * scope, cons
     return NULL;
 }
 
-lv_grad_dsc_t * lv_xml_component_get_grad(lv_xml_component_scope_t * scope, const char * name)
+const char* lv_xml_component_get_grad(lv_xml_component_scope_t * scope, const char * name, 
+    void *parent_fn)
 {
     lv_xml_grad_t * d;
+    static char gradbuf[128];
+
     LV_LL_READ(&scope->gradient_ll, d) {
         if (lv_streq(d->name, name)) {
-            return (lv_grad_dsc_t*)"none"; // return &d->grad_dsc;
+            struct func_context* fn = d->link_fn;
+            struct func_context* pfn = parent_fn;
+            if (parent_fn != NULL) {
+                int no = pfn->grad_cnt;
+                snprintf(gradbuf, sizeof(gradbuf), "static bool gard_dsc%d_ready", pfn->grad_cnt);
+                lvgen_new_callinsn(parent_fn, LV_TYPE(void), LV_FN_EXPR, gradbuf, NULL);
+
+                snprintf(gradbuf, sizeof(gradbuf), "static lv_grad_dsc_t gard_dsc%d", pfn->grad_cnt);
+                lvgen_new_callinsn(parent_fn, LV_TYPE(void), LV_FN_EXPR, gradbuf, NULL);
+
+                snprintf(gradbuf, sizeof(gradbuf), "if (!gard_dsc%d_ready) {", pfn->grad_cnt);
+                lvgen_new_callinsn(parent_fn, LV_TYPE(void), LV_FN_EXPR, gradbuf, NULL);
+                    snprintf(gradbuf, sizeof(gradbuf), "gard_dsc%d_ready = true", pfn->grad_cnt);
+                    lvgen_new_callinsn(parent_fn, LV_TYPE(void), LV_FN_EXPR, gradbuf, NULL);
+
+                    snprintf(gradbuf, sizeof(gradbuf), "&gard_dsc%d", no);
+                    lvgen_new_callinsn(parent_fn, LV_TYPE(void), fn->signature, gradbuf, NULL);
+                lvgen_new_callinsn(parent_fn, LV_TYPE(void), LV_FN_EXPR, "}", NULL);
+
+                pfn->grad_cnt++;
+                lvgen_new_module_depend(pfn->owner, fn);
+                return gradbuf;
+            }
         }
     }
 
-    return NULL;
+    return "none";
 }
 
 
@@ -465,6 +490,7 @@ static lv_style_prop_t style_prop_text_to_enum(const char * txt)
     if (lvgen_cc_find_sym("styles", txt, &pv, NULL))
         return pv;
 
+    LV_LOG_WARN("No style found with %s name", txt);
     return NULL;
 }
 

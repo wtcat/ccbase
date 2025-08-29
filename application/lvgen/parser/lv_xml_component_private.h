@@ -63,6 +63,7 @@ typedef struct {
 typedef struct {
     const char * name;
     lv_grad_dsc_t grad_dsc;
+    void* link_fn;
 } lv_xml_grad_t;
 
 /**********************
