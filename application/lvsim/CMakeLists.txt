@@ -39,7 +39,8 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 
 add_executable(${PROJECT_NAME}
-	main.c
+#	main.c
+	main.cc
 )
 
 include(cmake/lvgl.cmake)
@@ -47,6 +48,7 @@ add_subdirectory(driver)
 
 target_link_libraries(${PROJECT_NAME}
 	lvgl
+	base
 	${CMAKE_CURRENT_SOURCE_DIR}/SDL2/lib/x64/SDL2.lib
 )
 
