@@ -144,7 +144,9 @@ void FilePathWatcherImpl::OnObjectSignaled(HANDLE object) {
   if (file_exists && (last_modified_.is_null() ||
       last_modified_ != file_info.last_modified)) {
     last_modified_ = file_info.last_modified;
-    first_notification_ = base::Time::Now();
+
+    //TODO: Fixme??
+    //first_notification_ = base::Time::Now();
     delegate_->OnFilePathChanged(target_);
   } else if (file_exists && !first_notification_.is_null()) {
     // The target's last modification time is equal to what's on record. This
@@ -222,8 +224,11 @@ bool FilePathWatcherImpl::UpdateWatch() {
 
   base::PlatformFileInfo file_info;
   if (file_util::GetFileInfo(target_, &file_info)) {
-    last_modified_ = file_info.last_modified;
-    first_notification_ = base::Time::Now();
+    //TODO: Fixme ??
+    if (last_modified_.is_null())
+      last_modified_ = file_info.last_modified;
+
+    //first_notification_ = base::Time::Now();
   }
 
   // Start at the target and walk up the directory chain until we succesfully
