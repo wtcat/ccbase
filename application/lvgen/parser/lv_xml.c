@@ -192,7 +192,7 @@ void * lv_xml_create_in_scope(lv_obj_t * parent, lv_xml_component_scope_t * pare
 
 void * lv_xml_create(lv_obj_t * parent, const char * name, const char ** attrs)
 {
-    struct func_context* fn = lvgen_new_module_func(lvgen_get_module());
+    struct func_context* fn = lvgen_new_module_func(lvgen_get_module_by_name(name));
     lv_obj_t * item = NULL;
 
     lvgen_add_func_argument(fn, LV_PTYPE(lv_obj_t), "parent");

@@ -130,6 +130,8 @@ struct func_context {
 struct global_context {
     lv_ll_t ll_funs;
     lv_ll_t ll_modules;
+
+    struct module_context* module;
 };
 
 /* Just only for C++ declare */
@@ -145,6 +147,7 @@ typedef lv_ll_t               LvDoubleList;
  */
 struct global_context* lvgen_get_context(void);
 struct module_context* lvgen_get_module(void);
+struct module_context* lvgen_get_module_by_name(const char* name);
 struct func_context* lvgen_new_func(lv_ll_t* fn_ll, struct module_context *mod);
 struct func_context* lvgen_new_module_func(struct module_context* mod);
 struct func_context* lvgen_new_global_func(void);

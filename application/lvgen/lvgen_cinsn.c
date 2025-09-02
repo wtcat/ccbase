@@ -40,23 +40,43 @@ struct global_context* lvgen_get_context(void) {
 }
 
 static struct module_context* lvgen_new_module(const char* file, bool is_view) {
-    struct module_context* mod = lv_ll_ins_tail(&lvgen_get_context()->ll_modules);
-    if (mod != NULL) {
-        /* Remove extension name ".xml" */
-        lv_strlcpy(mod->name, lv_basename(file), LV_SYMBOL_LEN);
-        mod->name[lv_strlen(mod->name) - 4] = '\0';
+    lv_ll_t* ll_modules = &lvgen_get_context()->ll_modules;
+    struct module_context* mod;
+    char modname[LV_SYMBOL_LEN];
 
-        lv_strlcpy(mod->path, file, sizeof(mod->path));
-        lv_ll_init(&mod->ll_consts, sizeof(struct module_const));
-        lv_ll_init(&mod->ll_funs, sizeof(struct func_context));
-        lv_ll_init(&mod->ll_deps, sizeof(struct module_depend));
-        mod->is_view = is_view;
+    /* Remove extension name ".xml" */
+    lv_strlcpy(modname, lv_basename(file), LV_SYMBOL_LEN);
+    modname[lv_strlen(modname) - 4] = '\0';
+
+    mod = lvgen_get_module_by_name(modname);
+    if (mod == NULL) {
+        mod = lv_ll_ins_tail(ll_modules);
+        if (mod != NULL) {
+            lv_strlcpy(mod->name, modname, LV_SYMBOL_LEN);
+            lv_strlcpy(mod->path, file, sizeof(mod->path));
+            lv_ll_init(&mod->ll_consts, sizeof(struct module_const));
+            lv_ll_init(&mod->ll_funs, sizeof(struct func_context));
+            lv_ll_init(&mod->ll_deps, sizeof(struct module_depend));
+            mod->is_view = is_view;
+        }
     }
+
+    lvgen_get_context()->module = mod;
     return mod;
 }
 
 struct module_context* lvgen_get_module(void) {
-    return lv_ll_get_tail(&lvgen_get_context()->ll_modules);
+    return lvgen_get_context()->module;
+}
+
+struct module_context* lvgen_get_module_by_name(const char *name) {
+    struct module_context* mod;
+
+    LV_LL_READ(&lvgen_get_context()->ll_modules, mod) {
+        if (!lv_strcmp(mod->name, name))
+            return mod;
+    }
+    return NULL;
 }
 
 struct module_depend *lvgen_new_module_depend(struct module_context* mod, 
