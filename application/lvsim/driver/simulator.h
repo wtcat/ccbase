@@ -24,12 +24,10 @@ typedef struct lvgl_message {
 	lvgl_message_cb_t routine;
 } lvgl_message_t;
 
-int lvgl_runloop(
-	int hor_res, 
-	int ver_res,
-	void (*ui_bringup)(void),
-	bool (*key_action)(int code, bool pressed)
-);
+int lvgl_runloop(int hor_res, int ver_res,
+	void (*ui_bringup)(void* param),
+	void* param,
+	bool (*key_action)(int code, bool pressed));
 
 int lvgl_send_message(
 	lvgl_message_cb_t cb, 

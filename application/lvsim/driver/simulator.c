@@ -91,7 +91,8 @@ int lvgl_send_message(lvgl_message_cb_t cb, uint16_t id, void* user) {
 }
 
 int lvgl_runloop(int hor_res, int ver_res,
-	void (*ui_bringup)(void),
+	void (*ui_bringup)(void *param),
+	void *param,
 	bool (*key_action)(int code, bool pressed)) {
 
 	/* Initialize lvgl graphic stack */
@@ -106,7 +107,7 @@ int lvgl_runloop(int hor_res, int ver_res,
 
 	/* Initialize user extension */
 	if (ui_bringup)
-		ui_bringup();
+		ui_bringup(param);
 
 	if (key_action == NULL)
 		key_action = key_defaultproc;
