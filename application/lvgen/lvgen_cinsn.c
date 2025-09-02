@@ -158,6 +158,20 @@ struct func_callinsn* lvgen_new_callinsn(struct func_context* fn,
     return NULL;
 }
 
+struct func_callinsn* lvgen_new_exprinsn(struct func_context* fn, 
+    const char* insn, ...) {
+    struct func_callinsn* pins = lv_ll_ins_tail(&fn->ll_insn);
+    if (pins != NULL) {
+        va_list ap;
+
+        pins->rtype = type__lv_expr;
+        va_start(ap, insn);
+        lv_vsnprintf(pins->expr, sizeof(pins->expr), insn, ap);
+        va_end(ap);
+    }
+    return pins;
+}
+
 int lvgen_parse(const char* file, bool is_view) {
     struct module_context* mod;
     int ret;

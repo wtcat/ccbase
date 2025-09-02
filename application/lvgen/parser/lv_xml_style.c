@@ -453,22 +453,16 @@ const char* lv_xml_component_get_grad(lv_xml_component_scope_t * scope, const ch
             struct func_context* pfn = parent_fn;
             if (parent_fn != NULL) {
                 int no = pfn->grad_cnt;
-                snprintf(gradbuf, sizeof(gradbuf), "static bool gard_dsc%d_ready", pfn->grad_cnt);
-                lvgen_new_callinsn(parent_fn, LV_TYPE(void), LV_FN_EXPR, gradbuf, NULL);
 
-                snprintf(gradbuf, sizeof(gradbuf), "static lv_grad_dsc_t gard_dsc%d", pfn->grad_cnt);
-                lvgen_new_callinsn(parent_fn, LV_TYPE(void), LV_FN_EXPR, gradbuf, NULL);
+                snprintf(gradbuf, sizeof(gradbuf), "&gard_dsc%d", no);
+                lvgen_new_exprinsn(parent_fn, "static lv_grad_dsc_t gard_dsc%d;", no);
+                lvgen_new_exprinsn(parent_fn, "static bool gard_dsc%d_ready;", no);
+                lvgen_new_exprinsn(parent_fn, "if (!gard_dsc%d_ready) {", no);
+                lvgen_new_exprinsn(parent_fn, "   gard_dsc%d_ready = true;", no);
+                lvgen_new_exprinsn(parent_fn, "   %s(%s);", fn->signature, gradbuf);
+                lvgen_new_exprinsn(parent_fn, "}\n");
 
-                snprintf(gradbuf, sizeof(gradbuf), "if (!gard_dsc%d_ready) {", pfn->grad_cnt);
-                lvgen_new_callinsn(parent_fn, LV_TYPE(void), LV_FN_EXPR, gradbuf, NULL);
-                    snprintf(gradbuf, sizeof(gradbuf), "gard_dsc%d_ready = true", pfn->grad_cnt);
-                    lvgen_new_callinsn(parent_fn, LV_TYPE(void), LV_FN_EXPR, gradbuf, NULL);
-
-                    snprintf(gradbuf, sizeof(gradbuf), "&gard_dsc%d", no);
-                    lvgen_new_callinsn(parent_fn, LV_TYPE(void), fn->signature, gradbuf, NULL);
-                lvgen_new_callinsn(parent_fn, LV_TYPE(void), LV_FN_EXPR, "}", NULL);
-
-                pfn->grad_cnt++;
+                pfn->grad_cnt = no + 1;
                 lvgen_new_module_depend(pfn->owner, fn);
                 return gradbuf;
             }

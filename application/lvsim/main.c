@@ -120,29 +120,28 @@ int main(int argc, char* argv[]) {
 
 #else
 
-#define LV_CODE_EXPR(_expr) _expr
-
 static void ui_lvgen__my_card_grad1_grad_init(lv_grad_dsc_t* dsc) {
-    LV_CODE_EXPR(dsc->extend = LV_GRAD_EXTEND_PAD);
-    LV_CODE_EXPR(dsc->dir = LV_GRAD_DIR_HOR);
-    LV_CODE_EXPR(dsc->stops[0].color = lv_color_hex(0x00ff0000));
-    LV_CODE_EXPR(dsc->stops[0].opa = 255);
-    LV_CODE_EXPR(dsc->stops[0].frac = 0);
-    LV_CODE_EXPR(dsc->stops_count++);
-    LV_CODE_EXPR(dsc->stops[1].color = lv_color_hex(0x0000ff00));
-    LV_CODE_EXPR(dsc->stops[1].opa = 255);
-    LV_CODE_EXPR(dsc->stops[1].frac = 255);
-    LV_CODE_EXPR(dsc->stops_count++);
+    dsc->extend = LV_GRAD_EXTEND_PAD;
+    dsc->dir = LV_GRAD_DIR_HOR;
+    dsc->stops[0].color = lv_color_hex(0x00ff0000);
+    dsc->stops[0].opa = 255;
+    dsc->stops[0].frac = 0;
+    dsc->stops_count++;
+    dsc->stops[1].color = lv_color_hex(0x0000ff00);
+    dsc->stops[1].opa = 255;
+    dsc->stops[1].frac = 255;
+    dsc->stops_count++;
 }
 
 void ui_lvgen__my_card_gray_style_init(lv_style_t* style) {
     lv_style_init(style);
-    LV_CODE_EXPR(static bool gard_dsc0_ready);
-    LV_CODE_EXPR(static lv_grad_dsc_t gard_dsc0);
-    LV_CODE_EXPR(if (!gard_dsc0_ready) {);
-    LV_CODE_EXPR(gard_dsc0_ready = true);
-    ui_lvgen__my_card_grad1_grad_init(&gard_dsc0);
-    LV_CODE_EXPR(});
+    static lv_grad_dsc_t gard_dsc0;
+    static bool gard_dsc0_ready;
+    if (!gard_dsc0_ready) {
+        gard_dsc0_ready = true;
+        ui_lvgen__my_card_grad1_grad_init(&gard_dsc0);
+    }
+
     lv_style_set_bg_grad(style, &gard_dsc0);
 }
 
@@ -254,6 +253,7 @@ static lv_obj_t* ui_lvgen__view_create(lv_obj_t* parent, lv_view__private_t* pri
 
     return obj_0;
 }
+
 
 static void view_init(void) {
 	static lv_view__private_t styles;

@@ -518,12 +518,8 @@ static void process_grad_element(lv_xml_parser_state_t * state, const char * tag
     lv_snprintf(fn->signature, sizeof(fn->signature), LV_FN_PREFIX "%s_%s_grad_init", 
         state->scope.name, grad->name);
     lvgen_add_func_argument(fn, LV_PTYPE(lv_grad_dsc_t), "dsc");
-    lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, 
-        "dsc->extend = LV_GRAD_EXTEND_PAD", NULL);
+    lvgen_new_exprinsn(fn, "dsc->extend = LV_GRAD_EXTEND_PAD;");
     grad->link_fn = fn;
-
-    char strbuf[256];
-
 
     if(lv_streq(tag_name, "linear")) {
         dsc->dir = LV_GRAD_DIR_LINEAR;
@@ -540,24 +536,11 @@ static void process_grad_element(lv_xml_parser_state_t * state, const char * tag
         dsc->params.linear.end.x = lv_xml_to_size_int(lv_xml_split_str(&buf_p, ' '));
         dsc->params.linear.end.y = lv_xml_to_size_int(buf_p);
 
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR,
-            "dsc->dir = LV_GRAD_DIR_LINEAR", NULL);
-
-        lv_snprintf(strbuf, sizeof(strbuf),
-            "dsc->params.linear.start.x = %d", dsc->params.linear.start.x);
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
-
-        lv_snprintf(strbuf, sizeof(strbuf),
-            "dsc->params.linear.start.y = %d", dsc->params.linear.start.y);
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
-
-        lv_snprintf(strbuf, sizeof(strbuf),
-            "dsc->params.end.start.x = %d", dsc->params.linear.end.x);
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
-
-        lv_snprintf(strbuf, sizeof(strbuf),
-            "dsc->params.end.start.y = %d", dsc->params.linear.end.y);
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
+        lvgen_new_exprinsn(fn, "dsc->dir = LV_GRAD_DIR_LINEAR;");
+        lvgen_new_exprinsn(fn, "dsc->params.linear.start.x = %d;", dsc->params.linear.start.x);
+        lvgen_new_exprinsn(fn, "dsc->params.linear.start.y = %d;", dsc->params.linear.start.y);
+        lvgen_new_exprinsn(fn, "dsc->params.end.start.x = %d;", dsc->params.linear.end.x);
+        lvgen_new_exprinsn(fn, "dsc->params.end.start.y = %d;", dsc->params.linear.end.y);
     }
     else if(lv_streq(tag_name, "radial")) {
         dsc->dir = LV_GRAD_DIR_RADIAL;
@@ -627,41 +610,15 @@ static void process_grad_element(lv_xml_parser_state_t * state, const char * tag
             dsc->params.radial.focal_extent.y = dsc->params.radial.focal.y;
         }
 
-
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR,
-            "dsc->dir = LV_GRAD_DIR_RADIAL", NULL);
-
-        lv_snprintf(strbuf, sizeof(strbuf),
-            "dsc->params.radial.end.x = %d", dsc->params.radial.end.x);
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
-
-        lv_snprintf(strbuf, sizeof(strbuf),
-            "dsc->params.radial.end.y = %d", dsc->params.radial.end.y);
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
-
-        lv_snprintf(strbuf, sizeof(strbuf),
-            "dsc->params.radial.end_extent.x = %d", dsc->params.radial.end_extent.x);
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
-
-        lv_snprintf(strbuf, sizeof(strbuf),
-            "dsc->params.radial.end_extent.y = %d", dsc->params.radial.end_extent.y);
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
-
-        lv_snprintf(strbuf, sizeof(strbuf),
-            "dsc->params.radial.focal.x = %d", dsc->params.radial.focal.x);
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
-
-        lv_snprintf(strbuf, sizeof(strbuf),
-            "dsc->params.radial.focal.y = %d", dsc->params.radial.focal.y);
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
-
-        lv_snprintf(strbuf, sizeof(strbuf),
-            "dsc->params.radial.focal_extent.x = %d", dsc->params.radial.focal_extent.x);
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
-
-        lv_snprintf(strbuf, sizeof(strbuf),
-            "dsc->params.radial.focal_extent.y = %d", dsc->params.radial.focal_extent.y);
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
+        lvgen_new_exprinsn(fn, "dsc->dir = LV_GRAD_DIR_RADIAL;");
+        lvgen_new_exprinsn(fn, "dsc->params.radial.end.x = %d;", dsc->params.radial.end.x);
+        lvgen_new_exprinsn(fn, "dsc->params.radial.end.y = %d;", dsc->params.radial.end.y);
+        lvgen_new_exprinsn(fn, "dsc->params.radial.end_extent.x = %d;", dsc->params.radial.end_extent.x);
+        lvgen_new_exprinsn(fn, "dsc->params.radial.end_extent.y = %d;", dsc->params.radial.end_extent.y);
+        lvgen_new_exprinsn(fn, "dsc->params.radial.focal.x = %d;", dsc->params.radial.focal.x);
+        lvgen_new_exprinsn(fn, "dsc->params.radial.focal.y = %d;", dsc->params.radial.focal.y);
+        lvgen_new_exprinsn(fn, "dsc->params.radial.focal_extent.x = %d;", dsc->params.radial.focal_extent.x);
+        lvgen_new_exprinsn(fn, "dsc->params.radial.focal_extent.y = %d;", dsc->params.radial.focal_extent.y);
     }
 
     else if(lv_streq(tag_name, "conical")) {
@@ -690,35 +647,19 @@ static void process_grad_element(lv_xml_parser_state_t * state, const char * tag
             dsc->params.conical.end_angle = 360;
         }
 
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR,
-            "dsc->dir = LV_GRAD_DIR_CONICAL", NULL);
-
-        lv_snprintf(strbuf, sizeof(strbuf),
-            "dsc->params.conical.center.x = %d", dsc->params.conical.center.x);
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
-
-        lv_snprintf(strbuf, sizeof(strbuf),
-            "dsc->params.conical.center.y = %d", dsc->params.conical.center.y);
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
-
-        lv_snprintf(strbuf, sizeof(strbuf),
-            "dsc->params.conical.start_angle = %d", dsc->params.conical.start_angle);
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
-
-        lv_snprintf(strbuf, sizeof(strbuf),
-            "dsc->params.conical.end_angle = %d", dsc->params.conical.end_angle);
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
-
+        lvgen_new_exprinsn(fn, "dsc->dir = LV_GRAD_DIR_CONICAL;");
+        lvgen_new_exprinsn(fn, "dsc->params.conical.center.x = %d;", dsc->params.conical.center.x);
+        lvgen_new_exprinsn(fn, "dsc->params.conical.center.y = %d;", dsc->params.conical.center.y);
+        lvgen_new_exprinsn(fn, "dsc->params.conical.start_angle = %d;", dsc->params.conical.start_angle);
+        lvgen_new_exprinsn(fn, "dsc->params.conical.end_angle = %d;", dsc->params.conical.end_angle);
     }
     else if(lv_streq(tag_name, "horizontal")) {
         dsc->dir = LV_GRAD_DIR_HOR;
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR,
-            "dsc->dir = LV_GRAD_DIR_HOR", NULL);
+        lvgen_new_exprinsn(fn, "dsc->dir = LV_GRAD_DIR_HOR;");
     }
     else if(lv_streq(tag_name, "vertical")) {
         dsc->dir = LV_GRAD_DIR_VER;
-        lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR,
-            "tdsc->dir = LV_GRAD_DIR_VER", NULL);
+        lvgen_new_exprinsn(fn, "tdsc->dir = LV_GRAD_DIR_VER;");
     }
     else {
         LV_LOG_WARN("Unknown gradient type: %s", tag_name);
@@ -741,29 +682,17 @@ static void process_grad_stop_element(lv_xml_parser_state_t * state, const char 
     const char * color_value = lv_xml_get_value_of(attrs, "color");
     const char * opa_value = lv_xml_get_value_of(attrs, "opa");
     const char * offset_value = lv_xml_get_value_of(attrs, "offset");
-    char strbuf[128];
 
-    //dsc->stops[idx].color = color_value ? lv_xml_to_color(color_value) : "lv_color_black()";
-    //dsc->stops[idx].opa = opa_value ? lv_xml_to_opa(opa_value) : LV_OPA_COVER;
-    //dsc->stops[idx].frac = offset_value ? lv_xml_to_opa(offset_value) : (uint8_t)((int32_t)idx * 255 /
-    //                                                                              (LV_GRADIENT_MAX_STOPS - 1));
-
-    snprintf(strbuf, sizeof(strbuf), "dsc->stops[%d].color = %s", 
+    lvgen_new_exprinsn(fn, "dsc->stops[%d].color = %s;",
         dsc->stops_count, 
         color_value ? lv_xml_to_color(color_value) : "lv_color_black()");
-    lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
-
-    snprintf(strbuf, sizeof(strbuf), "dsc->stops[%d].opa = %s",
+    lvgen_new_exprinsn(fn, "dsc->stops[%d].opa = %s;",
         dsc->stops_count,
         opa_value ? lv_xml_to_opa_string(opa_value) : "LV_OPA_COVER");
-    lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
-
-    snprintf(strbuf, sizeof(strbuf), "dsc->stops[%d].frac = %d",
+    lvgen_new_exprinsn(fn, "dsc->stops[%d].frac = %d;",
         dsc->stops_count,
         offset_value? (int)lv_xml_to_opa(offset_value) : ((int32_t)idx * 255 / (LV_GRADIENT_MAX_STOPS - 1)));
-    lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, strbuf, NULL);
-
-    lvgen_new_callinsn(fn, LV_TYPE(void), LV_FN_EXPR, "dsc->stops_count++", NULL);
+    lvgen_new_exprinsn(fn, "dsc->stops_count++;");
 
     dsc->stops_count++;
 }

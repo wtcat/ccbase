@@ -21,9 +21,13 @@ extern "C" {
 #define LV_TYPE(name)  type__##name
 #define LV_TYPE_USED(name)  (LV_TYPE(name) | type__lv_used)
 #define LV_PTYPE(name) (LV_TYPE(name) | type__lv_pointer)
+
+#define LV_IS_EXPR(_t) ((_t) & type__lv_expr)
+
 enum lv_types {
-#define type__lv_used    (0x80000000ul)
-#define type__lv_pointer (0x40000000ul)
+#define type__lv_used    (0x00010000ul)
+#define type__lv_pointer (0x00020000ul)
+#define type__lv_expr    (0x01000000ul)
 #define type__lv_mask    (0x0000FFFF)
     type__void,
     type__lv_obj_t,
@@ -71,10 +75,15 @@ enum var_scope {
 struct func_callinsn {
 #define LV_MAX_ARGS 7
     int   rtype;
-    char* lvalue;
-    char  insn[LV_SYMBOL_LEN];
-    char  args[LV_MAX_ARGS][LV_SYMBOL_LEN];
-    int   args_num;
+    union {
+        struct {
+            char* lvalue;
+            char  insn[LV_SYMBOL_LEN];
+            char  args[LV_MAX_ARGS][LV_SYMBOL_LEN];
+            int   args_num;
+        };
+        char expr[(LV_MAX_ARGS + 1) * LV_SYMBOL_LEN];
+    };
 };
 
 struct var_insn {
@@ -140,6 +149,7 @@ struct func_context* lvgen_new_func(lv_ll_t* fn_ll, struct module_context *mod);
 struct func_context* lvgen_new_module_func(struct module_context* mod);
 struct func_context* lvgen_new_global_func(void);
 struct func_callinsn* lvgen_new_callinsn(struct func_context* fn, int retype, const char* insn, ...);
+struct func_callinsn* lvgen_new_exprinsn(struct func_context* fn, const char* insn, ...);
 void lvgen_add_func_argument(struct func_context* fn, int type, const char* var);
 lv_obj_t* lvgen_new_lvalue(struct func_context* fn, const char* name,
     struct func_callinsn* insn);
