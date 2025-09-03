@@ -34,7 +34,13 @@ bool LvCodeGenerator::LoadViews(const FilePath& dir) {
         printf("Invalid path(%s)\n", dir.AsUTF8Unsafe().c_str());
         return false;
     }
-    return ScanDirectory(dir, 0);
+
+    // Parse components
+    FilePath component_dir = dir.Append(L"components");
+    if (file_util::PathExists(component_dir))
+        ScanDirectory(component_dir, 0, false);
+
+    return ScanDirectory(dir, 0, true);
 }
 
 bool LvCodeGenerator::Generate() const{
@@ -133,7 +139,7 @@ xml::XMLElement* LvCodeGenerator::FindChild(xml::XMLElement* parent,
     return nullptr;
 }
 
-bool LvCodeGenerator::ScanDirectory(const FilePath& dir, int level) {
+bool LvCodeGenerator::ScanDirectory(const FilePath& dir, int level, bool ignore_components) {
     const fs::path root_path(dir.MaybeAsASCII());
     bool okay = false;
     bool view;
@@ -143,11 +149,15 @@ bool LvCodeGenerator::ScanDirectory(const FilePath& dir, int level) {
         return true;
 
     view = (dir.BaseName() != FilePath(L"components"))? true: false;
+    if (ignore_components && !view)
+        return true;
+
     level++;
 
     for (const auto& entry : fs::directory_iterator(root_path)) {
         if (fs::is_directory(entry)) {
-            okay = ScanDirectory(FilePath::FromUTF8Unsafe(entry.path().string()), level);
+            okay = ScanDirectory(FilePath::FromUTF8Unsafe(entry.path().string()), level, 
+                ignore_components);
             if (!okay)
                 break;
         }

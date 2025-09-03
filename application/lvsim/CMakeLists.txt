@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12.4)
 
-project(simulator)
+project(lvsim)
 enable_language(C CXX)
 
 set(ROOT_DIR           ${CMAKE_CURRENT_SOURCE_DIR})

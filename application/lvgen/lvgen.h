@@ -56,7 +56,7 @@ public:
 private:
     LvCodeGenerator();
 
-    bool ScanDirectory(const FilePath& dir, int level);
+    bool ScanDirectory(const FilePath& dir, int level, bool ignore_components);
     bool ParseView(const std::string& file, bool is_view);
 
     bool GenerateModule(const LvModuleContext *mod, std::string& buf) const;

@@ -270,6 +270,11 @@ int main(int argc, char* argv[]) {
         if (cmdline->HasSwitch("dir"))
             dir = cmdline->GetSwitchValuePath("dir");
 
+        if (!file_util::PathExists(dir)) {
+            printf("Not found path(%s)\n", dir.AsUTF8Unsafe().c_str());
+            return -1;
+        }
+
         if (cmdline->HasSwitch("hres"))
             hres = std::stoi(cmdline->GetSwitchValueASCII("hres"));
 

@@ -20,9 +20,7 @@ int main(int argc, char* argv[]) {
 
         if (cmdline->HasSwitch("help")) {
             printf(
-                "lvgen "
-                "[--dir=path]\n"
-
+                "lvgen [--dir=path]\n"
                 "Options:\n"
                 "  --dir      The root directory of input files\n"
             );
@@ -33,6 +31,11 @@ int main(int argc, char* argv[]) {
         if (cmdline->HasSwitch("dir"))
             dir = cmdline->GetSwitchValuePath("dir");
  
+        if (!file_util::PathExists(dir)) {
+            printf("Not found path(%s)\n", dir.AsUTF8Unsafe().c_str());
+            return -1;
+        }
+
         app::LvCodeGenerator *lvgen = app::LvCodeGenerator::GetInstance();
         if (lvgen->LoadAttributes(FilePath(L"lvdb.xml"))) {
             if (lvgen->LoadViews(dir))
