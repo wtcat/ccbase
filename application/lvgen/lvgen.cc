@@ -43,7 +43,7 @@ bool LvCodeGenerator::LoadViews(const FilePath& dir) {
     return ScanDirectory(dir, 0, true);
 }
 
-bool LvCodeGenerator::Generate() const{
+bool LvCodeGenerator::Generate(const FilePath &outdir) const{
     if (lvgen_generate()) {
         std::string buf;
         buf.reserve(8192);
@@ -52,7 +52,7 @@ bool LvCodeGenerator::Generate() const{
         void* ll_ptr;
         LV_LL_READ(&ctx->ll_modules, ll_ptr) {
             buf.clear();
-            GenerateModule((const LvModuleContext*)ll_ptr, buf);
+            GenerateModule((const LvModuleContext*)ll_ptr, buf, outdir);
         }
 
         return true;
@@ -181,14 +181,15 @@ bool LvCodeGenerator::ParseView(const std::string& file, bool is_view) {
     return lvgen_parse(file.c_str(), is_view) == 0;
 }
 
-bool LvCodeGenerator::GenerateModule(const LvModuleContext* mod, std::string &buf) const {
+bool LvCodeGenerator::GenerateModule(const LvModuleContext* mod, std::string &buf,
+    const FilePath &outdir) const {
     if (lv_ll_get_head(&mod->ll_funs) != nullptr) {
+
         //Generate module header file
         if (GenerateModuleHeader(mod, buf)) {
-            FilePath dir(FilePath::FromUTF8Unsafe(mod->path).DirName());
             char tbuf[128];
             snprintf(tbuf, sizeof(tbuf), "%s.h", mod->name);
-            if (file_util::WriteFile(dir.Append(FilePath::FromUTF8Unsafe(tbuf)), 
+            if (file_util::WriteFile(outdir.Append(FilePath::FromUTF8Unsafe(tbuf)),
                 buf.data(), (int)buf.size()) < 0)
                 return false;
 
@@ -196,7 +197,7 @@ bool LvCodeGenerator::GenerateModule(const LvModuleContext* mod, std::string &bu
             buf.clear();
             if (GenerateModuleSource(mod, buf)) {
                 snprintf(tbuf, sizeof(tbuf), "%s.c", mod->name);
-                return file_util::WriteFile(dir.Append(FilePath::FromUTF8Unsafe(tbuf)),
+                return file_util::WriteFile(outdir.Append(FilePath::FromUTF8Unsafe(tbuf)),
                     buf.data(), (int)buf.size()) > 0;
             }
         }

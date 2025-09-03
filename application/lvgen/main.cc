@@ -19,27 +19,30 @@ int main(int argc, char* argv[]) {
         CommandLine* cmdline = CommandLine::ForCurrentProcess();
 
         if (cmdline->HasSwitch("help")) {
-            printf(
-                "lvgen [--dir=path]\n"
-                "Options:\n"
-                "  --dir      The root directory of input files\n"
-            );
+            printf("lvgen [--indir=input directory] [--outdir=output directory]\n");
             return 0;
         }
 
-        FilePath dir(L"source");
-        if (cmdline->HasSwitch("dir"))
-            dir = cmdline->GetSwitchValuePath("dir");
+        FilePath indir(L"source");
+        if (cmdline->HasSwitch("indir"))
+            indir = cmdline->GetSwitchValuePath("indir");
  
-        if (!file_util::PathExists(dir)) {
-            printf("Not found path(%s)\n", dir.AsUTF8Unsafe().c_str());
+        if (!file_util::PathExists(indir)) {
+            printf("Not found path(%s)\n", indir.AsUTF8Unsafe().c_str());
             return -1;
         }
 
+        FilePath outdir(L"code");
+        if (cmdline->HasSwitch("outdir"))
+            outdir = cmdline->GetSwitchValuePath("outdir");
+
+        if (!file_util::PathExists(outdir))
+            file_util::CreateDirectory(outdir);
+
         app::LvCodeGenerator *lvgen = app::LvCodeGenerator::GetInstance();
         if (lvgen->LoadAttributes(FilePath(L"lvdb.xml"))) {
-            if (lvgen->LoadViews(dir))
-                return !lvgen->Generate();
+            if (lvgen->LoadViews(indir))
+                return !lvgen->Generate(outdir);
         }
     }
 

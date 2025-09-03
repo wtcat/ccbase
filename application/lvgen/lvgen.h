@@ -51,7 +51,7 @@ public:
     bool LoadAttributes(const FilePath& file);
     const LvAttribute* FindAttribute(const std::string& ns, const std::string& key);
     bool LoadViews(const FilePath& dir);
-    bool Generate() const;
+    bool Generate(const FilePath& outdir) const;
 
 private:
     LvCodeGenerator();
@@ -59,7 +59,8 @@ private:
     bool ScanDirectory(const FilePath& dir, int level, bool ignore_components);
     bool ParseView(const std::string& file, bool is_view);
 
-    bool GenerateModule(const LvModuleContext *mod, std::string& buf) const;
+    bool GenerateModule(const LvModuleContext *mod, std::string& buf, 
+        const FilePath& outdir) const;
     bool GenerateModuleHeader(const LvModuleContext* mod, std::string &buf) const;
     bool GenerateModuleSource(const LvModuleContext* mod, std::string &buf) const;
     bool GenerateFunction(const LvFunctionContext* fn, std::string& buf) const;
