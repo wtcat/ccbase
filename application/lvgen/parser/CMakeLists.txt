@@ -22,6 +22,15 @@ target_sources(lv_parser
 	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_button_parser.c
 	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_image_parser.c
 	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_arc_parser.c
+	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_canvas_parser.c
+	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_calendar_parser.c
+	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_event_parser.c
+	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_roller_parser.c
+	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_keyboard_parser.c
+
+	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_bar_parser.c
+	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_checkbox_parser.c
+	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_chart_parser.c
 
 )
 

@@ -25,6 +25,7 @@ collect_link_libraries(libs ${TARGET_NAME})
 target_link_libraries(${TARGET_NAME}
     ${libs}
     tinyxml2
+    mimalloc
 )
 
 # Copy sdl dynamic link library

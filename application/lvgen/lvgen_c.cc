@@ -12,7 +12,7 @@ bool lvgen_cc_find_sym(const char* ns, const char* key,
         if (pv)
             *pv = attr->value.c_str();
         if (pt)
-            *pt = attr->value.c_str();
+            *pt = attr->type.c_str();
         return true;
     }
     return false;

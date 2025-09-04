@@ -9,9 +9,6 @@
 
 #include "lv_xml_canvas_parser.h"
 #if LV_USE_XML
-#include "../../../lvgl.h"
-#include "../../../lvgl_private.h"
-
 
 /*********************
  *      DEFINES
@@ -39,11 +36,7 @@
 
 void * lv_xml_canvas_create(lv_xml_parser_state_t * state, const char ** attrs)
 {
-    LV_UNUSED(attrs);
-
-    void * item = lv_canvas_create(lv_xml_state_get_parent(state));
-
-    return item;
+    return lv_xml_default_widget_create(state, attrs, "lv_canvas_create", "canvas");
 }
 
 void lv_xml_canvas_apply(lv_xml_parser_state_t * state, const char ** attrs)

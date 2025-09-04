@@ -55,35 +55,31 @@ void lv_xml_image_apply(lv_xml_parser_state_t * state, const char ** attrs)
         const char * value = attrs[i + 1];
 
         if (lv_streq("src", name)) { //lv_image_set_src(item, lv_xml_get_image(&state->scope, value));
-            lvgen_new_callinsn(fn, LV_TYPE(void), "lv_image_set_src", 
-                LV_OBJNAME(item), value, NULL);
+            lvgen_new_exprinsn(fn, "lv_image_set_src(%s, %s);", 
+                LV_OBJNAME(item), value);
         }
         else if (lv_streq("inner_align", name)) { //lv_image_set_inner_align(item, image_align_to_enum(value));
-            lvgen_new_callinsn(fn, LV_TYPE(void), "lv_image_set_inner_align",
-                LV_OBJNAME(item), image_align_to_enum(value), NULL);
+            lvgen_new_exprinsn(fn, "lv_image_set_inner_align(%s, %s);",
+                LV_OBJNAME(item), image_align_to_enum(value));
         }
         else if (lv_streq("rotation", name)) {//lv_image_set_rotation(item, lv_xml_atoi(value));
-            lvgen_new_callinsn(fn, LV_TYPE(void), "lv_image_set_rotation",
-                LV_OBJNAME(item), lv_xml_atoi_string(value), NULL);
+            lvgen_new_exprinsn(fn, "lv_image_set_rotation(%s, %s);",
+                LV_OBJNAME(item), lv_xml_atoi_string(value));
         }
         else if (lv_streq("scale_x", name)) { //lv_image_set_scale_x(item, lv_xml_atoi(value));
-            lvgen_new_callinsn(fn, LV_TYPE(void), "lv_image_set_scale_x",
-                LV_OBJNAME(item), lv_xml_atoi_string(value), NULL);
+            lvgen_new_exprinsn(fn, "lv_image_set_scale_x(%s, %s);",
+                LV_OBJNAME(item), lv_xml_atoi_string(value));
         }
         else if (lv_streq("scale_y", name)) { //lv_image_set_scale_y(item, lv_xml_atoi(value));
-            lvgen_new_callinsn(fn, LV_TYPE(void), "lv_image_set_scale_y",
-                LV_OBJNAME(item), lv_xml_atoi_string(value), NULL);
+            lvgen_new_exprinsn(fn, "lv_image_set_scale_y(%s, %s);",
+                LV_OBJNAME(item), lv_xml_atoi_string(value));
         }
         else if (lv_streq("pivot", name)) {
-            char x_str[12], y_str[12];
             int32_t x = lv_xml_atoi_split(&value, ' ');
             int32_t y = lv_xml_atoi_split(&value, ' ');
-            //lv_image_set_pivot(item, x, y);
 
-            lv_snprintf(x_str, sizeof(x_str), "%d", x);
-            lv_snprintf(y_str, sizeof(y_str), "%d", y);
-            lvgen_new_callinsn(fn, LV_TYPE(void), "lv_image_set_pivot", LV_OBJNAME(item), 
-                x_str, y_str, NULL);
+            lvgen_new_exprinsn(fn, "lv_image_set_pivot(%s, %d, %d);",
+                LV_OBJNAME(item), x, y);
         }
     }
 }

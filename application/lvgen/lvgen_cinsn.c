@@ -31,7 +31,7 @@ static void lvgen_func_clear(lv_ll_t* fn_ll) {
 
 static void lvgen_module_clear(struct module_context* mod) {
     lvgen_func_clear(&mod->ll_funs);
-    lv_ll_clear(&mod->ll_consts);
+    lv_ll_clear(&mod->ll_fdecls);
     lv_ll_clear(&mod->ll_deps);
 }
 
@@ -54,7 +54,7 @@ static struct module_context* lvgen_new_module(const char* file, bool is_view) {
         if (mod != NULL) {
             lv_strlcpy(mod->name, modname, LV_SYMBOL_LEN);
             lv_strlcpy(mod->path, file, sizeof(mod->path));
-            lv_ll_init(&mod->ll_consts, sizeof(struct module_const));
+            lv_ll_init(&mod->ll_fdecls, sizeof(struct forward_declare));
             lv_ll_init(&mod->ll_funs, sizeof(struct func_context));
             lv_ll_init(&mod->ll_deps, sizeof(struct module_depend));
             mod->is_view = is_view;
@@ -104,21 +104,47 @@ struct module_depend *lvgen_new_module_depend(struct module_context* mod,
 }
 
 struct func_context* lvgen_new_global_func(void) {
-    return lvgen_new_func(&lvgen_get_context()->ll_funs, NULL);
+    return lvgen_new_func(&lvgen_get_context()->ll_funs, NULL, NULL);
+}
+
+struct func_context* lvgen_new_global_func_named(const char *fn_name) {
+    return lvgen_new_func(&lvgen_get_context()->ll_funs, NULL, fn_name);
 }
 
 struct func_context* lvgen_new_module_func(struct module_context* mod) {
-    return lvgen_new_func(&mod->ll_funs, mod);
+    return lvgen_new_module_func_named(mod, NULL);
 }
 
-struct func_context* lvgen_new_func(lv_ll_t *fn_ll, struct module_context *mod) {
-    struct func_context* fn = lv_ll_ins_tail(fn_ll);
+bool lvgen_func_initialized(struct func_context* fn) {
+    return fn->signature[0] != '\0';
+}
+
+struct func_context* lvgen_new_module_func_named(struct module_context* mod,
+    const char *fn_name) {
+    return lvgen_new_func(&mod->ll_funs, mod, fn_name);
+}
+
+struct func_context* lvgen_new_func(lv_ll_t *fn_ll, struct module_context *mod,
+    const char *signature) {
+    struct func_context* fn;
+
+    if (signature != NULL) {
+        LV_LL_READ(fn_ll, fn) {
+            if (!lv_strcmp(signature, fn->signature))
+                return fn;
+        }
+    }
+
+    fn = lv_ll_ins_tail(fn_ll);
     if (fn != NULL) {
         lv_memset(fn, 0, sizeof(*fn));
         lv_ll_init(&fn->ll_insn, sizeof(struct func_callinsn));
         lv_ll_init(&fn->ll_objs, sizeof(lv_obj_t));
         fn->owner = mod;
+        if (signature != NULL)
+            lv_strlcpy(fn->signature, signature, sizeof(fn->signature));
     }
+
     return fn;
 }
 
@@ -150,6 +176,10 @@ void lvgen_add_func_argument(struct func_context* fn, int type, const char *var)
     lv_strlcpy(fn->args[n].name, var, sizeof(fn->args[0].name));
     fn->args[n].type = type;
     fn->args_num = n + 1;
+}
+
+void lvgen_set_func_rettype(struct func_context* fn, int type) {
+    fn->rtype = type;
 }
 
 struct func_callinsn* lvgen_new_callinsn(struct func_context* fn,

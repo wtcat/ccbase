@@ -181,6 +181,7 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
                 lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_MARGIN_BOTTOM", NULL);
             }
         }
+
         else SET_STYLE_IF(width, lv_xml_to_size(value));
         else SET_STYLE_IF(min_width, lv_xml_to_size(value));
         else SET_STYLE_IF(max_width, lv_xml_to_size(value));

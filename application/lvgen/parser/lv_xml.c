@@ -101,39 +101,39 @@ void lv_xml_init(void)
     lv_xml_widget_register("lv_button", lv_xml_button_create, lv_xml_button_apply);
     lv_xml_widget_register("lv_image", lv_xml_image_create, lv_xml_image_apply);
     lv_xml_widget_register("lv_arc", lv_xml_arc_create, lv_xml_arc_apply);
-#if 0
+    lv_xml_widget_register("lv_event-call_function", lv_xml_event_call_function_create, lv_xml_event_call_function_apply);
+    lv_xml_widget_register("lv_roller", lv_xml_roller_create, lv_xml_roller_apply);
+    lv_xml_widget_register("lv_canvas", lv_xml_canvas_create, lv_xml_canvas_apply);
+    lv_xml_widget_register("lv_calendar", lv_xml_calendar_create, lv_xml_calendar_apply);
+    lv_xml_widget_register("lv_calendar-header_arrow", lv_xml_calendar_header_arrow_create,
+        lv_xml_calendar_header_arrow_apply);
+    lv_xml_widget_register("lv_calendar-header_dropdown", lv_xml_calendar_header_dropdown_create,
+        lv_xml_calendar_header_dropdown_apply);
+    lv_xml_widget_register("lv_keyboard", lv_xml_keyboard_create, lv_xml_keyboard_apply);
     lv_xml_widget_register("lv_bar", lv_xml_bar_create, lv_xml_bar_apply);
-    lv_xml_widget_register("lv_slider", lv_xml_slider_create, lv_xml_slider_apply);
-    lv_xml_widget_register("lv_tabview", lv_xml_tabview_create, lv_xml_tabview_apply);
-    lv_xml_widget_register("lv_tabview-tab_bar", lv_xml_tabview_tab_bar_create, lv_xml_tabview_tab_bar_apply);
-    lv_xml_widget_register("lv_tabview-tab", lv_xml_tabview_tab_create, lv_xml_tabview_tab_apply);
     lv_xml_widget_register("lv_chart", lv_xml_chart_create, lv_xml_chart_apply);
     lv_xml_widget_register("lv_chart-cursor", lv_xml_chart_cursor_create, lv_xml_chart_cursor_apply);
     lv_xml_widget_register("lv_chart-series", lv_xml_chart_series_create, lv_xml_chart_series_apply);
     lv_xml_widget_register("lv_chart-axis", lv_xml_chart_axis_create, lv_xml_chart_axis_apply);
+    lv_xml_widget_register("lv_checkbox", lv_xml_checkbox_create, lv_xml_checkbox_apply);
+#if 0
+    
+    lv_xml_widget_register("lv_slider", lv_xml_slider_create, lv_xml_slider_apply);
+    lv_xml_widget_register("lv_tabview", lv_xml_tabview_create, lv_xml_tabview_apply);
+    lv_xml_widget_register("lv_tabview-tab_bar", lv_xml_tabview_tab_bar_create, lv_xml_tabview_tab_bar_apply);
+    lv_xml_widget_register("lv_tabview-tab", lv_xml_tabview_tab_create, lv_xml_tabview_tab_apply);
+
     lv_xml_widget_register("lv_table", lv_xml_table_create, lv_xml_table_apply);
     lv_xml_widget_register("lv_table-column", lv_xml_table_column_create, lv_xml_table_column_apply);
     lv_xml_widget_register("lv_table-cell", lv_xml_table_cell_create, lv_xml_table_cell_apply);
     lv_xml_widget_register("lv_dropdown", lv_xml_dropdown_create, lv_xml_dropdown_apply);
     lv_xml_widget_register("lv_dropdown-list", lv_xml_dropdown_list_create, lv_xml_dropdown_list_apply);
-    lv_xml_widget_register("lv_roller", lv_xml_roller_create, lv_xml_roller_apply);
     lv_xml_widget_register("lv_scale", lv_xml_scale_create, lv_xml_scale_apply);
     lv_xml_widget_register("lv_scale-section", lv_xml_scale_section_create, lv_xml_scale_section_apply);
     lv_xml_widget_register("lv_spangroup", lv_xml_spangroup_create, lv_xml_spangroup_apply);
     lv_xml_widget_register("lv_spangroup-span", lv_xml_spangroup_span_create, lv_xml_spangroup_span_apply);
     lv_xml_widget_register("lv_buttonmatrix", lv_xml_buttonmatrix_create, lv_xml_buttonmatrix_apply);
     lv_xml_widget_register("lv_textarea", lv_xml_textarea_create, lv_xml_textarea_apply);
-    lv_xml_widget_register("lv_keyboard", lv_xml_keyboard_create, lv_xml_keyboard_apply);
-    
-    lv_xml_widget_register("lv_checkbox", lv_xml_checkbox_create, lv_xml_checkbox_apply);
-    lv_xml_widget_register("lv_canvas", lv_xml_canvas_create, lv_xml_canvas_apply);
-    lv_xml_widget_register("lv_calendar", lv_xml_calendar_create, lv_xml_calendar_apply);
-    lv_xml_widget_register("lv_calendar-header_arrow", lv_xml_calendar_header_arrow_create,
-                           lv_xml_calendar_header_arrow_apply);
-    lv_xml_widget_register("lv_calendar-header_dropdown", lv_xml_calendar_header_dropdown_create,
-                           lv_xml_calendar_header_dropdown_apply);
-
-    lv_xml_widget_register("lv_event-call_function", lv_xml_event_call_function_create, lv_xml_event_call_function_apply);
 
     lv_xml_register_font(NULL, "lv_font_default", lv_font_get_default());
 #endif

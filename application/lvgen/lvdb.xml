@@ -260,6 +260,42 @@
 			<prop name="reverse" value="LV_ARC_MODE_REVERSE"/>
 		</lv_arc_mode_t>
 		
+		<lv_roller_mode_t>
+			<prop name="normal" value="LV_ROLLER_MODE_NORMAL"/>
+			<prop name="infinite" value="LV_ROLLER_MODE_INFINITE"/>
+		</lv_roller_mode_t>
+		
+		<lv_bar_orientation_t>
+			<prop name="auto" value="LV_BAR_ORIENTATION_AUTO"/>
+			<prop name="horizontal" value="LV_BAR_ORIENTATION_HORIZONTAL"/>
+			<prop name="vertical" value="LV_BAR_ORIENTATION_VERTICAL"/>
+		</lv_bar_orientation_t>
+		
+		<lv_bar_mode_t>
+			<prop name="normal" value="LV_BAR_MODE_NORMAL"/>
+			<prop name="range" value="LV_BAR_MODE_RANGE"/>
+			<prop name="symmetrical" value="LV_BAR_MODE_SYMMETRICAL"/>
+		</lv_bar_mode_t>
+		
+		<lv_chart_type_t>
+			<prop name="none" value="LV_CHART_TYPE_NONE"/>
+			<prop name="line" value="LV_CHART_TYPE_LINE"/>
+			<prop name="bar" value="LV_CHART_TYPE_BAR"/>
+			<prop name="scatter" value="LV_CHART_TYPE_SCATTER"/>
+		</lv_chart_type_t>
+		
+		<lv_chart_update_mode_t>
+			<prop name="shift" value="LV_CHART_UPDATE_MODE_SHIFT"/>
+			<prop name="circular" value="LV_CHART_UPDATE_MODE_CIRCULAR"/>
+		</lv_chart_update_mode_t>
+		
+		<lv_chart_axis_t>
+			<prop name="primary_x" value="LV_CHART_AXIS_PRIMARY_X"/>
+			<prop name="primary_y" value="LV_CHART_AXIS_PRIMARY_Y"/>
+			<prop name="secondary_x" value="LV_CHART_AXIS_SECONDARY_X"/>
+			<prop name="secondary_y" value="LV_CHART_AXIS_SECONDARY_Y"/>
+		</lv_chart_axis_t>
+		
 	</types>
 	
 	<styles>

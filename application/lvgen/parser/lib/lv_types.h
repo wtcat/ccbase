@@ -91,6 +91,8 @@ typedef void * lv_event_cb_t; //TODO
 typedef const char* lv_color_t; //TODO
 typedef uint8_t lv_opa_t; //TODO
 
+typedef const char* lv_roller_mode_t;
+typedef const char* lv_event_code_t;
 typedef const char* lv_style_prop_t;
 typedef const char* lv_state_t;
 typedef const char* lv_align_t;
@@ -110,6 +112,13 @@ typedef const char* lv_style_selector_t;
 typedef const char* lv_obj_flag_t;
 typedef const char* lv_label_long_mode_t;
 typedef const char* lv_arc_mode_t;
+typedef const char* lv_keyboard_mode_t;
+typedef const char* lv_bar_orientation_t;
+typedef const char* lv_bar_mode_t;
+typedef const char* lv_chart_type_t;
+typedef const char* lv_chart_update_mode_t;
+typedef const char* lv_chart_axis_t;
+
 typedef char lv_font_t;
 
 typedef char* lv_style_t;
@@ -124,6 +133,9 @@ typedef struct {
 	lv_base_t base;
     void* scope_fn;
 } lv_obj_t;
+
+typedef lv_obj_t lv_chart_series_t;
+typedef lv_obj_t lv_chart_cursor_t;
 
 /*
  * OPA 

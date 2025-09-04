@@ -32,9 +32,9 @@ void ShowLayout(lv_obj_t* obj, int level) {
     for (int i = 0; i < level; i++)
         printf("    ");
 
-    printf("=>obj(%p@%s) flags(0x%x) childcnt(%d) coord{(%d, %d) (%d, %d)} class_p(%p)\n",
-        obj,
+    printf("=>obj(%s@%p) flags(0x%x) childcnt(%d) coord{(%d, %d) (%d, %d)} class_p(%p)\n",
         lv_obj_get_name(obj),
+        obj,
         obj->flags,
         children,
         obj->coords.x1, obj->coords.y1, obj->coords.x2, obj->coords.y2,
@@ -198,12 +198,10 @@ public:
         root_dir_ = dir;
         lvgl_runloop(hres, vres, &ViewManager::Init, &param, KeyProcess);
     }
-
     static void ViewMessageCallback(struct lvgl_message* msg) {
         ViewManager* vm = (ViewManager*)msg->user;
         vm->ReloadView(vm->updated_file);
     }
-
     static void Init(void* ptr) {
         ViewInitParam* p = (ViewInitParam*)ptr;
 
@@ -211,11 +209,15 @@ public:
         p->thread->message_loop()->PostTask(FROM_HERE,
             base::Bind(&ViewManager::OnAddFileWatchPath, p->view)
         );
+
+        lv_obj_set_name_static(lv_screen_active(), "ActiveScreen");
+        lv_obj_set_name_static(lv_layer_top(), "TopLayerScreen");
+        lv_obj_set_name_static(lv_layer_sys(), "SysLayerScreen");
+        lv_obj_set_name_static(lv_layer_bottom(), "BottomLayerScreen");
     }
 
 private:
     DISALLOW_COPY_AND_ASSIGN(ViewManager);
-
     bool RegisterView(const FilePath& file) {
         std::string path("A:");
         path.append(file.AsUTF8Unsafe());

@@ -24,7 +24,7 @@ extern "C" {
 
 #define LV_IS_EXPR(_t) ((_t) & type__lv_expr)
 
-enum lv_types {
+    enum lv_types {
 #define type__lv_used    (0x00010000ul)
 #define type__lv_pointer (0x00020000ul)
 #define type__lv_expr    (0x01000000ul)
@@ -33,6 +33,9 @@ enum lv_types {
     type__lv_obj_t,
     type__lv_style_t,
     type__lv_grad_dsc_t,
+    type__lv_event_t,
+    type__lv_chart_series_t,
+    type__lv_chart_cursor_t,
     type__lv_view__private_t,
     type__lv__end,
 };
@@ -50,6 +53,9 @@ static const struct type_name {
     _LV_TYPE_MAP(lv_obj_t),
     _LV_TYPE_MAP(lv_style_t),
     _LV_TYPE_MAP(lv_grad_dsc_t),
+    _LV_TYPE_MAP(lv_event_t),
+    _LV_TYPE_MAP(lv_chart_series_t),
+    _LV_TYPE_MAP(lv_chart_cursor_t),
     _LV_TYPE_MAP(lv_view__private_t),
 };
 
@@ -100,10 +106,14 @@ struct module_depend {
     struct module_context* mod;
 };
 
+struct forward_declare {
+    struct func_context* fn;
+};
+
 struct module_context {
     char     path[LV_MAX_PATH];
     char     name[LV_SYMBOL_LEN];
-    lv_ll_t  ll_consts;
+    lv_ll_t  ll_fdecls;
     lv_ll_t  ll_funs;
     lv_ll_t  ll_deps;
     bool     is_view;
@@ -148,16 +158,22 @@ typedef lv_ll_t               LvDoubleList;
 struct global_context* lvgen_get_context(void);
 struct module_context* lvgen_get_module(void);
 struct module_context* lvgen_get_module_by_name(const char* name);
-struct func_context* lvgen_new_func(lv_ll_t* fn_ll, struct module_context *mod);
+struct func_context* lvgen_new_func(lv_ll_t* fn_ll, struct module_context *mod,
+    const char* signature);
 struct func_context* lvgen_new_module_func(struct module_context* mod);
+struct func_context* lvgen_new_module_func_named(struct module_context* mod,
+    const char* fn_name);
 struct func_context* lvgen_new_global_func(void);
+struct func_context* lvgen_new_global_func_named(const char* fn_name);
 struct func_callinsn* lvgen_new_callinsn(struct func_context* fn, int retype, const char* insn, ...);
 struct func_callinsn* lvgen_new_exprinsn(struct func_context* fn, const char* insn, ...);
 void lvgen_add_func_argument(struct func_context* fn, int type, const char* var);
+void lvgen_set_func_rettype(struct func_context* fn, int type);
 lv_obj_t* lvgen_new_lvalue(struct func_context* fn, const char* name,
     struct func_callinsn* insn);
 struct module_depend* lvgen_new_module_depend(struct module_context* mod,
     struct func_context* depfn);
+bool lvgen_func_initialized(struct func_context* fn);
 
 void lvgen_context_init(void);
 void lvgen_context_destroy(void);
