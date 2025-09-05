@@ -1,6 +1,33 @@
 <?xml version="1.0" encoding="utf-8" standalone="no" ?>
 <lvgl>
 	<types>
+		<lv_api_t>
+			<prop name="bool" value="bool"/>
+			<prop name="int" value="int"/>
+			<prop name="string" value="const char *"/>
+			<prop name="opa" value="lv_opa_t"/>
+			<prop name="color" value="lv_color_t"/>
+			<prop name="px" value="int"/>
+			<prop name="content" value="int"/>
+			<prop name="lv_obj" value="lv_obj_t *"/>
+			<prop name="screen" value="lv_obj_t *"/>
+			<prop name="time_ms" value="uint32_t"/>
+			<prop name="deg_0.1" value="int"/>
+			<prop name="scale_1/256" value="uint8_t"/>
+			
+			<prop name="style" value="lv_style_t *"/>
+			<prop name="font" value="lv_font_t *"/>
+			<prop name="image" value="lv_image_dsc_t *"/>
+			<prop name="animation" value="lv_anim_t *"/>
+			<prop name="event_cb" value="lv_event_cb_t *"/>
+			<prop name="grad" value="lv_grad_dsc_t *"/>
+			<prop name="subject" value="lv_subject_t *"/>
+			
+			<prop name="int[N]" value="int *"/>
+			<prop name="string[...NULL]" value="char *"/>
+			<prop name="string[]" value="char []"/>
+		</lv_api_t>
+		
 		<lv_event_code_t>
 			<prop name="all" value="LV_EVENT_ALL"/>
 			<prop name="pressed" value="LV_EVENT_PRESSED"/>
