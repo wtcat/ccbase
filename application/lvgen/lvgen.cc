@@ -265,8 +265,8 @@ bool LvCodeGenerator::GenerateModuleSource(const LvModuleContext* mod, std::stri
     LV_LL_READ(&mod->ll_funs, ll_ptr) {
         LvFunctionContext* fn = (LvFunctionContext*)ll_ptr;
 
-        if (!mod->is_view && fn->ref_cnt == 0)
-            continue;
+        //if (!mod->is_view && fn->ref_cnt == 0)
+        //    continue;
 
         GenerateFunction(fn, fn_text);
         if (fn->style_num > max_styles)
@@ -346,47 +346,47 @@ bool LvCodeGenerator::GenerateFunctionSignature(const LvFunctionContext* fn, cha
         break;
     case 1:
         offset += snprintf(tbuf + offset, remain - offset, "(%s %s)",
-            lv_type_to_name(fn->args[0].type), fn->args[0].name
+            fn->args[0].type, fn->args[0].name
         );
         break;
     case 2:
         offset += snprintf(tbuf + offset, remain - offset, "(%s %s, %s %s)",
-            lv_type_to_name(fn->args[0].type), fn->args[0].name,
-            lv_type_to_name(fn->args[1].type), fn->args[1].name
+            fn->args[0].type, fn->args[0].name,
+            fn->args[1].type, fn->args[1].name
         );
         break;
     case 3:
         offset += snprintf(tbuf + offset, remain - offset, "(%s %s, %s %s, %s %s)",
-            lv_type_to_name(fn->args[0].type), fn->args[0].name,
-            lv_type_to_name(fn->args[1].type), fn->args[1].name,
-            lv_type_to_name(fn->args[2].type), fn->args[2].name
+            fn->args[0].type, fn->args[0].name,
+            fn->args[1].type, fn->args[1].name,
+            fn->args[2].type, fn->args[2].name
         );
         break;
     case 4:
         offset += snprintf(tbuf + offset, remain - offset, "(%s %s, %s %s, %s %s, %s %s)",
-            lv_type_to_name(fn->args[0].type), fn->args[0].name,
-            lv_type_to_name(fn->args[1].type), fn->args[1].name,
-            lv_type_to_name(fn->args[2].type), fn->args[2].name,
-            lv_type_to_name(fn->args[3].type), fn->args[3].name
+            fn->args[0].type, fn->args[0].name,
+            fn->args[1].type, fn->args[1].name,
+            fn->args[2].type, fn->args[2].name,
+            fn->args[3].type, fn->args[3].name
         );
         break;
     case 5:
         offset += snprintf(tbuf + offset, remain - offset, "(%s %s, %s %s, %s %s, %s %s, %s %s)",
-            lv_type_to_name(fn->args[0].type), fn->args[0].name,
-            lv_type_to_name(fn->args[1].type), fn->args[1].name,
-            lv_type_to_name(fn->args[2].type), fn->args[2].name,
-            lv_type_to_name(fn->args[3].type), fn->args[3].name,
-            lv_type_to_name(fn->args[4].type), fn->args[4].name
+            fn->args[0].type, fn->args[0].name,
+            fn->args[1].type, fn->args[1].name,
+            fn->args[2].type, fn->args[2].name,
+            fn->args[3].type, fn->args[3].name,
+            fn->args[4].type, fn->args[4].name
         );
         break;
     case 6:
         offset += snprintf(tbuf + offset, remain - offset, "(%s %s, %s %s, %s %s, %s %s, %s %s, %s %s)",
-            lv_type_to_name(fn->args[0].type), fn->args[0].name,
-            lv_type_to_name(fn->args[1].type), fn->args[1].name,
-            lv_type_to_name(fn->args[2].type), fn->args[2].name,
-            lv_type_to_name(fn->args[3].type), fn->args[3].name,
-            lv_type_to_name(fn->args[4].type), fn->args[4].name,
-            lv_type_to_name(fn->args[5].type), fn->args[5].name
+            fn->args[0].type, fn->args[0].name,
+            fn->args[1].type, fn->args[1].name,
+            fn->args[2].type, fn->args[2].name,
+            fn->args[3].type, fn->args[3].name,
+            fn->args[4].type, fn->args[4].name,
+            fn->args[5].type, fn->args[5].name
         );
         break;
     default:

@@ -517,7 +517,7 @@ static void process_grad_element(lv_xml_parser_state_t * state, const char * tag
     struct func_context* fn = lvgen_new_module_func(lvgen_get_module());
     lv_snprintf(fn->signature, sizeof(fn->signature), LV_FN_PREFIX "%s_%s_grad_init", 
         state->scope.name, grad->name);
-    lvgen_add_func_argument(fn, LV_PTYPE(lv_grad_dsc_t), "dsc");
+    lvgen_add_func_argument(fn, "lv_grad_dsc_t*", "dsc");
     lvgen_new_exprinsn(fn, "dsc->extend = LV_GRAD_EXTEND_PAD;");
     grad->link_fn = fn;
 

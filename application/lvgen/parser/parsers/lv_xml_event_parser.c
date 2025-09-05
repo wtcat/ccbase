@@ -77,7 +77,7 @@ void * lv_xml_event_call_function_create(lv_xml_parser_state_t * state, const ch
     struct func_context* newfn = lvgen_new_module_func_named(lvgen_get_module(), cb_txt);
     if (!lvgen_func_initialized(newfn)) {
         lvgen_set_func_rettype(newfn, LV_TYPE(void));
-        lvgen_add_func_argument(newfn, LV_PTYPE(lv_event_t), "e");
+        lvgen_add_func_argument(newfn, "lv_event_t*", "e");
         lv_strlcpy(newfn->signature, cb_txt, sizeof(newfn->signature));
         lvgen_new_exprinsn(newfn, "lv_obj_t *target = lv_event_get_target(e);");
         lvgen_new_exprinsn(newfn, "lv_event_code_t code = lv_event_get_code(e);");

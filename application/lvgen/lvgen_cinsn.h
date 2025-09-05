@@ -93,7 +93,7 @@ struct func_callinsn {
 };
 
 struct var_insn {
-    int  type;
+    char type[LV_SYMBOL_LEN];
     char name[LV_SYMBOL_LEN];
 };
 
@@ -167,7 +167,7 @@ struct func_context* lvgen_new_global_func(void);
 struct func_context* lvgen_new_global_func_named(const char* fn_name);
 struct func_callinsn* lvgen_new_callinsn(struct func_context* fn, int retype, const char* insn, ...);
 struct func_callinsn* lvgen_new_exprinsn(struct func_context* fn, const char* insn, ...);
-void lvgen_add_func_argument(struct func_context* fn, int type, const char* var);
+void lvgen_add_func_argument(struct func_context* fn, const char* type, const char* var);
 void lvgen_set_func_rettype(struct func_context* fn, int type);
 lv_obj_t* lvgen_new_lvalue(struct func_context* fn, const char* name,
     struct func_callinsn* insn);

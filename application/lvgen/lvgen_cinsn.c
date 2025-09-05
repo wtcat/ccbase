@@ -169,12 +169,12 @@ lv_obj_t* lvgen_new_lvalue(struct func_context* fn, const char *name,
     return obj;
 }
 
-void lvgen_add_func_argument(struct func_context* fn, int type, const char *var) {
+void lvgen_add_func_argument(struct func_context* fn, const char *type, const char *var) {
     int n = fn->args_num;
 
     assert(n < LV_MAX_ARGS);
-    lv_strlcpy(fn->args[n].name, var, sizeof(fn->args[0].name));
-    fn->args[n].type = type;
+    lv_strlcpy(fn->args[n].name, var, LV_SYMBOL_LEN);
+    lv_strlcpy(fn->args[n].type, type, LV_SYMBOL_LEN);
     fn->args_num = n + 1;
 }
 

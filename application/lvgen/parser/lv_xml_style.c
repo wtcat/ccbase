@@ -118,7 +118,7 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
         lv_snprintf((char *)xml_style->long_name, long_name_len, "%s.%s", scope->name, style_name); /*E.g. my_button.style1*/
 
         lv_snprintf(fn->signature, sizeof(fn->signature), LV_FN_PREFIX "%s_%s_style_init", scope->name, style_name);
-        lvgen_add_func_argument(fn, LV_PTYPE(lv_style_t), "style");
+        lvgen_add_func_argument(fn, "lv_style_t*", "style");
         lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_init", "style", NULL);
         xml_style->link_fn = fn;
     }
