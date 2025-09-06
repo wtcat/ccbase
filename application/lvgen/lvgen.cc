@@ -49,8 +49,9 @@ bool LvCodeGenerator::Generate(const FilePath &outdir) const{
         buf.reserve(8192);
 
         LvGlobalContext* ctx = lvgen_get_context();
-        void* ll_ptr;
-        LV_LL_READ(&ctx->ll_modules, ll_ptr) {
+        LvModuleContext* ll_ptr;
+
+        TAILQ_FOREACH(ll_ptr, &ctx->ll_modules, link) {
             buf.clear();
             GenerateModule((const LvModuleContext*)ll_ptr, buf, outdir);
         }
@@ -183,8 +184,8 @@ bool LvCodeGenerator::ParseView(const std::string& file, bool is_view) {
 
 bool LvCodeGenerator::GenerateModule(const LvModuleContext* mod, std::string &buf,
     const FilePath &outdir) const {
-    if (lv_ll_get_head(&mod->ll_funs) != nullptr) {
 
+    if (!TAILQ_EMPTY(&mod->ll_funs)) {
         //Generate module header file
         if (GenerateModuleHeader(mod, buf)) {
             char tbuf[128];
@@ -221,9 +222,8 @@ bool LvCodeGenerator::GenerateModuleHeader(const LvModuleContext* mod, std::stri
     buf.append("#endif\n\n");
 
     // Function declare
-    void* ll_ptr;
-    LV_LL_READ(&mod->ll_funs, ll_ptr) {
-        LvFunctionContext* fn = (LvFunctionContext*)ll_ptr;
+    LvFunctionContext* fn;
+    TAILQ_FOREACH(fn, &mod->ll_funs, link) {
         if (fn->export_cnt > 0 && GenerateFunctionSignature(fn, tbuf, sizeof(tbuf)))
             buf.append(tbuf).append(";\n");
     }
@@ -242,7 +242,7 @@ bool LvCodeGenerator::GenerateModuleHeader(const LvModuleContext* mod, std::stri
 
 bool LvCodeGenerator::GenerateModuleSource(const LvModuleContext* mod, std::string& buf) const {
     scoped_ptr<char> strbuf(new char[kStringBufferSize]);
-    void* ll_ptr;
+    LvModuleDepend* mdep;
 
     //Add copyright information
     GenerateCopyright(buf);
@@ -250,8 +250,8 @@ bool LvCodeGenerator::GenerateModuleSource(const LvModuleContext* mod, std::stri
     //Add header file depends
     buf.append("#include \"lvgl.h\"\n");
     buf.append("#include \"lvgen_cdefs.h\"\n");
-    LV_LL_READ(&mod->ll_deps, ll_ptr) {
-        LvModuleDepend* mdep = (LvModuleDepend*)ll_ptr;
+
+    TAILQ_FOREACH(mdep, &mod->ll_deps, link) {
         snprintf(strbuf.get(), kStringBufferSize, "#include \"%s.h\"\n", mdep->mod->name);
         buf.append(strbuf.get());
     }
@@ -262,9 +262,8 @@ bool LvCodeGenerator::GenerateModuleSource(const LvModuleContext* mod, std::stri
     std::string fn_text;
     fn_text.reserve(8192);
 
-    LV_LL_READ(&mod->ll_funs, ll_ptr) {
-        LvFunctionContext* fn = (LvFunctionContext*)ll_ptr;
-
+    LvFunctionContext* fn;
+    TAILQ_FOREACH(fn, &mod->ll_funs, link) {
         //if (!mod->is_view && fn->ref_cnt == 0)
         //    continue;
 
@@ -399,11 +398,10 @@ bool LvCodeGenerator::GenerateFunctionSignature(const LvFunctionContext* fn, cha
 bool LvCodeGenerator::GenerateFunctionInstruction(const LvFunctionContext* fn, std::string &buf, 
     const char *indent) const  {
     char tbuf[512];
-    void* ll_ptr;
 
     // Format function instruction
-    LV_LL_READ(&fn->ll_insn, ll_ptr) {
-        LvFunctionCallInsn* ins = (LvFunctionCallInsn*)ll_ptr;
+    LvFunctionCallInsn* ins;
+    TAILQ_FOREACH(ins, &fn->ll_insn, link) {
         int remain = sizeof(tbuf);
         int offset = 0;
 

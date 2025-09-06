@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <parser/lib/lv_types.h>
 
+#include "sys/queue.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -71,6 +72,8 @@ const char* lv_type_to_name(int type) {
 #endif /* _LV_SOURCE_CODE */
 
 struct module_context;
+struct func_context;
+
 enum var_scope {
     LV_VAR_SCOPE_FUN_LOCAL,
     LV_VAR_SCOPE_FUN_STATIC,
@@ -78,8 +81,12 @@ enum var_scope {
     LV_VAR_SCOPE_MOD_GLOBAL,
 };
 
+TAILQ_HEAD(_fn_list, func_context);
+TAILQ_HEAD(_mod_list, module_context);
+
 struct func_callinsn {
 #define LV_MAX_ARGS 7
+    TAILQ_ENTRY(func_callinsn) link;
     int   rtype;
     union {
         struct {
@@ -97,29 +104,28 @@ struct var_insn {
     char name[LV_SYMBOL_LEN];
 };
 
-struct module_const {
-    char name[LV_SYMBOL_LEN];
-    char value[LV_SYMBOL_LEN];
-};
-
 struct module_depend {
+    TAILQ_ENTRY(module_depend) link;
     struct module_context* mod;
 };
 
 struct forward_declare {
+    TAILQ_ENTRY(forward_declare) link;
     struct func_context* fn;
 };
 
 struct module_context {
+    TAILQ_ENTRY(module_context) link;
     char     path[LV_MAX_PATH];
     char     name[LV_SYMBOL_LEN];
-    lv_ll_t  ll_fdecls;
-    lv_ll_t  ll_funs;
-    lv_ll_t  ll_deps;
+    TAILQ_HEAD(, forward_declare) ll_fdecls;
+    TAILQ_HEAD(, module_depend)   ll_deps;
+    struct _fn_list    ll_funs;
     bool     is_view;
 };
 
 struct func_context {
+    TAILQ_ENTRY(func_context) link;
     char            signature[LV_SYMBOL_LEN];
     struct var_insn args[LV_MAX_ARGS];
     const char*     rvar;
@@ -131,15 +137,15 @@ struct func_context {
     int             export_cnt;
     int             ref_cnt;
     int             grad_cnt;
-    lv_ll_t         ll_insn;
-    lv_ll_t         ll_objs;
+    TAILQ_HEAD(, func_callinsn) ll_insn;
+    TAILQ_HEAD(, _lv_obj) ll_objs;
 
     struct module_context* owner;
 };
 
 struct global_context {
-    lv_ll_t ll_funs;
-    lv_ll_t ll_modules;
+    struct _fn_list  ll_funs;
+    struct _mod_list ll_modules;
 
     struct module_context* module;
 };
@@ -150,7 +156,6 @@ typedef struct func_context   LvFunctionContext;
 typedef struct module_context LvModuleContext;
 typedef struct global_context LvGlobalContext;
 typedef struct module_depend  LvModuleDepend;
-typedef lv_ll_t               LvDoubleList;
 
 /*
  * Public API declare 
@@ -158,7 +163,7 @@ typedef lv_ll_t               LvDoubleList;
 struct global_context* lvgen_get_context(void);
 struct module_context* lvgen_get_module(void);
 struct module_context* lvgen_get_module_by_name(const char* name);
-struct func_context* lvgen_new_func(lv_ll_t* fn_ll, struct module_context *mod,
+struct func_context* lvgen_new_func(struct _fn_list* fn_ll, struct module_context *mod,
     const char* signature);
 struct func_context* lvgen_new_module_func(struct module_context* mod);
 struct func_context* lvgen_new_module_func_named(struct module_context* mod,

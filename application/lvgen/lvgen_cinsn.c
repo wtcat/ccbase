@@ -19,20 +19,43 @@
 
 static struct global_context lvgen_context;
 
-static void lvgen_func_clear(lv_ll_t* fn_ll) {
-    struct func_context* fn;
+#define LIST_REMOVE_NODE(_head, _node) \
+do { \
+    TAILQ_REMOVE((_head), (_node), link); \
+    lv_free((_node)); \
+} while (0)
 
-    LV_LL_READ(fn_ll, fn) {
-        lv_ll_clear(&fn->ll_insn);
-        lv_ll_clear(&fn->ll_objs);
+#define LIST_CLEAR(_head, _type) \
+do { \
+    struct _type* __p, *__n; \
+    TAILQ_FOREACH_SAFE(__p, (_head), link, __n) { \
+        LIST_REMOVE_NODE((_head), __p); \
+    } \
+} while(0)
+
+#define LIST_NEW_NODE(_head, _type, _ret, _clr) \
+do { \
+    struct _type *__node = lv_malloc(sizeof(struct _type)); \
+    if (__node != NULL) { \
+        if (_clr) lv_memset(__node, 0, sizeof(struct _type)); \
+        TAILQ_INSERT_TAIL((_head), __node, link); \
+    } \
+    (_ret) = __node; \
+} while (0)
+
+static void lvgen_func_clear(struct _fn_list *list) {
+    struct func_context* fn;
+    TAILQ_FOREACH(fn, list, link) {
+        LIST_CLEAR(&fn->ll_insn, func_callinsn);
+        LIST_CLEAR(&fn->ll_objs, _lv_obj);
     }
-    lv_ll_clear(fn_ll);
+    LIST_CLEAR(list, func_context);
 }
 
 static void lvgen_module_clear(struct module_context* mod) {
     lvgen_func_clear(&mod->ll_funs);
-    lv_ll_clear(&mod->ll_fdecls);
-    lv_ll_clear(&mod->ll_deps);
+    LIST_CLEAR(&mod->ll_fdecls, forward_declare);
+    LIST_CLEAR(&mod->ll_deps, module_depend);
 }
 
 struct global_context* lvgen_get_context(void) {
@@ -40,7 +63,7 @@ struct global_context* lvgen_get_context(void) {
 }
 
 static struct module_context* lvgen_new_module(const char* file, bool is_view) {
-    lv_ll_t* ll_modules = &lvgen_get_context()->ll_modules;
+    struct _mod_list* ll_modules = &lvgen_get_context()->ll_modules;
     struct module_context* mod;
     char modname[LV_SYMBOL_LEN];
 
@@ -50,13 +73,13 @@ static struct module_context* lvgen_new_module(const char* file, bool is_view) {
 
     mod = lvgen_get_module_by_name(modname);
     if (mod == NULL) {
-        mod = lv_ll_ins_tail(ll_modules);
+        LIST_NEW_NODE(ll_modules, module_context, mod, false);
         if (mod != NULL) {
             lv_strlcpy(mod->name, modname, LV_SYMBOL_LEN);
             lv_strlcpy(mod->path, file, sizeof(mod->path));
-            lv_ll_init(&mod->ll_fdecls, sizeof(struct forward_declare));
-            lv_ll_init(&mod->ll_funs, sizeof(struct func_context));
-            lv_ll_init(&mod->ll_deps, sizeof(struct module_depend));
+            TAILQ_INIT(&mod->ll_fdecls);
+            TAILQ_INIT(&mod->ll_funs);
+            TAILQ_INIT(&mod->ll_deps);
             mod->is_view = is_view;
         }
     }
@@ -72,7 +95,7 @@ struct module_context* lvgen_get_module(void) {
 struct module_context* lvgen_get_module_by_name(const char *name) {
     struct module_context* mod;
 
-    LV_LL_READ(&lvgen_get_context()->ll_modules, mod) {
+    TAILQ_FOREACH(mod, &lvgen_get_context()->ll_modules, link) {
         if (!lv_strcmp(mod->name, name))
             return mod;
     }
@@ -88,12 +111,12 @@ struct module_depend *lvgen_new_module_depend(struct module_context* mod,
         return NULL;
     }
 
-    LV_LL_READ(&mod->ll_deps, dep) {
+    TAILQ_FOREACH(dep, &mod->ll_deps, link) {
         if (dep->mod == depfn->owner)
             return dep;
     }
 
-    dep = lv_ll_ins_tail(&mod->ll_deps);
+    LIST_NEW_NODE(&mod->ll_deps, module_depend, dep, false);
     if (dep != NULL) {
         dep->mod = depfn->owner;
         depfn->export_cnt++;
@@ -124,22 +147,21 @@ struct func_context* lvgen_new_module_func_named(struct module_context* mod,
     return lvgen_new_func(&mod->ll_funs, mod, fn_name);
 }
 
-struct func_context* lvgen_new_func(lv_ll_t *fn_ll, struct module_context *mod,
+struct func_context* lvgen_new_func(struct _fn_list *fn_ll, struct module_context *mod,
     const char *signature) {
     struct func_context* fn;
 
     if (signature != NULL) {
-        LV_LL_READ(fn_ll, fn) {
+        TAILQ_FOREACH(fn, fn_ll, link) {
             if (!lv_strcmp(signature, fn->signature))
                 return fn;
         }
     }
 
-    fn = lv_ll_ins_tail(fn_ll);
+    LIST_NEW_NODE(fn_ll, func_context, fn, true);
     if (fn != NULL) {
-        lv_memset(fn, 0, sizeof(*fn));
-        lv_ll_init(&fn->ll_insn, sizeof(struct func_callinsn));
-        lv_ll_init(&fn->ll_objs, sizeof(lv_obj_t));
+        TAILQ_INIT(&fn->ll_insn);
+        TAILQ_INIT(&fn->ll_objs);
         fn->owner = mod;
         if (signature != NULL)
             lv_strlcpy(fn->signature, signature, sizeof(fn->signature));
@@ -153,12 +175,12 @@ lv_obj_t* lvgen_new_lvalue(struct func_context* fn, const char *name,
     lv_obj_t* obj;
     int no = 0;
 
-    LV_LL_READ(&fn->ll_objs, obj) {
+    TAILQ_FOREACH(obj, &fn->ll_objs, link) {
         if (!lv_memcmp(obj->base.name, name, lv_strlen(name)))
             no++;
     }
 
-    obj = lv_ll_ins_tail(&fn->ll_objs);
+    LIST_NEW_NODE(&fn->ll_objs, _lv_obj, obj, false);
     if (obj != NULL) {
         lv_snprintf(obj->base.name, sizeof(obj->base.name), "%s_%d", name, no);
 
@@ -184,11 +206,12 @@ void lvgen_set_func_rettype(struct func_context* fn, int type) {
 
 struct func_callinsn* lvgen_new_callinsn(struct func_context* fn,
     int retype, const char *insn, ...) {
-    struct func_callinsn* pins = lv_ll_ins_tail(&fn->ll_insn);
+    struct func_callinsn* pins;
+
+    LIST_NEW_NODE(&fn->ll_insn, func_callinsn, pins, true);
     if (pins != NULL) {
         va_list ap;
 
-        lv_memset(pins, 0, sizeof(*pins));
         va_start(ap, insn);
         for (int i = 0; i < LV_MAX_ARGS; i++) {
             const char* parg = va_arg(ap, const char*);
@@ -210,7 +233,9 @@ struct func_callinsn* lvgen_new_callinsn(struct func_context* fn,
 
 struct func_callinsn* lvgen_new_exprinsn(struct func_context* fn, 
     const char* insn, ...) {
-    struct func_callinsn* pins = lv_ll_ins_tail(&fn->ll_insn);
+    struct func_callinsn* pins;
+
+    LIST_NEW_NODE(&fn->ll_insn, func_callinsn, pins, false);
     if (pins != NULL) {
         va_list ap;
 
@@ -233,8 +258,7 @@ int lvgen_parse(const char* file, bool is_view) {
     ret = lv_xml_component_register_from_file(file);
     if (ret < 0 && mod) {
         lvgen_module_clear(mod);
-        lv_ll_remove(&lvgen_get_context()->ll_modules, mod);
-        lv_free(mod);
+        LIST_REMOVE_NODE(&lvgen_get_context()->ll_modules, mod);
     }
 
     return ret;
@@ -244,7 +268,7 @@ bool lvgen_generate(void) {
     struct global_context* ctx = lvgen_get_context();
     struct module_context* mod;
 
-    LV_LL_READ(&ctx->ll_modules, mod) {
+    TAILQ_FOREACH(mod, &ctx->ll_modules, link) {
         if (mod->is_view && !lv_xml_create(NULL, mod->name, NULL)) {
             printf("Failed to generate moudle(%s@ %s)\n", mod->name, mod->path);
         }
@@ -253,8 +277,8 @@ bool lvgen_generate(void) {
 }
 
 void lvgen_context_init(void) {
-    lv_ll_init(&lvgen_context.ll_funs, sizeof(struct func_context));
-    lv_ll_init(&lvgen_context.ll_modules, sizeof(struct module_context));
+    TAILQ_INIT(&lvgen_context.ll_funs);
+    TAILQ_INIT(&lvgen_context.ll_modules);
     lv_xml_init();
 }
 
@@ -262,12 +286,10 @@ void lvgen_context_destroy(void) {
     struct global_context* ctx = &lvgen_context;
     struct module_context* mod;
 
-    if (ctx->ll_funs.n_size > 0) {
-        lvgen_func_clear(&ctx->ll_funs);
-        LV_LL_READ(&ctx->ll_modules, mod) {
-            lv_xml_component_unregister(mod->name);
-            lvgen_module_clear(mod);
-        }
-        lv_ll_clear(&ctx->ll_modules);
+    lvgen_func_clear(&ctx->ll_funs);
+    TAILQ_FOREACH(mod, &ctx->ll_modules, link) {
+        lv_xml_component_unregister(mod->name);
+        lvgen_module_clear(mod);
     }
+    LIST_CLEAR(&ctx->ll_modules, module_context);
 }

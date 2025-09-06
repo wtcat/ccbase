@@ -11,6 +11,7 @@
 extern "C"{
 #endif
 #include "lv_ll.h"
+#include "sys/queue.h"
 
 /**********************
  *      MACROS
@@ -128,8 +129,9 @@ typedef struct {
 	char name[LV_MAX_VNAME];
 } lv_base_t;
 
-typedef struct {
+typedef struct _lv_obj {
 #define LV_OBJNAME(_obj) ((lv_obj_t *)(_obj))->base.name
+    TAILQ_ENTRY(_lv_obj) link;
 	lv_base_t base;
     void* scope_fn;
 } lv_obj_t;
