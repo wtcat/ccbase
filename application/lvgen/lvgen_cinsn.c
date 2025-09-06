@@ -48,6 +48,7 @@ static void lvgen_func_clear(struct _fn_list *list) {
     TAILQ_FOREACH(fn, list, link) {
         LIST_CLEAR(&fn->ll_insn, func_callinsn);
         LIST_CLEAR(&fn->ll_objs, _lv_obj);
+        LIST_CLEAR(&fn->ll_params, fn_param);
     }
     LIST_CLEAR(list, func_context);
 }
@@ -147,6 +148,33 @@ struct func_context* lvgen_new_module_func_named(struct module_context* mod,
     return lvgen_new_func(&mod->ll_funs, mod, fn_name);
 }
 
+struct fn_param* lvgen_get_fnparam(struct func_context* fn, const char* key) {
+    struct fn_param* param;
+
+    TAILQ_FOREACH(param, &fn->ll_params, link) {
+        if (!lv_strcmp(key, param->key))
+            return param;
+    }
+
+    return NULL;
+}
+
+struct fn_param* lvgen_new_fnparam(struct func_context* fn, const char *key) {
+    struct fn_param* param;
+
+    if (key != NULL) {
+        param = lvgen_get_fnparam(fn, key);
+        if (param)
+            return param;
+    }
+
+    LIST_NEW_NODE(&fn->ll_params, fn_param, param, true);
+    if (param != NULL)
+        lv_strlcpy(param->key, key, LV_SYMBOL_LEN);
+
+    return param;
+}
+
 struct func_context* lvgen_new_func(struct _fn_list *fn_ll, struct module_context *mod,
     const char *signature) {
     struct func_context* fn;
@@ -162,6 +190,7 @@ struct func_context* lvgen_new_func(struct _fn_list *fn_ll, struct module_contex
     if (fn != NULL) {
         TAILQ_INIT(&fn->ll_insn);
         TAILQ_INIT(&fn->ll_objs);
+        TAILQ_INIT(&fn->ll_params);
         fn->owner = mod;
         if (signature != NULL)
             lv_strlcpy(fn->signature, signature, sizeof(fn->signature));

@@ -40,6 +40,10 @@ extern "C" {
  * GLOBAL PROTOTYPES
  **********************/
 #if 1
+struct func_context;
+
+struct func_context* lv_xml_create_scope_fn(lv_xml_component_scope_t* scope, const char* name);
+
 void* lv_xml_default_widget_create(lv_xml_parser_state_t* state, const char** attrs,
     const char* fnname, const char* varname);
 

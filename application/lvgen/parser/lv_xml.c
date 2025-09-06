@@ -73,6 +73,28 @@ static void view_end_element_handler(void * user_data, const char * name);
  *   GLOBAL FUNCTIONS
  **********************/
 
+struct func_context* 
+lv_xml_create_scope_fn(lv_xml_component_scope_t* scope, const char* name) {
+    struct func_context* fn = lvgen_new_module_func(lvgen_get_module_by_name(name));
+
+    fn->rtype = LV_PTYPE(lv_obj_t);
+    lv_snprintf(fn->signature, sizeof(fn->signature), LV_FN_PREFIX "%s_create", name);
+    lvgen_add_func_argument(fn, "lv_obj_t*", "parent");
+
+    if (lv_ll_is_empty(&scope->param_ll)) {
+        lvgen_add_func_argument(fn, "lv_view__private_t*", LV_VFN_PARAM2);
+    } else {
+        lv_xml_param_t* param;
+        LV_LL_READ(&scope->param_ll, param) {
+            char* pv = "unknown";
+            lvgen_cc_find_sym("lv_api_t", param->type, &pv, NULL);
+            lvgen_add_func_argument(fn, pv, param->name);
+        }
+    }
+
+    return fn;
+}
+
 void* lv_xml_default_widget_create(lv_xml_parser_state_t* state, const char** attrs, 
     const char *fnname, const char *varname)
 {
@@ -86,7 +108,7 @@ void* lv_xml_default_widget_create(lv_xml_parser_state_t* state, const char** at
 
     lv_obj_t* obj = lvgen_new_lvalue(fn, varname, insn);
     obj->scope_fn = fn;
-    if (parent == NULL)
+    if (fn->rvar == NULL && (parent == NULL || state->parent != NULL))
         fn->rvar = LV_OBJNAME(obj);
 
     return obj;
@@ -150,8 +172,9 @@ void * lv_xml_create_in_scope(lv_obj_t * parent, lv_xml_component_scope_t * pare
     state.parent = parent;
     state.parent_attrs = attrs;
     state.parent_scope = parent_scope;
-    if (parent_scope != NULL)
-        state.scope.active_func = parent_scope->active_func;
+
+    //if (parent_scope != NULL)
+    //    state.scope.active_func = parent_scope->active_func;
 
     lv_obj_t ** parent_node = lv_ll_ins_head(&state.parent_ll);
     *parent_node = parent;
@@ -192,37 +215,12 @@ void * lv_xml_create_in_scope(lv_obj_t * parent, lv_xml_component_scope_t * pare
 
 void * lv_xml_create(lv_obj_t * parent, const char * name, const char ** attrs)
 {
-    struct func_context* fn = lvgen_new_module_func(lvgen_get_module_by_name(name));
-    lv_obj_t * item = NULL;
-
-    lvgen_add_func_argument(fn, "lv_obj_t*", "parent");
-    lvgen_add_func_argument(fn, "lv_view__private_t*", LV_VFN_PARAM2);
-    lv_snprintf(fn->signature, sizeof(fn->signature), LV_FN_PREFIX "%s_create", name);
-    fn->rtype = LV_PTYPE(lv_obj_t);
-
-    /* Select the widget specific parser type based on the name */
-    lv_widget_processor_t * p = lv_xml_widget_get_processor(name);
-    if(p) {
-        lv_xml_parser_state_t state;
-        lv_xml_parser_state_init(&state);
-        state.parent = parent;
-        state.scope.active_func = fn;
-
-        /* When a component is just created there is no scope where
-         * its styles, constants, etc are stored.
-         * So leave state.scope = NULL which means the global context.*/
-
-        state.item = p->create_cb(&state, attrs);
-        if(attrs) {
-            p->apply_cb(&state, attrs);
-        }
-        return state.item;
-    }
-
     lv_xml_component_scope_t * scope = lv_xml_component_get_scope(name);
     if(scope) {
+        struct func_context* fn = lv_xml_create_scope_fn(scope, name);
         scope->active_func = fn;
-        item = lv_xml_create_in_scope(parent, NULL, scope, attrs);
+
+        lv_obj_t* item = lv_xml_create_in_scope(parent, NULL, scope, attrs);
 
         if(attrs) {
             lv_xml_parser_state_t state;
@@ -233,7 +231,7 @@ void * lv_xml_create(lv_obj_t * parent, const char * name, const char ** attrs)
             /* When a component is just created there is no scope where
              * its styles, constants, etc are stored.
              * So leave state.scope = NULL which means the global context.*/
-
+            lv_widget_processor_t* p;
             p = lv_xml_widget_get_extended_widget_processor(scope->extends);
             p->apply_cb(&state, attrs);
         }
@@ -521,12 +519,16 @@ static const char * get_param_default(lv_xml_component_scope_t * scope, const ch
 static void resolve_params(lv_xml_component_scope_t * item_scope, lv_xml_component_scope_t * parent_scope,
                            const char ** item_attrs, const char ** parent_attrs)
 {
+    struct func_context* fn = item_scope->active_func;
     uint32_t i;
     for(i = 0; item_attrs[i]; i += 2) {
         const char * name = item_attrs[i];
         const char * value = item_attrs[i + 1];
         if(lv_streq(name, "styles")) continue; /*Styles will handle it themselves*/
         if(value[0] == '$') {
+            struct fn_param *param = lvgen_new_fnparam(fn, name);
+            lv_strlcpy(param->name, value, LV_SYMBOL_LEN);
+
             /*E.g. the ${my_color} value is the my_color attribute name on the parent*/
             const char * name_clean = &value[1]; /*skips `$`*/
 
@@ -551,6 +553,7 @@ static void resolve_params(lv_xml_component_scope_t * item_scope, lv_xml_compone
                 ext_value = get_param_default(item_scope, name_clean);
             }
             if(ext_value) {
+                lv_strlcpy(param->value, ext_value, LV_SYMBOL_LEN);
                 item_attrs[i + 1] = ext_value;
             }
             else {

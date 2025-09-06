@@ -16,7 +16,7 @@ extern "C"{
 /**********************
  *      MACROS
  **********************/
-#define LV_FN_PREFIX        "ui_lvgen__"
+#define LV_FN_PREFIX        "uigen__"
 #define LV_VFN_PARAM2       "priv"
 #define LV_VFN_STYLE_AT(n)  "&" LV_VFN_PARAM2 "->styles[" #n "]"
 #define LV_FN_EXPR          "LV_CODE_EXPR"

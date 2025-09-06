@@ -104,6 +104,13 @@ struct var_insn {
     char name[LV_SYMBOL_LEN];
 };
 
+struct fn_param {
+    TAILQ_ENTRY(fn_param) link;
+    char key[LV_SYMBOL_LEN];
+    char name[LV_SYMBOL_LEN];
+    char value[LV_SYMBOL_LEN];
+};
+
 struct module_depend {
     TAILQ_ENTRY(module_depend) link;
     struct module_context* mod;
@@ -139,6 +146,7 @@ struct func_context {
     int             grad_cnt;
     TAILQ_HEAD(, func_callinsn) ll_insn;
     TAILQ_HEAD(, _lv_obj) ll_objs;
+    TAILQ_HEAD(, fn_param) ll_params;
 
     struct module_context* owner;
 };
@@ -163,6 +171,8 @@ typedef struct module_depend  LvModuleDepend;
 struct global_context* lvgen_get_context(void);
 struct module_context* lvgen_get_module(void);
 struct module_context* lvgen_get_module_by_name(const char* name);
+struct fn_param* lvgen_new_fnparam(struct func_context* fn, const char* key);
+struct fn_param* lvgen_get_fnparam(struct func_context* fn, const char* key);
 struct func_context* lvgen_new_func(struct _fn_list* fn_ll, struct module_context *mod,
     const char* signature);
 struct func_context* lvgen_new_module_func(struct module_context* mod);
