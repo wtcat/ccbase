@@ -88,52 +88,52 @@ constexpr auto AddSum(Args&&... args) {
 
 
 //Iterator implemention
-template<typename Type, size_t Size>
-class TestContainer {
-public:
-
-    template<typename... Args>
-    constexpr TestContainer(Args... args) : buf_(args...) {}
-
-    class Iterator {
-    public:
-        Iterator(Type* ptr) : ptr_(ptr) {}
-        Type& operator*() const {
-            return *ptr_;
-        }
-        Iterator& operator++() {
-            ++ptr_;
-            return *this;
-        }
-        Iterator& operator++(int) {
-            Iterator temp = *this;
-            ++ptr_;
-            return temp;
-        }
-        bool operator==(const Iterator& iter) {
-            return ptr_ == iter.ptr_;
-        }
-        bool operator!=(const Iterator& iter) {
-            return ptr_ != iter.ptr_;
-        }
-    private:
-        Type* ptr_;
-    };
-
-    Iterator begin() {
-        return Iterator(buf_);
-    }
-    Iterator end() {
-        return Iterator(buf_ + Size);
-    }
-
-    Type& operator[](size_t index) {
-        return buf_[index];
-    }
-
-private:
-    Type buf_[Size];
-};
+//template<typename Type, size_t Size>
+//class TestContainer {
+//public:
+//
+//    template<typename... Args>
+//    constexpr TestContainer(Args... args) : buf_(args...) {}
+//
+//    class Iterator {
+//    public:
+//        Iterator(Type* ptr) : ptr_(ptr) {}
+//        Type& operator*() const {
+//            return *ptr_;
+//        }
+//        Iterator& operator++() {
+//            ++ptr_;
+//            return *this;
+//        }
+//        Iterator& operator++(int) {
+//            Iterator temp = *this;
+//            ++ptr_;
+//            return temp;
+//        }
+//        bool operator==(const Iterator& iter) {
+//            return ptr_ == iter.ptr_;
+//        }
+//        bool operator!=(const Iterator& iter) {
+//            return ptr_ != iter.ptr_;
+//        }
+//    private:
+//        Type* ptr_;
+//    };
+//
+//    Iterator begin() {
+//        return Iterator(buf_);
+//    }
+//    Iterator end() {
+//        return Iterator(buf_ + Size);
+//    }
+//
+//    Type& operator[](size_t index) {
+//        return buf_[index];
+//    }
+//
+//private:
+//    Type buf_[Size];
+//};
 
 
 //Memory allocator implemention
@@ -183,11 +183,11 @@ int main(int argc, char* argv[]) {
     //for (int i = 0; i < 30; i++)
     //    vec.push_back(i);
 
-    TestContainer<int, 3> array = { 1, 2, 3 };
-    for (auto iter : array) {
-    }
+    //TestContainer<int, 3> array = { 1, 2, 3 };
+    //for (auto iter : array) {
+    //}
 
-    AddSum(1, 2, 3, 4, 5, 6, 7);
+    //AddSum(1, 2, 3, 4, 5, 6, 7);
 
     //OpenCV
     cv::Mat img = cv::imread("HeartRatepx.png", cv::IMREAD_UNCHANGED);

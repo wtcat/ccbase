@@ -48,6 +48,14 @@ static void apply_styles(lv_xml_parser_state_t * state, lv_obj_t * obj, const ch
  *   GLOBAL FUNCTIONS
  **********************/
 
+const char* lv_xml_get_value(struct fn_param* param, const char* value) {
+    if (param == NULL)
+        return value;
+
+    lv_strlcpy(param->value, value, LV_SYMBOL_LEN);
+    return param->name + 1;
+}
+
 void * lv_xml_obj_create(lv_xml_parser_state_t * state, const char ** attrs)
 {
     return lv_xml_default_widget_create(state, attrs, "lv_obj_create", "obj");
@@ -56,44 +64,63 @@ void * lv_xml_obj_create(lv_xml_parser_state_t * state, const char ** attrs)
 void lv_xml_obj_apply(lv_xml_parser_state_t * state, const char ** attrs)
 {
     lv_obj_t *item = lv_xml_state_get_item(state);
-    struct func_context* fn = state->scope.active_func;
+    struct func_context* fn = lv_xml_state_get_active_fn(state);
     const char* pv;
 
     for(int i = 0; attrs[i]; i += 2) {
         const char * name = attrs[i];
         const char * value = attrs[i + 1];
         size_t name_len = lv_strlen(name);
-
+        struct fn_param* param = lvgen_get_fnparam(fn, name);
 #if LV_USE_OBJ_NAME
         if(lv_streq("name", name)) {
             lv_obj_set_name(item, value);
         }
 #endif
         
-        if(lv_streq("x", name)) //lv_obj_set_x(item, lv_xml_to_size(value));
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_x", LV_OBJNAME(item), lv_xml_to_size(value), NULL);
-        else if(lv_streq("y", name)) //lv_obj_set_y(item, lv_xml_to_size(value));
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_y", LV_OBJNAME(item), lv_xml_to_size(value), NULL);
-        else if(lv_streq("width", name)) //lv_obj_set_width(item, lv_xml_to_size(value));
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_width", LV_OBJNAME(item), lv_xml_to_size(value), NULL);
-        else if(lv_streq("height", name)) //lv_obj_set_height(item, lv_xml_to_size(value));
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_height", LV_OBJNAME(item), lv_xml_to_size(value), NULL);
-        else if(lv_streq("align", name)) //lv_obj_set_align(item, lv_xml_align_to_enum(value));
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_align", LV_OBJNAME(item), lv_xml_align_to_enum(value), NULL);
-        else if(lv_streq("flex_flow", name)) //lv_obj_set_flex_flow(item, lv_xml_flex_flow_to_enum(value));
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_flex_flow", LV_OBJNAME(item), lv_xml_flex_flow_to_enum(value), NULL);
-        else if(lv_streq("flex_grow", name)) //lv_obj_set_flex_grow(item, lv_xml_atoi(value));
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_flex_grow", LV_OBJNAME(item), lv_xml_atoi_string(value), NULL);
-        else if(lv_streq("ext_click_area", name)) //lv_obj_set_ext_click_area(item, lv_xml_atoi(value));
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_ext_click_area", LV_OBJNAME(item), lv_xml_atoi_string(value), NULL);
-
-        else if(lvgen_cc_find_sym("lv_obj_flag_t", name, &pv, NULL))
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_flag", LV_OBJNAME(item), pv, lv_xml_to_bool_string(value), NULL);
-
-        else if (lvgen_cc_find_sym("lv_state_t", name, &pv, NULL))
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_state", LV_OBJNAME(item), pv, lv_xml_to_bool_string(value), NULL);
-
-        else if(lv_streq("styles", name)) lv_xml_style_add_to_obj(state, item, value);
+        if (lv_streq("x", name)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_x(%s, %s);\n",
+                LV_OBJNAME(item), lv_xml_get_value(param, lv_xml_to_size(value)));
+        }
+        else if (lv_streq("y", name)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_y(%s, %s);\n",
+                LV_OBJNAME(item), lv_xml_get_value(param, lv_xml_to_size(value)));
+        }
+        else if (lv_streq("width", name)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_width(%s, %s);\n",
+                LV_OBJNAME(item), lv_xml_get_value(param, lv_xml_to_size(value)));
+        }
+        else if (lv_streq("height", name)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_height(%s, %s);\n",
+                LV_OBJNAME(item), lv_xml_get_value(param, lv_xml_to_size(value)));
+        }
+        else if (lv_streq("align", name)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_align(%s, %s);\n",
+                LV_OBJNAME(item), lv_xml_get_value(param, lv_xml_align_to_enum(value)));
+        }
+        else if (lv_streq("flex_flow", name)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_flex_flow(%s, %s);\n",
+                LV_OBJNAME(item), lv_xml_get_value(param, lv_xml_flex_flow_to_enum(value)));
+        }
+        else if (lv_streq("flex_grow", name)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_flex_grow(%s, %s);\n",
+                LV_OBJNAME(item), lv_xml_get_value(param, lv_xml_atoi_string(value)));
+        }
+        else if (lv_streq("ext_click_area", name)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_ext_click_area(%s, %s);\n",
+                LV_OBJNAME(item), lv_xml_get_value(param, lv_xml_atoi_string(value)));
+        }
+        else if (lvgen_cc_find_sym("lv_obj_flag_t", name, &pv, NULL)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_flag(%s, %s, %s);\n",
+                LV_OBJNAME(item), pv, lv_xml_get_value(param, lv_xml_to_bool_string(value)));
+        }
+        else if (lvgen_cc_find_sym("lv_state_t", name, &pv, NULL)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_state(%s, %s, %s);\n",
+                LV_OBJNAME(item), pv, lv_xml_get_value(param, lv_xml_to_bool_string(value)));
+        }
+        else if (lv_streq("styles", name)) {
+            lv_xml_style_add_to_obj(state, item, value);
+        }
 
 #if 0
         else if(lv_streq("bind_checked", name)) {
@@ -214,8 +241,7 @@ static void apply_styles(lv_xml_parser_state_t * state, lv_obj_t * obj, const ch
 
     lv_style_selector_t selector;
     const char * prop_name = lv_xml_style_string_process(name_local, &selector);
-
-    struct func_context* fn = state->scope.active_func;
+    struct func_context* fn = lv_xml_state_get_active_fn(state);
 
     SET_STYLE_IF(width, lv_xml_to_size(value));
     else SET_STYLE_IF(min_width, lv_xml_to_size(value));
@@ -343,6 +369,5 @@ static void apply_styles(lv_xml_parser_state_t * state, lv_obj_t * obj, const ch
     else SET_STYLE_IF(grid_cell_row_span, lv_xml_atoi_string(value));
     else SET_STYLE_IF(grid_cell_y_align, lv_xml_grid_align_to_enum(value));
 }
-
 
 #endif /* LV_USE_XML */
