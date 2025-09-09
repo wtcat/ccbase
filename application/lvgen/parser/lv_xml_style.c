@@ -50,7 +50,7 @@ static lv_style_prop_t style_prop_text_to_enum(const char * txt);
 //#define SET_STYLE_IF(prop, value) if(lv_streq(name, #prop)) lv_style_set_##prop(style, value)
 
 #define SET_STYLE_IF(prop, value) \
-    if(lv_streq(name, #prop)) lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_set_" #prop, "style", value, NULL)
+    if(lv_streq(name, #prop)) lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_set_" #prop, sty_param, value, NULL)
 
 /**********************
  *   GLOBAL FUNCTIONS
@@ -104,6 +104,8 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
         }
     }
 
+    const char* sty_param = "style";
+
     if(!found) {
         if (global)
             fn = lvgen_new_global_func();
@@ -117,9 +119,21 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
         xml_style->long_name = lv_malloc(long_name_len);
         lv_snprintf((char *)xml_style->long_name, long_name_len, "%s.%s", scope->name, style_name); /*E.g. my_button.style1*/
 
-        lv_snprintf(fn->signature, sizeof(fn->signature), LV_FN_PREFIX "%s_%s_style_init", scope->name, style_name);
-        lvgen_add_func_argument(fn, "lv_style_t*", "style");
-        lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_init", "style", NULL);
+        if (fn->owner->is_view) {
+            lv_snprintf(fn->signature, sizeof(fn->signature), LV_FN_PREFIX "%s_%s_style_init", scope->name, style_name);
+            lvgen_add_func_argument(fn, "lv_style_t*", "style");
+        } else {
+            sty_param = "&style";
+            lv_snprintf(fn->signature, sizeof(fn->signature), LV_FN_PREFIX "%s_%s_style", scope->name, style_name);
+            fn->rtype = LV_PTYPE(lv_style_t);
+
+            lvgen_new_exprinsn(fn, "static lv_style_t style;");
+            lvgen_new_exprinsn(fn, "static bool sty_inited;");
+            lvgen_new_exprinsn(fn, "if (sty_inited)");
+            lvgen_new_exprinsn(fn, "    return &style;");
+        }
+
+        lvgen_new_exprinsn(fn, "lv_style_init(style);");
         xml_style->link_fn = fn;
     }
 
@@ -314,6 +328,11 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
         }
     }
 
+    if (!fn->owner->is_view) {
+        lvgen_new_exprinsn(fn, "sty_inited = true;");
+        lvgen_new_exprinsn(fn, "return &style;");
+    }
+
     return LV_RESULT_OK;
 }
 
@@ -353,6 +372,7 @@ const char * lv_xml_style_string_process(char * txt, lv_style_selector_t * selec
 
 void lv_xml_style_add_to_obj(lv_xml_parser_state_t * state, lv_obj_t * obj, const char * text)
 {
+    struct func_context* fn = obj->scope_fn;
     char * str = lv_strdup(text);
     char * str_ori = str;
 
@@ -381,14 +401,36 @@ void lv_xml_style_add_to_obj(lv_xml_parser_state_t * state, lv_obj_t * obj, cons
                 /* Apply with the selector */
                 //lv_obj_add_style(obj, &xml_style->style, selector);
 
-                struct func_context* fn = obj->scope_fn;
+                
                 if (fn != NULL) {
                     struct func_context* callee = xml_style->link_fn;
                     char stybuf[64];
 
-                    lv_snprintf(stybuf, sizeof(stybuf), LV_VFN_STYLE_AT(%d), fn->style_num++);
-                    lvgen_new_callinsn(fn, LV_TYPE(void), callee->signature, stybuf, NULL);
-                    lvgen_new_callinsn(fn, LV_TYPE(void), "lv_obj_add_style", LV_OBJNAME(obj), stybuf, selector, NULL);
+                    if (fn->owner->is_view) {
+                        lv_snprintf(stybuf, sizeof(stybuf), LV_VFN_STYLE_AT(% d), fn->style_num++);
+                        lvgen_new_exprinsn(fn, "%s(%s);", callee->signature, stybuf);
+                        lvgen_new_exprinsn(fn, "lv_obj_add_style(%s, %s, %s);",
+                            LV_OBJNAME(obj),
+                            stybuf,
+                            selector
+                        );
+                    } else {
+                        /* This style import from function parameter */
+                        if (style_name[0] == '$') {
+                            lvgen_new_exprinsn(fn, "lv_obj_add_style(%s, %s, %s);",
+                                LV_OBJNAME(obj),
+                                style_name + 1,
+                                selector
+                            );
+                        } else {
+                            lvgen_new_exprinsn(fn, "lv_obj_add_style(%s, %s(), %s);",
+                                LV_OBJNAME(obj),
+                                callee->signature,
+                                selector
+                            );
+                        }
+                    }
+
                     lvgen_new_module_depend(fn->owner, callee);
                 }
             }
@@ -456,6 +498,7 @@ const char* lv_xml_component_get_grad(lv_xml_component_scope_t * scope, const ch
                 int no = pfn->grad_cnt;
 
                 snprintf(gradbuf, sizeof(gradbuf), "&gard_dsc%d", no);
+                lvgen_new_exprinsn(parent_fn, "\n");
                 lvgen_new_exprinsn(parent_fn, "static lv_grad_dsc_t gard_dsc%d;", no);
                 lvgen_new_exprinsn(parent_fn, "static bool gard_dsc%d_ready;", no);
                 lvgen_new_exprinsn(parent_fn, "if (!gard_dsc%d_ready) {", no);

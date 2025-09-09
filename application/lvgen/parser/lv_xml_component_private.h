@@ -21,6 +21,7 @@ extern "C" {
 #include "parser/lib/lv_ll.h"
 #include "lv_xml_utils.h"
 
+#include "parser/lv_xml_component_private.h"
 /**********************
  *      TYPEDEFS
  **********************/

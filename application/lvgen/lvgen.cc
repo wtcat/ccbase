@@ -406,7 +406,7 @@ bool LvCodeGenerator::GenerateFunctionInstruction(const LvFunctionContext* fn, s
         int offset = 0;
 
         if (indent) {
-            if (!LV_IS_EXPR(ins->rtype) && ins->lvalue != nullptr)
+            if (ins->lvalue != nullptr)
                 offset += snprintf(tbuf + offset, remain - offset, "\n");
             offset += snprintf(tbuf + offset, remain - offset, indent);
         }
@@ -477,6 +477,9 @@ bool LvCodeGenerator::GenerateFunctionInstruction(const LvFunctionContext* fn, s
                 return false;
             }
         } else {
+            if (ins->lvalue != nullptr)
+                offset += snprintf(tbuf + offset, remain - offset, "%s %s = ", 
+                    lv_type_to_name(ins->rtype), ins->lvalue);
             offset += snprintf(tbuf + offset, remain - offset, "%s\n", ins->expr);
         }
         

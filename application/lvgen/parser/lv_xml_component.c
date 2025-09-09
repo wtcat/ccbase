@@ -44,6 +44,8 @@ static void process_font_element(lv_xml_parser_state_t * state, const char * typ
 static void process_image_element(lv_xml_parser_state_t * state, const char * type, const char ** attrs);
 static void process_prop_element(lv_xml_parser_state_t * state, const char ** attrs);
 static char * extract_view_content(const char * xml_definition);
+static lv_obj_t* lv_xml_component_callfn(lv_xml_parser_state_t* state,
+    lv_xml_component_scope_t* subscope, const char* name);
 
 /**********************
  *  STATIC VARIABLES
@@ -121,6 +123,7 @@ void lv_xml_component_scope_init(lv_xml_component_scope_t * scope)
 lv_obj_t * lv_xml_component_process(lv_xml_parser_state_t * state, const char * name, const char ** attrs)
 {
     lv_xml_component_scope_t * scope = lv_xml_component_get_scope(name);
+    struct func_context* fn = lv_xml_state_get_active_fn(state);
     if(scope == NULL) return NULL;
 
     if (scope->active_func == NULL)
@@ -132,8 +135,14 @@ lv_obj_t * lv_xml_component_process(lv_xml_parser_state_t * state, const char * 
         return NULL;
     }
 
+    lv_obj_t* pitem;
+    if (state->parent_scope != NULL)
+        pitem = lv_xml_component_callfn(state, scope, name);
+    else
+        pitem = item;
+
     /* Apply the properties of the component, e.g. <my_button x="20" styles="red"/> */
-    state->item = item;
+    state->item = pitem? pitem: item;
     lv_widget_processor_t * extended_proc = lv_xml_widget_get_extended_widget_processor(scope->extends);
     extended_proc->apply_cb(state, attrs);
 
@@ -150,7 +159,8 @@ lv_obj_t * lv_xml_component_process(lv_xml_parser_state_t * state, const char * 
         }
     }
 #endif
-    return item;
+
+    return state->item;
 }
 
 lv_xml_component_scope_t * lv_xml_component_get_scope(const char * component_name)
@@ -812,6 +822,44 @@ static char * extract_view_content(const char * xml_definition)
     view_content[len] = '\0';
 
     return view_content;
+}
+
+static lv_obj_t* lv_xml_component_callfn(lv_xml_parser_state_t* state, 
+    lv_xml_component_scope_t *subscope, const char *name) {
+    struct func_context* fn = lv_xml_state_get_active_fn(state);
+    struct func_context* fn_callee = subscope->active_func;
+    struct fn_param* param, * next_param;
+    lv_obj_t* item = NULL;
+    char inbuf[256];
+    int offset = 0;
+
+    FOREACH_FN_PARAM(param, next_param, fn_callee) {
+        struct fn_param* fn_p = lvgen_get_fnparam(fn, param->name + 1);
+        const char* value;
+
+        if (fn_p == NULL)
+            value = param->value;
+        else
+            value = fn_p->name + 1;
+
+        if (next_param)
+            offset += lv_snprintf(inbuf + offset, sizeof(inbuf), "%s, ", value);
+        else
+            offset += lv_snprintf(inbuf + offset, sizeof(inbuf), "%s", value);
+    }
+
+    if (offset > 0) {
+        struct func_callinsn* insn = lvgen_new_exprinsn(fn, "%s(%s, %s);",
+            fn_callee->signature, fn->rvar, inbuf);
+
+        item = lvgen_new_lvalue(fn, name, insn);
+        item->scope_fn = fn;
+        insn->rtype |= LV_PTYPE(lv_obj_t);
+
+        lvgen_new_module_depend(fn->owner, fn_callee);
+    }
+
+    return item;
 }
 
 #endif /* LV_USE_XML */

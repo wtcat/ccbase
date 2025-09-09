@@ -269,6 +269,7 @@ struct func_callinsn* lvgen_new_exprinsn(struct func_context* fn,
         va_list ap;
 
         pins->rtype = type__lv_expr;
+        pins->lvalue = NULL;
         va_start(ap, insn);
         lv_vsnprintf(pins->expr, sizeof(pins->expr), insn, ap);
         va_end(ap);

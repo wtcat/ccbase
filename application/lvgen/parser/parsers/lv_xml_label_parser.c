@@ -46,21 +46,28 @@ void lv_xml_label_apply(lv_xml_parser_state_t * state, const char ** attrs)
 {
     void * item = lv_xml_state_get_item(state);
     struct func_context* fn = lv_xml_state_get_active_fn(state);
-    char strbuf[256];
 
     lv_xml_obj_apply(state, attrs); /*Apply the common properties, e.g. width, height, styles flags etc*/
 
     for(int i = 0; attrs[i]; i += 2) {
         const char * name = attrs[i];
         const char * value = attrs[i + 1];
+        struct fn_param* param;
 
+        param = lv_xml_obj_get_parameter(state->parent_scope, fn, name);
+
+        //lv_xml_obj_get_value(param, )
         if (lv_streq("text", name)) {
-            snprintf(strbuf, sizeof(strbuf), "\"%s\"", value);
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_label_set_text", LV_OBJNAME(item), strbuf, NULL);
+            lvgen_new_exprinsn(fn, "lv_label_set_text(%s, %s);",
+                LV_OBJNAME(item),
+                lv_xml_obj_get_value(param, value)
+            );
         }
         if (lv_streq("long_mode", name)) {
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_label_set_long_mode", LV_OBJNAME(item), 
-                long_mode_text_to_enum_value(value), NULL);
+            lvgen_new_exprinsn(fn, "lv_label_set_long_mode(%s, %s);",
+                LV_OBJNAME(item),
+                lv_xml_obj_get_value(param, long_mode_text_to_enum_value(value))
+            );
         }
 #if 0
         if(lv_streq("bind_text", name)) {

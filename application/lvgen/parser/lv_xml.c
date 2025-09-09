@@ -100,13 +100,19 @@ void* lv_xml_default_widget_create(lv_xml_parser_state_t* state, const char** at
 {
     struct func_context* fn = lv_xml_state_get_active_fn(state);
     lv_obj_t* parent = lv_xml_state_get_parent(state);
+    const char* parent_obj;
     LV_UNUSED(attrs);
 
-    const char* parent_name = (parent == NULL) ? "parent" : LV_OBJNAME(parent);
-    struct func_callinsn* insn = lvgen_new_callinsn(fn, LV_PTYPE(lv_obj_t), fnname,
-        parent_name, NULL);
+    /* If parent is empty or currernt instruction is the first one */
+    if (parent == NULL || TAILQ_EMPTY(&fn->ll_insn))
+        parent_obj = "parent";
+    else
+        parent_obj = LV_OBJNAME(parent);
+
+    struct func_callinsn* insn = lvgen_new_exprinsn(fn, "%s(%s);", fnname, parent_obj);
 
     lv_obj_t* obj = lvgen_new_lvalue(fn, varname, insn);
+    insn->rtype |= LV_PTYPE(lv_obj_t);
     obj->scope_fn = fn;
     if (fn->rvar == NULL && (parent == NULL || state->parent != NULL))
         fn->rvar = LV_OBJNAME(obj);
@@ -524,7 +530,9 @@ static void resolve_params(lv_xml_component_scope_t * item_scope, lv_xml_compone
     for(i = 0; item_attrs[i]; i += 2) {
         const char * name = item_attrs[i];
         const char * value = item_attrs[i + 1];
-        if(lv_streq(name, "styles")) continue; /*Styles will handle it themselves*/
+        if (lv_streq(name, "styles")) { /*Styles will handle it themselves*/
+            continue;
+        }
         if(value[0] == '$') {
             struct fn_param *param = lvgen_new_fnparam(fn, name);
             lv_strlcpy(param->name, value, LV_SYMBOL_LEN);

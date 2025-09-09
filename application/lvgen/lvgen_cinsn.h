@@ -88,9 +88,9 @@ struct func_callinsn {
 #define LV_MAX_ARGS 7
     TAILQ_ENTRY(func_callinsn) link;
     int   rtype;
+    char* lvalue;
     union {
         struct {
-            char* lvalue;
             char  insn[LV_SYMBOL_LEN];
             char  args[LV_MAX_ARGS][LV_SYMBOL_LEN];
             int   args_num;
@@ -105,10 +105,12 @@ struct var_insn {
 };
 
 struct fn_param {
+#define FN_COMPOSITE_ARGS 2
     TAILQ_ENTRY(fn_param) link;
     char key[LV_SYMBOL_LEN];
     char name[LV_SYMBOL_LEN];
     char value[LV_SYMBOL_LEN];
+    char pname[LV_SYMBOL_LEN];
 };
 
 struct module_depend {
@@ -197,6 +199,10 @@ bool lvgen_generate(void);
 
 bool lvgen_cc_find_sym(const char* ns, const char* key,
     const char** pv, const char** pt);
+
+
+#define FOREACH_FN_PARAM(_param, _next, _fn) \
+    TAILQ_FOREACH_SAFE((_param), &(_fn)->ll_params, link, (_next))
 
 #ifdef __cplusplus
 }

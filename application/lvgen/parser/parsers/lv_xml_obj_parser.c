@@ -24,7 +24,8 @@
  *  STATIC PROTOTYPES
  **********************/
 static lv_obj_flag_t flag_to_enum(const char * txt);
-static void apply_styles(lv_xml_parser_state_t * state, lv_obj_t * obj, const char * name, const char * value);
+static void apply_styles(lv_xml_parser_state_t * state, lv_obj_t * obj, const char * name, const char * value,
+    struct fn_param* param);
 
 /**********************
  *  STATIC VARIABLES
@@ -47,6 +48,31 @@ static void apply_styles(lv_xml_parser_state_t * state, lv_obj_t * obj, const ch
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
+struct fn_param* lv_xml_obj_get_parameter(lv_xml_component_scope_t * parent_scope,
+    struct func_context* fn, const char* name) {
+    struct fn_param* param = lvgen_get_fnparam(fn, name);
+    if (param != NULL) {
+        if (parent_scope != NULL) {
+            struct fn_param* param_p;
+            param_p = lvgen_get_fnparam(parent_scope->active_func, param->name + 1);
+            if (param_p != NULL)
+                lv_strlcpy(param->pname, param_p->name, LV_SYMBOL_LEN);
+        }
+    }
+    return param;
+}
+
+const char* lv_xml_obj_get_value(struct fn_param* param, const char* value) {
+    if (param == NULL)
+        return value;
+
+    lv_strlcpy(param->value, value, LV_SYMBOL_LEN);
+
+    //if (param->pname[0] != '\0')
+    //    return param->pname + 1;
+
+    return param->name + 1;
+}
 
 void * lv_xml_obj_create(lv_xml_parser_state_t * state, const char ** attrs)
 {
@@ -56,44 +82,65 @@ void * lv_xml_obj_create(lv_xml_parser_state_t * state, const char ** attrs)
 void lv_xml_obj_apply(lv_xml_parser_state_t * state, const char ** attrs)
 {
     lv_obj_t *item = lv_xml_state_get_item(state);
-    struct func_context* fn = state->scope.active_func;
+    struct func_context* fn = lv_xml_state_get_active_fn(state);
     const char* pv;
 
     for(int i = 0; attrs[i]; i += 2) {
         const char * name = attrs[i];
         const char * value = attrs[i + 1];
         size_t name_len = lv_strlen(name);
+        struct fn_param* param;
 
+        param = lv_xml_obj_get_parameter(state->parent_scope, fn, name);
 #if LV_USE_OBJ_NAME
         if(lv_streq("name", name)) {
             lv_obj_set_name(item, value);
         }
 #endif
         
-        if(lv_streq("x", name)) //lv_obj_set_x(item, lv_xml_to_size(value));
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_x", LV_OBJNAME(item), lv_xml_to_size(value), NULL);
-        else if(lv_streq("y", name)) //lv_obj_set_y(item, lv_xml_to_size(value));
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_y", LV_OBJNAME(item), lv_xml_to_size(value), NULL);
-        else if(lv_streq("width", name)) //lv_obj_set_width(item, lv_xml_to_size(value));
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_width", LV_OBJNAME(item), lv_xml_to_size(value), NULL);
-        else if(lv_streq("height", name)) //lv_obj_set_height(item, lv_xml_to_size(value));
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_height", LV_OBJNAME(item), lv_xml_to_size(value), NULL);
-        else if(lv_streq("align", name)) //lv_obj_set_align(item, lv_xml_align_to_enum(value));
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_align", LV_OBJNAME(item), lv_xml_align_to_enum(value), NULL);
-        else if(lv_streq("flex_flow", name)) //lv_obj_set_flex_flow(item, lv_xml_flex_flow_to_enum(value));
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_flex_flow", LV_OBJNAME(item), lv_xml_flex_flow_to_enum(value), NULL);
-        else if(lv_streq("flex_grow", name)) //lv_obj_set_flex_grow(item, lv_xml_atoi(value));
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_flex_grow", LV_OBJNAME(item), lv_xml_atoi_string(value), NULL);
-        else if(lv_streq("ext_click_area", name)) //lv_obj_set_ext_click_area(item, lv_xml_atoi(value));
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_ext_click_area", LV_OBJNAME(item), lv_xml_atoi_string(value), NULL);
-
-        else if(lvgen_cc_find_sym("lv_obj_flag_t", name, &pv, NULL))
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_flag", LV_OBJNAME(item), pv, lv_xml_to_bool_string(value), NULL);
-
-        else if (lvgen_cc_find_sym("lv_state_t", name, &pv, NULL))
-            lvgen_new_callinsn(fn, LV_PTYPE(void), "lv_obj_set_state", LV_OBJNAME(item), pv, lv_xml_to_bool_string(value), NULL);
-
-        else if(lv_streq("styles", name)) lv_xml_style_add_to_obj(state, item, value);
+        if (lv_streq("x", name)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_x(%s, %s);",
+                LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_to_size(value)));
+        }
+        else if (lv_streq("y", name)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_y(%s, %s);",
+                LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_to_size(value)));
+        }
+        else if (lv_streq("width", name)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_width(%s, %s);",
+                LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_to_size(value)));
+        }
+        else if (lv_streq("height", name)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_height(%s, %s);",
+                LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_to_size(value)));
+        }
+        else if (lv_streq("align", name)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_align(%s, %s);",
+                LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_align_to_enum(value)));
+        }
+        else if (lv_streq("flex_flow", name)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_flex_flow(%s, %s);",
+                LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_flex_flow_to_enum(value)));
+        }
+        else if (lv_streq("flex_grow", name)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_flex_grow(%s, %s);",
+                LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_atoi_string(value)));
+        }
+        else if (lv_streq("ext_click_area", name)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_ext_click_area(%s, %s);",
+                LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_atoi_string(value)));
+        }
+        else if (lvgen_cc_find_sym("lv_obj_flag_t", name, &pv, NULL)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_flag(%s, %s, %s);",
+                LV_OBJNAME(item), pv, lv_xml_obj_get_value(param, lv_xml_to_bool_string(value)));
+        }
+        else if (lvgen_cc_find_sym("lv_state_t", name, &pv, NULL)) {
+            lvgen_new_exprinsn(fn, "lv_obj_set_state(%s, %s, %s);",
+                LV_OBJNAME(item), pv, lv_xml_obj_get_value(param, lv_xml_to_bool_string(value)));
+        }
+        else if (lv_streq("styles", name)) {
+            lv_xml_style_add_to_obj(state, item, value);
+        }
 
 #if 0
         else if(lv_streq("bind_checked", name)) {
@@ -186,7 +233,7 @@ void lv_xml_obj_apply(lv_xml_parser_state_t * state, const char ** attrs)
         }
 #endif //if 0
         else if(name_len > 6 && lv_memcmp("style_", name, 6) == 0) {
-            apply_styles(state, item, name, value);
+            apply_styles(state, item, name, value, param);
         }
     }
 }
@@ -207,16 +254,81 @@ static lv_obj_flag_t flag_to_enum(const char * txt)
 }
 
 
-static void apply_styles(lv_xml_parser_state_t * state, lv_obj_t * obj, const char * name, const char * value)
+static void apply_styles(lv_xml_parser_state_t * state, lv_obj_t * obj, const char * name, 
+    const char * value, struct fn_param* param)
 {
     char name_local[512];
     lv_strlcpy(name_local, name, sizeof(name_local));
 
     lv_style_selector_t selector;
     const char * prop_name = lv_xml_style_string_process(name_local, &selector);
+    struct func_context* fn = lv_xml_state_get_active_fn(state);
 
-    struct func_context* fn = state->scope.active_func;
+    const char* prop_value = NULL;
+    char *pt;
 
+    if (lvgen_cc_find_sym("styles", prop_name + sizeof("style_") - 1, NULL, &pt)) {
+        if (!lv_strcmp(pt, "size")) {
+            prop_value = !param? lv_xml_to_size(value): lv_xml_obj_get_value(param, lv_xml_to_size(value));
+        }
+        else if (!lv_strcmp(pt, "int")) {
+            prop_value = !param ? lv_xml_atoi_string(value) : lv_xml_obj_get_value(param, lv_xml_atoi_string(value));
+        }
+        else if (!lv_strcmp(pt, "lv_base_dir_t")) {
+            prop_value = !param ? lv_xml_base_dir_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_base_dir_to_enum(value));
+        }
+        else if (!lv_strcmp(pt, "opa")) {
+            prop_value = !param ? lv_xml_to_opa_string(value) : lv_xml_obj_get_value(param, lv_xml_to_opa_string(value));
+        }
+        else if (!lv_strcmp(pt, "color")) {
+            prop_value = !param ? lv_xml_to_color(value) : lv_xml_obj_get_value(param, lv_xml_to_color(value));
+        }
+        else if (!lv_strcmp(pt, "lv_grad_dir_t")) {
+            prop_value = !param ? lv_xml_grad_dir_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_grad_dir_to_enum(value));
+        }
+        else if (!lv_strcmp(pt, "image")) {
+            //prop_value = !param ? lv_xml_grad_dir_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_grad_dir_to_enum(value));
+        }
+        else if (!lv_strcmp(pt, "bool")) {
+            prop_value = !param ? lv_xml_to_bool_string(value) : lv_xml_obj_get_value(param, lv_xml_to_bool_string(value));
+        }
+        else if (!lv_strcmp(pt, "side")) {
+            prop_value = !param ? lv_xml_border_side_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_border_side_to_enum(value));
+        }
+        else if (!lv_strcmp(pt, "font")) {
+            //TODO: fix
+            prop_value = !param ? lv_xml_get_font(&state->scope, value) : lv_xml_obj_get_value(param, lv_xml_get_font(&state->scope, value));
+        }
+        else if (!lv_strcmp(pt, "lv_text_align_t")) {
+            prop_value = !param ? lv_xml_text_align_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_text_align_to_enum(value));
+        }
+        else if (!lv_strcmp(pt, "lv_text_decor_t")) {
+            prop_value = !param ? lv_xml_text_decor_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_text_decor_to_enum(value));
+        }
+        else if (!lv_strcmp(pt, "lv_blend_mode_t")) {
+            prop_value = !param ? lv_xml_blend_mode_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_blend_mode_to_enum(value));
+        }
+        else if (!lv_strcmp(pt, "lv_layout_t")) {
+            prop_value = !param ? lv_xml_layout_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_layout_to_enum(value));
+        }
+        else if (!lv_strcmp(pt, "lv_flex_flow_t")) {
+            prop_value = !param ? lv_xml_flex_flow_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_flex_flow_to_enum(value));
+        }
+        else if (!lv_strcmp(pt, "enum_flex_align")) {
+            prop_value = !param ? lv_xml_flex_align_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_flex_align_to_enum(value));
+        }
+        else if (!lv_strcmp(pt, "lv_grid_align_t")) {
+            prop_value = !param ? lv_xml_grid_align_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_grid_align_to_enum(value));
+        }
+        else {
+            //TODO:
+            printf("Invalid style type: name(%s) type(%s)\n", prop_name, pt);
+        }
+
+        lvgen_new_exprinsn(fn, "lv_obj_set_%s(%s, %s, %s);", prop_name, LV_OBJNAME(obj), prop_value, selector);
+    }
+    
+#if 0  
     SET_STYLE_IF(width, lv_xml_to_size(value));
     else SET_STYLE_IF(min_width, lv_xml_to_size(value));
     else SET_STYLE_IF(max_width, lv_xml_to_size(value));
@@ -342,7 +454,7 @@ static void apply_styles(lv_xml_parser_state_t * state, lv_obj_t * obj, const ch
     else SET_STYLE_IF(grid_cell_row_pos, lv_xml_atoi_string(value));
     else SET_STYLE_IF(grid_cell_row_span, lv_xml_atoi_string(value));
     else SET_STYLE_IF(grid_cell_y_align, lv_xml_grid_align_to_enum(value));
+#endif //if 0
 }
-
 
 #endif /* LV_USE_XML */

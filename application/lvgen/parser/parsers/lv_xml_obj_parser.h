@@ -20,6 +20,8 @@ extern "C" {
 /**********************
  *      TYPEDEFS
  **********************/
+struct func_context;
+struct fn_param;
 
 /**********************
  * GLOBAL PROTOTYPES
@@ -28,6 +30,9 @@ extern "C" {
 void * lv_xml_obj_create(lv_xml_parser_state_t * state, const char ** attrs);
 void lv_xml_obj_apply(lv_xml_parser_state_t * state, const char ** attrs);
 
+struct fn_param* lv_xml_obj_get_parameter(lv_xml_component_scope_t* parent_scope,
+    struct func_context* fn, const char* name);
+const char* lv_xml_obj_get_value(struct fn_param* param, const char* value);
 /**********************
  *      MACROS
  **********************/
