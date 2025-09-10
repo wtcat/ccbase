@@ -6,7 +6,6 @@
 /*********************
  *      INCLUDES
  *********************/
-#
 #include "lv_xml_obj_parser.h"
 #include "lvgen_cinsn.h"
 
@@ -92,6 +91,7 @@ void lv_xml_obj_apply(lv_xml_parser_state_t * state, const char ** attrs)
         struct fn_param* param;
 
         param = lvgen_get_fnparam(fn, name); // lv_xml_obj_get_parameter(state->parent_scope, fn, name);
+
 #if LV_USE_OBJ_NAME
         if(lv_streq("name", name)) {
             lv_obj_set_name(item, value);
@@ -263,7 +263,6 @@ static void apply_styles(lv_xml_parser_state_t * state, lv_obj_t * obj, const ch
     lv_style_selector_t selector;
     const char * prop_name = lv_xml_style_string_process(name_local, &selector);
     struct func_context* fn = lv_xml_state_get_active_fn(state);
-
     const char* prop_value = NULL;
     char *pt;
 
