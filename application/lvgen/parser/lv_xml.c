@@ -84,7 +84,9 @@ lv_xml_create_scope_fn(lv_xml_component_scope_t* scope, struct func_context* cal
     lvgen_add_func_argument(fn, "lv_obj_t*", "parent");
 
     if (lv_ll_is_empty(&scope->param_ll)) {
-        lvgen_add_func_argument(fn, "lv_view__private_t*", LV_VFN_PARAM2);
+        struct var_insn* arg = lvgen_func_new_arg(fn);
+        lv_snprintf(arg->type, sizeof(arg->type), "%s__private_t*", fn->owner->name);
+        lv_strlcpy(arg->name, LV_VFN_PARAM2, sizeof(arg->name));
     } else {
         lv_xml_param_t* param;
         LV_LL_READ(&scope->param_ll, param) {

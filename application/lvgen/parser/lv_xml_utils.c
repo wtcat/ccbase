@@ -156,7 +156,7 @@ const char *lv_xml_atoi_string(const char* str)
     static char numbuf[20];
 
     int32_t v = lv_xml_atoi_split(&str, '\0');
-    lv_snprintf(numbuf, sizeof(numbuf), "%d", str);
+    lv_snprintf(numbuf, sizeof(numbuf), "%d", v);
 
     return numbuf;
 }

@@ -58,10 +58,17 @@ void lv_xml_label_apply(lv_xml_parser_state_t * state, const char ** attrs)
 
         //lv_xml_obj_get_value(param, )
         if (lv_streq("text", name)) {
-            lvgen_new_exprinsn(fn, "lv_label_set_text(%s, %s);",
-                LV_OBJNAME(item),
-                lv_xml_obj_get_value(param, value)
-            );
+            if (param == NULL) {
+                lvgen_new_exprinsn(fn, "lv_label_set_text(%s, \"%s\");",
+                    LV_OBJNAME(item),
+                    lv_xml_obj_get_value(param, value)
+                );
+            } else {
+                lvgen_new_exprinsn(fn, "lv_label_set_text(%s, %s);",
+                    LV_OBJNAME(item),
+                    lv_xml_obj_get_value(param, value)
+                );
+            }
         }
         if (lv_streq("long_mode", name)) {
             lvgen_new_exprinsn(fn, "lv_label_set_long_mode(%s, %s);",

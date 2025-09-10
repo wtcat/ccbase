@@ -259,6 +259,14 @@ void lvgen_add_func_argument(struct func_context* fn, const char *type, const ch
     fn->args_num = n + 1;
 }
 
+struct var_insn *lvgen_func_new_arg(struct func_context* fn) {
+    int n = fn->args_num;
+
+    assert(n < LV_MAX_ARGS);
+    fn->args_num = n + 1;
+    return &fn->args[n];
+}
+
 void lvgen_set_func_rettype(struct func_context* fn, int type) {
     fn->rtype = type;
 }

@@ -129,8 +129,10 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
             fn->rtype = LV_PTYPE(lv_style_t);
 
             lvgen_new_exprinsn(fn, "static lv_style_t style;");
-            lvgen_new_exprinsn(fn, "static bool sty_inited;");
-            lvgen_new_exprinsn(fn, "if (sty_inited) return &style;");
+            lvgen_new_exprinsn(fn, "");
+            lvgen_new_exprinsn(fn, "if (!lv_style_is_empty(&style))");
+            lvgen_new_exprinsn(fn, "    return &style;");
+            lvgen_new_exprinsn(fn, "");
         }
 
         lvgen_new_exprinsn(fn, "lv_style_init(%s);", sty_param);
@@ -328,9 +330,7 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
         }
     }
 
-    if (!fn->owner->is_view)
-        lvgen_new_exprinsn(fn, "sty_inited = true;");
-
+    lvgen_new_exprinsn(fn, "");
     lvgen_new_exprinsn(fn, "return %s;", sty_param);
 
     return LV_RESULT_OK;

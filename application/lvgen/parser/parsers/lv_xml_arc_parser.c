@@ -50,6 +50,9 @@ void lv_xml_arc_apply(lv_xml_parser_state_t * state, const char ** attrs)
     for(int i = 0; attrs[i]; i += 2) {
         const char * name = attrs[i];
         const char * value = attrs[i + 1];
+  /*      struct fn_param* param;
+
+        param = lv_xml_obj_get_parameter(state->parent_scope, fn, name);*/
 
         if(lv_streq("angles", name)) {
             char buf[64];

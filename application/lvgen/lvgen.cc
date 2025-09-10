@@ -297,11 +297,13 @@ bool LvCodeGenerator::GenerateModuleSource(const LvModuleContext* mod, std::stri
             "#if MAX_IMAGES > 0\n"
             "\tlv_image_dsc_t images[MAX_IMAGES];\n"
             "#endif\n"
-            "} lv_view__private_t;"
+            "} %s__private_t;"
             "\n\n\n",
             max_styles,
             max_fonts,
-            max_images);
+            max_images,
+            mod->name
+        );
         buf.append(strbuf.get());
     }
     buf.append(fn_text);

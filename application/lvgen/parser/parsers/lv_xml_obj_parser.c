@@ -51,14 +51,7 @@ static void apply_styles(lv_xml_parser_state_t * state, lv_obj_t * obj, const ch
 struct fn_param* lv_xml_obj_get_parameter(lv_xml_component_scope_t * parent_scope,
     struct func_context* fn, const char* name) {
     struct fn_param* param = lvgen_get_fnparam(fn, name);
-    //if (param != NULL) {
-    //    if (parent_scope != NULL) {
-    //        struct fn_param* param_p;
-    //        param_p = lvgen_get_fnparam(parent_scope->active_func, param->name + 1);
-    //        if (param_p != NULL)
-    //            lv_strlcpy(param->pname, param_p->name, LV_SYMBOL_LEN);
-    //    }
-    //}
+
     return param;
 }
 
@@ -67,8 +60,6 @@ const char* lv_xml_obj_get_value(struct fn_param* param, const char* value) {
         return value;
 
     lvgen_fnparam_copy_value(param, value);
-    //if (param->pname[0] != '\0')
-    //    return param->pname + 1;
 
     return param->name + 1;
 }

@@ -126,13 +126,14 @@ lv_obj_t * lv_xml_component_process(lv_xml_parser_state_t * state, const char * 
     struct func_context* fn = lv_xml_state_get_active_fn(state);
     if(scope == NULL) return NULL;
 
-    if (scope->active_func == NULL)
+    lv_obj_t* item = NULL;
+    if (scope->active_func == NULL) {
         scope->active_func = lv_xml_create_scope_fn(scope, fn, name);
-
-    lv_obj_t * item = lv_xml_create_in_scope(state->parent, &state->scope, scope, attrs);
-    if(item == NULL) {
-        LV_LOG_WARN("Couldn't create component '%s'", name);
-        return NULL;
+        item = lv_xml_create_in_scope(state->parent, &state->scope, scope, attrs);
+        if (item == NULL) {
+            LV_LOG_WARN("Couldn't create component '%s'", name);
+            return NULL;
+        }
     }
 
     lv_obj_t* pitem;
@@ -143,6 +144,7 @@ lv_obj_t * lv_xml_component_process(lv_xml_parser_state_t * state, const char * 
 
     /* Apply the properties of the component, e.g. <my_button x="20" styles="red"/> */
     state->item = pitem? pitem: item;
+    assert(state->item != NULL);
     lv_widget_processor_t * extended_proc = lv_xml_widget_get_extended_widget_processor(scope->extends);
     extended_proc->apply_cb(state, attrs);
 
