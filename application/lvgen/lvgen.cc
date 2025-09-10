@@ -338,60 +338,23 @@ bool LvCodeGenerator::GenerateFunctionSignature(const LvFunctionContext* fn, cha
     if (fn->export_cnt == 0)
         offset += snprintf(tbuf + offset, remain - offset, "static ");
 
-    offset += snprintf(tbuf + offset, remain - offset, "%s %s",
+    offset += snprintf(tbuf + offset, remain - offset, "%s %s(",
         lv_type_to_name(fn->rtype), fn->signature);
 
-    switch (fn->args_num) {
-    case 0:
-        offset += snprintf(tbuf + offset, remain - offset, "(void)");
-        break;
-    case 1:
-        offset += snprintf(tbuf + offset, remain - offset, "(%s %s)",
-            fn->args[0].type, fn->args[0].name
-        );
-        break;
-    case 2:
-        offset += snprintf(tbuf + offset, remain - offset, "(%s %s, %s %s)",
-            fn->args[0].type, fn->args[0].name,
-            fn->args[1].type, fn->args[1].name
-        );
-        break;
-    case 3:
-        offset += snprintf(tbuf + offset, remain - offset, "(%s %s, %s %s, %s %s)",
-            fn->args[0].type, fn->args[0].name,
-            fn->args[1].type, fn->args[1].name,
-            fn->args[2].type, fn->args[2].name
-        );
-        break;
-    case 4:
-        offset += snprintf(tbuf + offset, remain - offset, "(%s %s, %s %s, %s %s, %s %s)",
-            fn->args[0].type, fn->args[0].name,
-            fn->args[1].type, fn->args[1].name,
-            fn->args[2].type, fn->args[2].name,
-            fn->args[3].type, fn->args[3].name
-        );
-        break;
-    case 5:
-        offset += snprintf(tbuf + offset, remain - offset, "(%s %s, %s %s, %s %s, %s %s, %s %s)",
-            fn->args[0].type, fn->args[0].name,
-            fn->args[1].type, fn->args[1].name,
-            fn->args[2].type, fn->args[2].name,
-            fn->args[3].type, fn->args[3].name,
-            fn->args[4].type, fn->args[4].name
-        );
-        break;
-    case 6:
-        offset += snprintf(tbuf + offset, remain - offset, "(%s %s, %s %s, %s %s, %s %s, %s %s, %s %s)",
-            fn->args[0].type, fn->args[0].name,
-            fn->args[1].type, fn->args[1].name,
-            fn->args[2].type, fn->args[2].name,
-            fn->args[3].type, fn->args[3].name,
-            fn->args[4].type, fn->args[4].name,
-            fn->args[5].type, fn->args[5].name
-        );
-        break;
-    default:
-        return false;
+    if (fn->args_num > 0) {
+        for (int i = 0; i < fn->args_num; i++) {
+            if (i + 1 < fn->args_num) {
+                offset += snprintf(tbuf + offset, remain - offset, "%s %s, ",
+                    fn->args[i].type, fn->args[i].name
+                );
+            } else {
+                offset += snprintf(tbuf + offset, remain - offset, "%s %s)",
+                    fn->args[i].type, fn->args[i].name
+                );
+            }
+        }
+    } else {
+        offset += snprintf(tbuf + offset, remain - offset, "void)");
     }
 
     return true;
@@ -419,65 +382,80 @@ bool LvCodeGenerator::GenerateFunctionInstruction(const LvFunctionContext* fn, s
                     lv_type_to_name(ins->rtype), ins->lvalue);
             }
 
-            switch (ins->args_num) {
-            case 0:
-                offset += snprintf(tbuf + offset, remain - offset, "%s();\n",
-                    ins->insn);
-                break;
-            case 1:
-                offset += snprintf(tbuf + offset, remain - offset, "%s(%s);\n",
-                    ins->insn,
-                    ins->args[0]
-                );
-                break;
-            case 2:
-                offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s);\n",
-                    ins->insn,
-                    ins->args[0],
-                    ins->args[1]
-                );
-                break;
-            case 3:
-                offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s, %s);\n",
-                    ins->insn,
-                    ins->args[0],
-                    ins->args[1],
-                    ins->args[2]
-                );
-                break;
-            case 4:
-                offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s, %s, %s);\n",
-                    ins->insn,
-                    ins->args[0],
-                    ins->args[1],
-                    ins->args[2],
-                    ins->args[3]
-                );
-                break;
-            case 5:
-                offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s, %s, %s, %s);\n",
-                    ins->insn,
-                    ins->args[0],
-                    ins->args[1],
-                    ins->args[2],
-                    ins->args[3],
-                    ins->args[4]
-                );
-                break;
-            case 6:
-                offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s, %s, %s, %s, %s);\n",
-                    ins->insn,
-                    ins->args[0],
-                    ins->args[1],
-                    ins->args[2],
-                    ins->args[3],
-                    ins->args[4],
-                    ins->args[5]
-                );
-                break;
-            default:
-                return false;
+            offset += snprintf(tbuf + offset, remain - offset, "%s(",
+                ins->insn);
+
+            if (ins->args_num > 0) {
+                for (int i = 0; i < ins->args_num; i++) {
+                    if (i + 1 < ins->args_num)
+                        offset += snprintf(tbuf + offset, remain - offset, "%s, ", ins->args[i]);
+                    else
+                        offset += snprintf(tbuf + offset, remain - offset, "%s);\n", ins->args[i]);
+                }
+            } else {
+                offset += snprintf(tbuf + offset, remain - offset, ");\n");
             }
+
+            //switch (ins->args_num) {
+            //case 0:
+            //    offset += snprintf(tbuf + offset, remain - offset, "%s();\n",
+            //        ins->insn);
+            //    break;
+            //case 1:
+            //    offset += snprintf(tbuf + offset, remain - offset, "%s(%s);\n",
+            //        ins->insn,
+            //        ins->args[0]
+            //    );
+            //    break;
+            //case 2:
+            //    offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s);\n",
+            //        ins->insn,
+            //        ins->args[0],
+            //        ins->args[1]
+            //    );
+            //    break;
+            //case 3:
+            //    offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s, %s);\n",
+            //        ins->insn,
+            //        ins->args[0],
+            //        ins->args[1],
+            //        ins->args[2]
+            //    );
+            //    break;
+            //case 4:
+            //    offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s, %s, %s);\n",
+            //        ins->insn,
+            //        ins->args[0],
+            //        ins->args[1],
+            //        ins->args[2],
+            //        ins->args[3]
+            //    );
+            //    break;
+            //case 5:
+            //    offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s, %s, %s, %s);\n",
+            //        ins->insn,
+            //        ins->args[0],
+            //        ins->args[1],
+            //        ins->args[2],
+            //        ins->args[3],
+            //        ins->args[4]
+            //    );
+            //    break;
+            //case 6:
+            //    offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s, %s, %s, %s, %s);\n",
+            //        ins->insn,
+            //        ins->args[0],
+            //        ins->args[1],
+            //        ins->args[2],
+            //        ins->args[3],
+            //        ins->args[4],
+            //        ins->args[5]
+            //    );
+            //    break;
+            //default:
+            //    return false;
+            //}
+
         } else {
             if (ins->lvalue != nullptr)
                 offset += snprintf(tbuf + offset, remain - offset, "%s %s = ", 
