@@ -5,6 +5,7 @@
 #define LVGEN_LVGEN_CINSN_H_
 
 #include <stdbool.h>
+#include <assert.h>
 #include <parser/lib/lv_types.h>
 
 #include "sys/queue.h"
@@ -110,7 +111,8 @@ struct fn_param {
     char key[LV_SYMBOL_LEN];
     char name[LV_SYMBOL_LEN];
     char value[LV_SYMBOL_LEN];
-    char pname[LV_SYMBOL_LEN];
+    //char pname[LV_SYMBOL_LEN];
+    char type[LV_SYMBOL_LEN];
 };
 
 struct module_depend {
@@ -150,6 +152,7 @@ struct func_context {
     TAILQ_HEAD(, _lv_obj) ll_objs;
     TAILQ_HEAD(, fn_param) ll_params;
 
+    struct func_context* parent;
     struct module_context* owner;
 };
 
@@ -175,6 +178,10 @@ struct module_context* lvgen_get_module(void);
 struct module_context* lvgen_get_module_by_name(const char* name);
 struct fn_param* lvgen_new_fnparam(struct func_context* fn, const char* key);
 struct fn_param* lvgen_get_fnparam(struct func_context* fn, const char* key);
+struct fn_param* lvgen_new_fnparam_by_name(struct func_context* fn, const char* name);
+bool lvgen_fnparam_empty(struct func_context* fn);
+int lvgen_fnparam_copy_value(struct fn_param* param, const char* value);
+
 struct func_context* lvgen_new_func(struct _fn_list* fn_ll, struct module_context *mod,
     const char* signature);
 struct func_context* lvgen_new_module_func(struct module_context* mod);

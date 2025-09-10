@@ -120,20 +120,20 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
         lv_snprintf((char *)xml_style->long_name, long_name_len, "%s.%s", scope->name, style_name); /*E.g. my_button.style1*/
 
         if (fn->owner->is_view) {
-            lv_snprintf(fn->signature, sizeof(fn->signature), LV_FN_PREFIX "%s_%s_style_init", scope->name, style_name);
+            lv_snprintf(fn->signature, sizeof(fn->signature), "%s_%s__style", scope->name, style_name);
             lvgen_add_func_argument(fn, "lv_style_t*", "style");
+            fn->rtype = LV_PTYPE(lv_style_t);
         } else {
             sty_param = "&style";
-            lv_snprintf(fn->signature, sizeof(fn->signature), LV_FN_PREFIX "%s_%s_style", scope->name, style_name);
+            lv_snprintf(fn->signature, sizeof(fn->signature), "%s_%s__style", scope->name, style_name);
             fn->rtype = LV_PTYPE(lv_style_t);
 
             lvgen_new_exprinsn(fn, "static lv_style_t style;");
             lvgen_new_exprinsn(fn, "static bool sty_inited;");
-            lvgen_new_exprinsn(fn, "if (sty_inited)");
-            lvgen_new_exprinsn(fn, "    return &style;");
+            lvgen_new_exprinsn(fn, "if (sty_inited) return &style;");
         }
 
-        lvgen_new_exprinsn(fn, "lv_style_init(style);");
+        lvgen_new_exprinsn(fn, "lv_style_init(%s);", sty_param);
         xml_style->link_fn = fn;
     }
 
@@ -328,10 +328,10 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
         }
     }
 
-    if (!fn->owner->is_view) {
+    if (!fn->owner->is_view)
         lvgen_new_exprinsn(fn, "sty_inited = true;");
-        lvgen_new_exprinsn(fn, "return &style;");
-    }
+
+    lvgen_new_exprinsn(fn, "return %s;", sty_param);
 
     return LV_RESULT_OK;
 }
@@ -372,6 +372,7 @@ const char * lv_xml_style_string_process(char * txt, lv_style_selector_t * selec
 
 void lv_xml_style_add_to_obj(lv_xml_parser_state_t * state, lv_obj_t * obj, const char * text)
 {
+    struct func_context* parent_fn = lv_xml_state_get_active_fn(state);
     struct func_context* fn = obj->scope_fn;
     char * str = lv_strdup(text);
     char * str_ori = str;
@@ -381,11 +382,17 @@ void lv_xml_style_add_to_obj(lv_xml_parser_state_t * state, lv_obj_t * obj, cons
     while(onestyle_str != NULL) {
         /* Parse the parts and states after the space */
         lv_style_selector_t selector = 0;
+        struct fn_param* param;
+
         const char * style_name = lv_xml_style_string_process(onestyle_str, &selector);
         if(style_name != NULL) {
             lv_xml_style_t * xml_style = NULL;
             /*Resolve parameters or just find the style*/
             if(style_name[0] == '$') {
+                /* Add style parameter for function */
+                param = lvgen_new_fnparam_by_name(fn, style_name);
+                lv_strlcpy(param->key, "styles", sizeof(param->name));
+
                 /*E.g. `$pr_style` style name means use the value
                  *coming from the parent's `pr_style` named attribute*/
                 const char * name_clean = &style_name[1];
@@ -401,37 +408,60 @@ void lv_xml_style_add_to_obj(lv_xml_parser_state_t * state, lv_obj_t * obj, cons
                 /* Apply with the selector */
                 //lv_obj_add_style(obj, &xml_style->style, selector);
 
-                
                 if (fn != NULL) {
                     struct func_context* callee = xml_style->link_fn;
-                    char stybuf[64];
 
                     if (fn->owner->is_view) {
-                        lv_snprintf(stybuf, sizeof(stybuf), LV_VFN_STYLE_AT(% d), fn->style_num++);
-                        lvgen_new_exprinsn(fn, "%s(%s);", callee->signature, stybuf);
-                        lvgen_new_exprinsn(fn, "lv_obj_add_style(%s, %s, %s);",
+                        lvgen_new_exprinsn(fn, "lv_obj_add_style(%s, %s(" LV_VFN_STYLE_AT(%d) "), %s);",
                             LV_OBJNAME(obj),
-                            stybuf,
+                            callee->signature,
+                            fn->style_num++,
                             selector
                         );
+
                     } else {
                         /* This style import from function parameter */
                         if (style_name[0] == '$') {
+                            assert(fn->parent != NULL);
+
+                            /* Set value for style parameter */
+                            lv_snprintf(param->value, sizeof(param->value), "%s(" LV_VFN_STYLE_AT(%d) ")",
+                                callee->signature, 
+                                fn->parent->style_num++
+                            );
                             lvgen_new_exprinsn(fn, "lv_obj_add_style(%s, %s, %s);",
                                 LV_OBJNAME(obj),
                                 style_name + 1,
                                 selector
                             );
+
+                            //fn = fn->parent;
                         } else {
-                            lvgen_new_exprinsn(fn, "lv_obj_add_style(%s, %s(), %s);",
-                                LV_OBJNAME(obj),
-                                callee->signature,
-                                selector
-                            );
+                            /* Cross reference */
+                            if (fn->parent && callee->owner == fn->parent->owner) {
+                                fn = fn->parent;
+                                obj = state->item;
+
+                                lvgen_new_exprinsn(fn, "lv_obj_add_style(%s, %s(" LV_VFN_STYLE_AT(%d) "), %s);",
+                                    LV_OBJNAME(obj),
+                                    callee->signature,
+                                    fn->style_num++,
+                                    selector
+                                );
+                            } else {
+                                lvgen_new_exprinsn(fn, "lv_obj_add_style(%s, %s(), %s);",
+                                    LV_OBJNAME(obj),
+                                    callee->signature,
+                                    selector
+                                );
+                            }
                         }
                     }
 
-                    lvgen_new_module_depend(fn->owner, callee);
+                    if (style_name[0] == '$')
+                        lvgen_new_module_depend(fn->parent->owner, callee);
+                    else
+                        lvgen_new_module_depend(fn->owner, callee);
                 }
             }
         }

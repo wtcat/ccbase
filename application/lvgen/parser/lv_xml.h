@@ -19,7 +19,7 @@ extern "C" {
 #include "parser/lib/lv_ll.h"
 #include "parser/lib/lv_mem.h"
 #include "parser/lib/lv_string.h"
-
+#include "parser/lib/lv_stdio.h"
 #include "lv_xml_private.h"
 
 #if LV_USE_XML
@@ -42,7 +42,9 @@ extern "C" {
 #if 1
 struct func_context;
 
-struct func_context* lv_xml_create_scope_fn(lv_xml_component_scope_t* scope, const char* name);
+struct func_context*
+lv_xml_create_scope_fn(lv_xml_component_scope_t* scope, struct func_context* caller,
+        const char* name);
 
 void* lv_xml_default_widget_create(lv_xml_parser_state_t* state, const char** attrs,
     const char* fnname, const char* varname);

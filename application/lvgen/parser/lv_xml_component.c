@@ -127,7 +127,7 @@ lv_obj_t * lv_xml_component_process(lv_xml_parser_state_t * state, const char * 
     if(scope == NULL) return NULL;
 
     if (scope->active_func == NULL)
-        scope->active_func = lv_xml_create_scope_fn(scope, name);
+        scope->active_func = lv_xml_create_scope_fn(scope, fn, name);
 
     lv_obj_t * item = lv_xml_create_in_scope(state->parent, &state->scope, scope, attrs);
     if(item == NULL) {
@@ -136,7 +136,7 @@ lv_obj_t * lv_xml_component_process(lv_xml_parser_state_t * state, const char * 
     }
 
     lv_obj_t* pitem;
-    if (state->parent_scope != NULL)
+    if (fn != NULL)
         pitem = lv_xml_component_callfn(state, scope, name);
     else
         pitem = item;

@@ -159,6 +159,13 @@ struct fn_param* lvgen_get_fnparam(struct func_context* fn, const char* key) {
     return NULL;
 }
 
+int lvgen_fnparam_copy_value(struct fn_param* param, const char* value) {
+    if (value[0] != '$' && !lv_strcmp(param->type, "string"))
+        return lv_snprintf(param->value, sizeof(param->value), "\"%s\"", value);
+
+    return (int)lv_strlcpy(param->value, value, LV_SYMBOL_LEN);
+}
+
 struct fn_param* lvgen_new_fnparam(struct func_context* fn, const char *key) {
     struct fn_param* param;
 
@@ -173,6 +180,29 @@ struct fn_param* lvgen_new_fnparam(struct func_context* fn, const char *key) {
         lv_strlcpy(param->key, key, LV_SYMBOL_LEN);
 
     return param;
+}
+
+struct fn_param* lvgen_new_fnparam_by_name(struct func_context* fn, const char* name) {
+    struct fn_param* param;
+
+    if (name != NULL) {
+        TAILQ_FOREACH(param, &fn->ll_params, link) {
+            if (!lv_strcmp(name, param->name))
+                return param;
+        }
+    }
+
+    LIST_NEW_NODE(&fn->ll_params, fn_param, param, true);
+    if (param != NULL) {
+        lv_strlcpy(param->name + 1, name, LV_SYMBOL_LEN);
+        param->name[0] = '$';
+    }
+
+    return param;
+}
+
+bool lvgen_fnparam_empty(struct func_context* fn) {
+    return TAILQ_EMPTY(&fn->ll_params);
 }
 
 struct func_context* lvgen_new_func(struct _fn_list *fn_ll, struct module_context *mod,

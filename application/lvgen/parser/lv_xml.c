@@ -74,9 +74,11 @@ static void view_end_element_handler(void * user_data, const char * name);
  **********************/
 
 struct func_context* 
-lv_xml_create_scope_fn(lv_xml_component_scope_t* scope, const char* name) {
+lv_xml_create_scope_fn(lv_xml_component_scope_t* scope, struct func_context* caller, 
+    const char* name) {
     struct func_context* fn = lvgen_new_module_func(lvgen_get_module_by_name(name));
 
+    fn->parent = caller;
     fn->rtype = LV_PTYPE(lv_obj_t);
     lv_snprintf(fn->signature, sizeof(fn->signature), LV_FN_PREFIX "%s_create", name);
     lvgen_add_func_argument(fn, "lv_obj_t*", "parent");
@@ -223,7 +225,7 @@ void * lv_xml_create(lv_obj_t * parent, const char * name, const char ** attrs)
 {
     lv_xml_component_scope_t * scope = lv_xml_component_get_scope(name);
     if(scope) {
-        struct func_context* fn = lv_xml_create_scope_fn(scope, name);
+        struct func_context* fn = lv_xml_create_scope_fn(scope, NULL, name);
         scope->active_func = fn;
 
         lv_obj_t* item = lv_xml_create_in_scope(parent, NULL, scope, attrs);
@@ -527,6 +529,15 @@ static void resolve_params(lv_xml_component_scope_t * item_scope, lv_xml_compone
 {
     struct func_context* fn = item_scope->active_func;
     uint32_t i;
+
+    /* Collect function parameters */
+    if (lvgen_fnparam_empty(fn)) {
+        lv_xml_param_t* fparam;
+        LV_LL_READ(&item_scope->param_ll, fparam) {
+            lvgen_new_fnparam_by_name(fn, fparam->name);
+        }
+    }
+    
     for(i = 0; item_attrs[i]; i += 2) {
         const char * name = item_attrs[i];
         const char * value = item_attrs[i + 1];
@@ -534,8 +545,8 @@ static void resolve_params(lv_xml_component_scope_t * item_scope, lv_xml_compone
             continue;
         }
         if(value[0] == '$') {
-            struct fn_param *param = lvgen_new_fnparam(fn, name);
-            lv_strlcpy(param->name, value, LV_SYMBOL_LEN);
+            struct fn_param *param = lvgen_new_fnparam_by_name(fn, value);
+            lv_strlcpy(param->key, name, sizeof(param->key));
 
             /*E.g. the ${my_color} value is the my_color attribute name on the parent*/
             const char * name_clean = &value[1]; /*skips `$`*/
@@ -543,6 +554,9 @@ static void resolve_params(lv_xml_component_scope_t * item_scope, lv_xml_compone
             const char * type = get_param_type(item_scope, name_clean);
             if(type == NULL) {
                 LV_LOG_WARN("'%s' parameter is not defined on '%s'", name_clean, item_scope->name);
+            }
+            else {
+                lv_strlcpy(param->type, type, sizeof(param->type));
             }
             const char * ext_value = lv_xml_get_value_of(parent_attrs, name_clean);
             if(ext_value) {
@@ -561,7 +575,7 @@ static void resolve_params(lv_xml_component_scope_t * item_scope, lv_xml_compone
                 ext_value = get_param_default(item_scope, name_clean);
             }
             if(ext_value) {
-                lv_strlcpy(param->value, ext_value, LV_SYMBOL_LEN);
+                lvgen_fnparam_copy_value(param, ext_value);
                 item_attrs[i + 1] = ext_value;
             }
             else {
