@@ -32,6 +32,7 @@ target_sources(lv_parser
 	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_checkbox_parser.c
 	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_chart_parser.c
 
+	${CMAKE_CURRENT_SOURCE_DIR}/parsers/lv_xml_slider_parser.c
 )
 
 add_subdirectory(lib)

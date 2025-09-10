@@ -118,7 +118,8 @@ typedef const char* lv_bar_mode_t;
 typedef const char* lv_chart_type_t;
 typedef const char* lv_chart_update_mode_t;
 typedef const char* lv_chart_axis_t;
-
+typedef const char* lv_slider_orientation_t;
+typedef const char* lv_slider_mode_t;
 typedef char lv_font_t;
 
 typedef char* lv_style_t;

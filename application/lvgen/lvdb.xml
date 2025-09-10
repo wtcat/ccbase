@@ -323,6 +323,18 @@
 			<prop name="secondary_y" value="LV_CHART_AXIS_SECONDARY_Y"/>
 		</lv_chart_axis_t>
 		
+		<lv_slider_orientation_t>
+			<prop name="auto" value="LV_SLIDER_ORIENTATION_AUTO"/>
+			<prop name="horizontal" value="LV_SLIDER_ORIENTATION_HORIZONTAL"/>
+			<prop name="vertical" value="LV_SLIDER_ORIENTATION_VERTICAL"/>
+		</lv_slider_orientation_t>
+		
+		<lv_slider_mode_t>
+			<prop name="normal" value="LV_SLIDER_MODE_NORMAL"/>
+			<prop name="range" value="LV_SLIDER_MODE_RANGE"/>
+			<prop name="symmetrical" value="LV_SLIDER_MODE_SYMMETRICAL"/>
+		</lv_slider_mode_t>
+		
 	</types>
 	
 	<styles>
