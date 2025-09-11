@@ -396,66 +396,6 @@ bool LvCodeGenerator::GenerateFunctionInstruction(const LvFunctionContext* fn, s
                 offset += snprintf(tbuf + offset, remain - offset, ");\n");
             }
 
-            //switch (ins->args_num) {
-            //case 0:
-            //    offset += snprintf(tbuf + offset, remain - offset, "%s();\n",
-            //        ins->insn);
-            //    break;
-            //case 1:
-            //    offset += snprintf(tbuf + offset, remain - offset, "%s(%s);\n",
-            //        ins->insn,
-            //        ins->args[0]
-            //    );
-            //    break;
-            //case 2:
-            //    offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s);\n",
-            //        ins->insn,
-            //        ins->args[0],
-            //        ins->args[1]
-            //    );
-            //    break;
-            //case 3:
-            //    offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s, %s);\n",
-            //        ins->insn,
-            //        ins->args[0],
-            //        ins->args[1],
-            //        ins->args[2]
-            //    );
-            //    break;
-            //case 4:
-            //    offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s, %s, %s);\n",
-            //        ins->insn,
-            //        ins->args[0],
-            //        ins->args[1],
-            //        ins->args[2],
-            //        ins->args[3]
-            //    );
-            //    break;
-            //case 5:
-            //    offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s, %s, %s, %s);\n",
-            //        ins->insn,
-            //        ins->args[0],
-            //        ins->args[1],
-            //        ins->args[2],
-            //        ins->args[3],
-            //        ins->args[4]
-            //    );
-            //    break;
-            //case 6:
-            //    offset += snprintf(tbuf + offset, remain - offset, "%s(%s, %s, %s, %s, %s, %s);\n",
-            //        ins->insn,
-            //        ins->args[0],
-            //        ins->args[1],
-            //        ins->args[2],
-            //        ins->args[3],
-            //        ins->args[4],
-            //        ins->args[5]
-            //    );
-            //    break;
-            //default:
-            //    return false;
-            //}
-
         } else {
             if (ins->lvalue != nullptr)
                 offset += snprintf(tbuf + offset, remain - offset, "%s %s = ", 

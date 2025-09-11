@@ -50,10 +50,12 @@ void lv_xml_checkbox_apply(lv_xml_parser_state_t * state, const char ** attrs)
         const char * name = attrs[i];
         const char * value = attrs[i + 1];
 
+        struct fn_param* param = lv_xml_obj_get_parameter(state->parent_scope, fn, name);
+
         if (lv_streq("text", name)) {
             //lv_checkbox_set_text(item, value);
             lvgen_new_exprinsn(fn, "lv_checkbox_set_text(%s, %s);",
-                LV_OBJNAME(item), value);
+                LV_OBJNAME(item), lv_xml_obj_get_value(param, value));
         }
     }
 }

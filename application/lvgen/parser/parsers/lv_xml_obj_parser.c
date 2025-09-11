@@ -81,7 +81,7 @@ void lv_xml_obj_apply(lv_xml_parser_state_t * state, const char ** attrs)
         size_t name_len = lv_strlen(name);
         struct fn_param* param;
 
-        param = lvgen_get_fnparam(fn, name); // lv_xml_obj_get_parameter(state->parent_scope, fn, name);
+        param = lv_xml_obj_get_parameter(state->parent_scope, fn, name);
 
 #if LV_USE_OBJ_NAME
         if(lv_streq("name", name)) {
