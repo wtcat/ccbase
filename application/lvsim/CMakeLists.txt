@@ -45,6 +45,7 @@ add_executable(${PROJECT_NAME}
 
 include(cmake/lvgl.cmake)
 add_subdirectory(driver)
+add_subdirectory(plugin)
 
 target_link_libraries(${PROJECT_NAME}
 	lvgl

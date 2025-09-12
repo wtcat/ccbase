@@ -481,6 +481,12 @@ static void process_image_element(lv_xml_parser_state_t * state, const char * ty
         return;
     }
 
+    const char* scene = lv_xml_get_value_of(attrs, "scene");
+    if (src_path == NULL) {
+        LV_LOG_WARN("'scene' is missing from a `%s` font", name);
+        return;
+    }
+
     /* E.g. <file name="avatar" src_path="avatar1.png">*/
     if(lv_streq(type, "file")) {
         lv_xml_register_image(&state->scope, name, src_path);

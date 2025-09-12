@@ -19,6 +19,7 @@ extern "C"{
 #define LV_FN_PREFIX        "lv__"
 #define LV_VFN_PARAM2       "user"
 #define LV_VFN_STYLE_AT(n)  "&" LV_VFN_PARAM2 "->styles[" #n "]"
+#define LV_VIEW_USER_TYPE   "scene__%s_t"
 
 
 #define LV_LOG_WARN(fmt, ...) printf("%s:" fmt "\n", __func__, ##__VA_ARGS__)

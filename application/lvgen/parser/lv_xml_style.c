@@ -123,6 +123,9 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
             lv_snprintf(fn->signature, sizeof(fn->signature), "%s_%s__style", scope->name, style_name);
             lvgen_add_func_argument(fn, "lv_style_t*", "style");
             fn->rtype = LV_PTYPE(lv_style_t);
+            lvgen_new_exprinsn(fn, "if (!lv_style_is_empty(style))");
+            lvgen_new_exprinsn(fn, "    return style;");
+            lvgen_new_exprinsn(fn, "");
         } else {
             sty_param = "&style";
             lv_snprintf(fn->signature, sizeof(fn->signature), "%s_%s__style", scope->name, style_name);
@@ -162,39 +165,39 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
         if(lv_streq(value, "remove")) {
             lv_style_prop_t prop = style_prop_text_to_enum(name);
             if (lv_strcmp(prop, "LV_STYLE_PROP_INV")) {
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", prop, NULL);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, %s);", sty_param, prop);
             }
             else if(lv_streq(name, "pad_all")) {
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_PAD_TOP", NULL);
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_PAD_BOTTOM", NULL);
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_PAD_LEFT", NULL);
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_PAD_RIGHT", NULL);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_PAD_TOP);", sty_param);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_PAD_BOTTOM);", sty_param);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_PAD_LEFT);", sty_param);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_PAD_RIGHT);", sty_param);
             }
             else if(lv_streq(name, "pad_hor")) {
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_PAD_LEFT", NULL);
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_PAD_RIGHT", NULL);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_PAD_LEFT);", sty_param);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_PAD_RIGHT);", sty_param);
             }
             else if(lv_streq(name, "pad_ver")) {
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_PAD_TOP", NULL);
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_PAD_BOTTOM", NULL);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_PAD_TOP);", sty_param);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_PAD_BOTTOM);", sty_param);
             }
             else if(lv_streq(name, "pad_gap")) {
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_PAD_COLUMN", NULL);
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_PAD_ROW", NULL);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_PAD_COLUMN);", sty_param);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_PAD_ROW);", sty_param);
             }
             else if(lv_streq(name, "margin_all")) {
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_MARGIN_TOP", NULL);
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_MARGIN_BOTTOM", NULL);
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_MARGIN_LEFT", NULL);
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_MARGIN_RIGHT", NULL);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_MARGIN_TOP);", sty_param);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_MARGIN_BOTTOM);", sty_param);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_MARGIN_LEFT);", sty_param);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_MARGIN_RIGHT);", sty_param);
             }
             else if(lv_streq(name, "margin_hor")) {
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_MARGIN_LEFT", NULL);
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_MARGIN_RIGHT", NULL);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_MARGIN_LEFT);", sty_param);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_MARGIN_RIGHT);", sty_param);
             }
             else if(lv_streq(name, "margin_ver")) {
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_MARGIN_TOP", NULL);
-                lvgen_new_callinsn(fn, LV_TYPE(void), "lv_style_remove_prop", "style", "LV_STYLE_MARGIN_BOTTOM", NULL);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_MARGIN_TOP);", sty_param);
+                lvgen_new_exprinsn(fn, "lv_style_remove_prop(%s, LV_STYLE_MARGIN_BOTTOM);", sty_param);
             }
         }
 
