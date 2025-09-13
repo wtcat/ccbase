@@ -63,7 +63,7 @@ int32_t lv_xml_strtol(const char * str, char ** endptr, int32_t base);
 char * lv_xml_split_str(char ** src, char delimiter);
 
 
-const void* lv_xml_get_image(lv_xml_component_scope_t* scope, const char* name);
+const void* lv_xml_get_image(lv_xml_parser_state_t* scope, const char* name);
 const lv_font_t* lv_xml_get_font(lv_xml_component_scope_t* scope, const char* name);
 
 #endif /* LV_USE_XML */

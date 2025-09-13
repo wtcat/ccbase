@@ -359,5 +359,6 @@ void lvgen_context_destroy(void) {
         lv_xml_component_unregister(mod->name);
         lvgen_module_clear(mod);
     }
+    lv_xml_component_unregister("globals");
     LIST_CLEAR(&ctx->ll_modules, module_context);
 }

@@ -241,7 +241,7 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
         else SET_STYLE_IF(bg_grad_stop, lv_xml_atoi_string(value));
         else SET_STYLE_IF(bg_grad, lv_xml_component_get_grad(scope, value, fn));
 
-        else SET_STYLE_IF(bg_image_src, lv_xml_get_image(scope, value));
+        else SET_STYLE_IF(bg_image_src, lv_xml_get_image((lv_xml_parser_state_t*)scope, value));
         else SET_STYLE_IF(bg_image_tiled, lv_xml_to_bool_string(value));
         else SET_STYLE_IF(bg_image_recolor, lv_xml_to_color(value));
         else SET_STYLE_IF(bg_image_recolor_opa, lv_xml_to_opa_string(value));
@@ -287,7 +287,7 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
         else SET_STYLE_IF(arc_opa, lv_xml_to_opa_string(value));
         else SET_STYLE_IF(arc_width, lv_xml_atoi_string(value));
         else SET_STYLE_IF(arc_rounded, lv_xml_to_bool_string(value));
-        else SET_STYLE_IF(arc_image_src, lv_xml_get_image(scope, value));
+        else SET_STYLE_IF(arc_image_src, lv_xml_get_image((lv_xml_parser_state_t*)scope, value));
 
         else SET_STYLE_IF(opa, lv_xml_to_opa_string(value));
         else SET_STYLE_IF(opa_layered, lv_xml_to_opa_string(value));
@@ -305,7 +305,7 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
         else SET_STYLE_IF(transform_pivot_x, lv_xml_atoi_string(value));
         else SET_STYLE_IF(transform_pivot_y, lv_xml_atoi_string(value));
         else SET_STYLE_IF(transform_skew_x, lv_xml_atoi_string(value));
-        else SET_STYLE_IF(bitmap_mask_src, lv_xml_get_image(scope, value));
+        else SET_STYLE_IF(bitmap_mask_src, lv_xml_get_image((lv_xml_parser_state_t*)scope, value));
         else SET_STYLE_IF(rotary_sensitivity, lv_xml_atoi_string(value));
         else SET_STYLE_IF(recolor, lv_xml_to_color(value));
         else SET_STYLE_IF(recolor_opa, lv_xml_to_opa_string(value));

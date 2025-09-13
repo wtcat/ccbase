@@ -490,8 +490,11 @@ static void process_image_element(lv_xml_parser_state_t * state, const char * ty
     /* E.g. <file name="avatar" src_path="avatar1.png">*/
     if(lv_streq(type, "file")) {
         lv_xml_register_image(&state->scope, name, src_path);
-    }
-    else {
+    } else if (lv_streq(type, "scene")) {
+        char img_src[128];
+        lv_snprintf(img_src, sizeof(img_src), LV_IMAGE_SRC_FMT(name));
+        lv_xml_register_image(&state->scope, name, img_src);
+    } else {
         LV_LOG_INFO("Ignore non-file image `%s`", name);
     }
 }

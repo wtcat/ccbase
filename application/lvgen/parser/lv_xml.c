@@ -417,35 +417,30 @@ lv_result_t lv_xml_register_image(lv_xml_component_scope_t * scope, const char *
 
     img = lv_ll_ins_head(&scope->image_ll);
     img->name = lv_strdup(name);
-    //if(lv_image_src_get_type(src) == LV_IMAGE_SRC_FILE) {
-    //    img->src = lv_strdup(src);
-    //}
-    //else {
-    //    img->src = src;
-    //}
+    img->src = lv_strdup(src);
 
     return LV_RESULT_OK;
 }
 
-const void * lv_xml_get_image(lv_xml_component_scope_t * scope, const char * name)
+const void * lv_xml_get_image(lv_xml_parser_state_t* state, const char * name)
 {
-    if(scope == NULL) scope = lv_xml_component_get_scope("globals");
-    if(scope == NULL) return NULL;
-
-    lv_xml_image_t * img;
-    if(scope) {
+    lv_xml_component_scope_t* scope = &state->scope;
+    lv_xml_image_t* img;
+    
+    while (scope != NULL) {
         LV_LL_READ(&scope->image_ll, img) {
-            if(lv_streq(img->name, name)) return img->src;
+            if (lv_streq(img->name, name)) 
+                return img->src;
         }
+        scope = state->parent_scope;
     }
 
     /*If not found in the component check the global space*/
-    if((scope == NULL || scope->name == NULL) || !lv_streq(scope->name, "globals")) {
-        scope = lv_xml_component_get_scope("globals");
-        if(scope) {
-            LV_LL_READ(&scope->image_ll, img) {
-                if(lv_streq(img->name, name)) return img->src;
-            }
+    scope = lv_xml_component_get_scope("globals");
+    if(scope) {
+        LV_LL_READ(&scope->image_ll, img) {
+            if(lv_streq(img->name, name))
+                return img->src;
         }
     }
 

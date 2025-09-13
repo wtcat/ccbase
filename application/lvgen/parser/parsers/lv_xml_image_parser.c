@@ -57,7 +57,7 @@ void lv_xml_image_apply(lv_xml_parser_state_t * state, const char ** attrs)
 
         if (lv_streq("src", name)) { //lv_image_set_src(item, lv_xml_get_image(&state->scope, value));
             lvgen_new_exprinsn(fn, "lv_image_set_src(%s, %s);", 
-                LV_OBJNAME(item), lv_xml_obj_get_value(param, value));
+                LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_get_image(state, value)));
         }
         else if (lv_streq("inner_align", name)) { //lv_image_set_inner_align(item, image_align_to_enum(value));
             lvgen_new_exprinsn(fn, "lv_image_set_inner_align(%s, %s);",

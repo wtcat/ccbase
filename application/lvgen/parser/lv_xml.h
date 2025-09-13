@@ -63,7 +63,7 @@ const lv_font_t * lv_xml_get_font(lv_xml_component_scope_t * scope, const char *
 
 lv_result_t lv_xml_register_image(lv_xml_component_scope_t * scope, const char * name, const void * src);
 
-const void * lv_xml_get_image(lv_xml_component_scope_t * scope, const char * name);
+const void * lv_xml_get_image(lv_xml_parser_state_t* scope, const char * name);
 
 /**
  * Map globally available subject name to an actual subject variable

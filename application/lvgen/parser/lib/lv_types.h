@@ -16,10 +16,13 @@ extern "C"{
 /**********************
  *      MACROS
  **********************/
-#define LV_FN_PREFIX        "lv__"
-#define LV_VFN_PARAM2       "user"
+#define LV_FN_PREFIX        "uv__"
+#define LV_VFN_PARAM2       "priv"
 #define LV_VFN_STYLE_AT(n)  "&" LV_VFN_PARAM2 "->styles[" #n "]"
 #define LV_VIEW_USER_TYPE   "scene__%s_t"
+
+#define LV_IMAGE_RES_NAME   "res_img"
+#define LV_IMAGE_SRC_FMT(name)  "&" LV_VFN_PARAM2 "->" LV_IMAGE_RES_NAME "[K_%s]", name
 
 
 #define LV_LOG_WARN(fmt, ...) printf("%s:" fmt "\n", __func__, ##__VA_ARGS__)
