@@ -43,12 +43,14 @@ do { \
     (_ret) = __node; \
 } while (0)
 
+
 static void lvgen_func_clear(struct _fn_list *list) {
     struct func_context* fn;
     TAILQ_FOREACH(fn, list, link) {
         LIST_CLEAR(&fn->ll_insn, func_callinsn);
         LIST_CLEAR(&fn->ll_objs, _lv_obj);
         LIST_CLEAR(&fn->ll_params, fn_param);
+
     }
     LIST_CLEAR(list, func_context);
 }
@@ -87,6 +89,16 @@ static struct module_context* lvgen_new_module(const char* file, bool is_view) {
 
     lvgen_get_context()->module = mod;
     return mod;
+}
+
+void lvgen_func_reset(struct func_context* fn) {
+    if (fn == NULL)
+        return;
+
+    LIST_CLEAR(&fn->ll_insn, func_callinsn);
+    LIST_CLEAR(&fn->ll_objs, _lv_obj);
+    LIST_CLEAR(&fn->ll_params, fn_param);
+    lv_memset(&fn->args, 0, sizeof(*fn) - offsetof(struct func_context, args));
 }
 
 struct module_context* lvgen_get_module(void) {

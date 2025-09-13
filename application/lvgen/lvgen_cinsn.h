@@ -111,7 +111,6 @@ struct fn_param {
     char key[LV_SYMBOL_LEN];
     char name[LV_SYMBOL_LEN];
     char value[LV_SYMBOL_LEN];
-    //char pname[LV_SYMBOL_LEN];
     char type[LV_SYMBOL_LEN];
 };
 
@@ -141,6 +140,12 @@ struct func_context {
     struct var_insn args[LV_MAX_ARGS];
     const char*     rvar;
     int             rtype;
+    TAILQ_HEAD(, func_callinsn) ll_insn;
+    TAILQ_HEAD(, _lv_obj) ll_objs;
+    TAILQ_HEAD(, fn_param) ll_params;
+    struct func_context* parent;
+    struct module_context* owner;
+    
     int             args_num;
     int             style_num;
     int             image_num;
@@ -148,12 +153,6 @@ struct func_context {
     int             export_cnt;
     int             ref_cnt;
     int             grad_cnt;
-    TAILQ_HEAD(, func_callinsn) ll_insn;
-    TAILQ_HEAD(, _lv_obj) ll_objs;
-    TAILQ_HEAD(, fn_param) ll_params;
-
-    struct func_context* parent;
-    struct module_context* owner;
 };
 
 struct global_context {

@@ -127,15 +127,17 @@ lv_obj_t * lv_xml_component_process(lv_xml_parser_state_t * state, const char * 
     if(scope == NULL) return NULL;
 
     lv_obj_t* item = NULL;
-    if (scope->active_func == NULL) {
-        scope->active_func = lv_xml_create_scope_fn(scope, fn, name);
-        item = lv_xml_create_in_scope(state->parent, &state->scope, scope, attrs);
-        if (item == NULL) {
-            LV_LOG_WARN("Couldn't create component '%s'", name);
-            return NULL;
-        }
-    }
 
+    if (scope->active_func != NULL)
+        lvgen_func_reset(fn);
+    
+    scope->active_func = lv_xml_create_scope_fn(scope, fn, name);
+    item = lv_xml_create_in_scope(state->parent, &state->scope, scope, attrs);
+    if (item == NULL) {
+        LV_LOG_WARN("Couldn't create component '%s'", name);
+        return NULL;
+    }
+    
     lv_obj_t* pitem;
     if (fn != NULL)
         pitem = lv_xml_component_callfn(state, scope, name);
