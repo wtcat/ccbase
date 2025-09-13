@@ -8,6 +8,7 @@
 #include <vector>
 #include <unordered_map>
 
+#include "base/memory/singleton.h"
 #include "application/helper/dyn_loader.h"
 
 namespace lvsim {
@@ -18,7 +19,7 @@ public:
     ResourceLoader(const std::string& name) : name_(name) {}
     virtual ~ResourceLoader() {}
     virtual ReHandle Load(const FilePath& file, void *ext) = 0;
-    virtual bool Get(ReHandle h, const std::string& name, void *data) = 0;
+    virtual bool Get(ReHandle h, const std::string& name, void **data) = 0;
     virtual void Put(ReHandle h, void* p) = 0;
     virtual void Unload(ReHandle h) = 0;
     virtual void Clear() = 0;
@@ -35,19 +36,22 @@ class ResourcePluginManager {
 public:
     typedef ResourceLoader* (*LoaderConstructFn)();
 
-    ResourcePluginManager() = default;
-    ~ResourcePluginManager() {
-        Unload();
-    }
+    ResourcePluginManager();
+    ~ResourcePluginManager();
+
+    static ResourcePluginManager* GetInstance();
     bool Load(const FilePath& dir);
     bool Initialize();
     void Unload();
-    const ResourceLoader* FindLoader(const std::string& name);
-
+    void Reset();
+    ResourceLoader* FindLoader(const std::string& name);
+    
 private:
     bool RegisterLoader(ResourceLoader* loader);
 private:
     DISALLOW_COPY_AND_ASSIGN(ResourcePluginManager);
+    friend struct DefaultSingletonTraits<ResourcePluginManager>;
+
     std::unordered_map<std::string, ResourceLoader*> loaders_;
     std::vector<scoped_refptr<helper::DynLoader>> plugins_;
 };

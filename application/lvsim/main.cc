@@ -5,6 +5,7 @@
 
 #include "lvgl/lvgl.h"
 #include "lvgl/src/core/lv_obj_private.h"
+#include "lvgl/src/others/xml/lv_xml_private.h"
 #include "driver/simulator.h"
 #undef main
 
@@ -22,6 +23,8 @@
 #include "base/files/file_path_watcher.h"
 #include "base/threading/thread.h"
 #include "base/command_line.h"
+
+#include "plugin/plugin.h"
 
 namespace {
 namespace fs = std::filesystem;
@@ -134,8 +137,12 @@ public:
     bool ReloadView(const FilePath& view_file) {
         // Destroy current view
         lv_obj_clean(lv_screen_active());
-        if (!active_view_.file.empty())
+        if (!active_view_.file.empty()) {
             lv_xml_component_unregister(active_view_.view.c_str());
+            ResetGlobalComponent();
+        }
+        /* Clear resource */
+        lvsim::ResourcePluginManager::GetInstance()->Reset();
 
         if (file_util::PathExists(view_file)) {
             active_view_.file = view_file;
@@ -232,6 +239,28 @@ private:
         
         if (active_view_.view.size() > 0)
             lv_xml_component_unregister(active_view_.view.c_str());
+
+        ResetGlobalComponent();
+        lv_xml_component_unregister("globals");
+    }
+    void ResetGlobalComponent() {
+        lv_xml_component_scope_t* scope = lv_xml_component_get_scope("globals");
+        if (scope != nullptr) {
+            void* ll_ptr;
+            LV_LL_READ(&scope->image_ll, ll_ptr) {
+                lv_xml_image_t* image = (lv_xml_image_t*)ll_ptr;
+                lv_free((char*)image->name);
+                if (lv_image_src_get_type(image->src) == LV_IMAGE_SRC_FILE)
+                    lv_free((char*)image->src);
+            }
+            lv_ll_clear(&scope->image_ll);
+            
+            LV_LL_READ(&scope->font_ll, ll_ptr) {
+                lv_xml_font_t* font = (lv_xml_font_t*)ll_ptr;
+                lv_free((char*)font->name);
+            }
+            lv_ll_clear(&scope->font_ll);
+        }
     }
 
 private:
@@ -282,6 +311,12 @@ int main(int argc, char* argv[]) {
 
         if (cmdline->HasSwitch("vres"))
             vres = std::stoi(cmdline->GetSwitchValueASCII("vres"));
+
+
+        // Load resource plugins
+        lvsim::ResourcePluginManager* rpm = lvsim::ResourcePluginManager::GetInstance();
+        if (rpm->Load(FilePath(L"plugin")))
+            rpm->Initialize();
 
         scoped_refptr<ViewManager> viewptr(new ViewManager);
         viewptr->Run(dir, hres, vres);

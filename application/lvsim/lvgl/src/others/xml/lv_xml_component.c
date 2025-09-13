@@ -21,6 +21,9 @@
 #include "../../misc/lv_fs.h"
 #include <string.h>
 
+#define _XML_SOURCE_CODE
+#include "xml_parser_notify.h"
+
 /*********************
  *      DEFINES
  *********************/
@@ -332,6 +335,11 @@ static void process_const_element(lv_xml_parser_state_t * state, const char ** a
 
 static void process_font_element(lv_xml_parser_state_t * state, const char * type, const char ** attrs)
 {
+    if (_font_parser_callback) {
+        _font_parser_callback(state, type, attrs);
+        return;
+    }
+
     const char * name = lv_xml_get_value_of(attrs, "name");
     if(name == NULL) {
         LV_LOG_WARN("'name' is missing from a font");
@@ -421,6 +429,11 @@ static void process_font_element(lv_xml_parser_state_t * state, const char * typ
 
 static void process_image_element(lv_xml_parser_state_t * state, const char * type, const char ** attrs)
 {
+    if (_image_parser_callback) {
+        _image_parser_callback(state, type, attrs);
+        return;
+    }
+
     const char * name = lv_xml_get_value_of(attrs, "name");
     if(name == NULL) {
         LV_LOG_WARN("'name' is missing from a font");
