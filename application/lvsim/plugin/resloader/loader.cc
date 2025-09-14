@@ -68,10 +68,19 @@ public:
         lvgl_res_loader_deinit();
     }
 
-    ReHandle Load(const FilePath& dir, void *ext) override {
-        uint32_t scene_id = Hash((const uint8_t *)ext, strlen((char *)ext));
+    ReHandle Load(const Attribute &attr) override {
+        const char* path = attr.GetValue("src_path");
+        if (path == nullptr)
+            return nullptr;
+
+        const char *id = attr.GetValue("id");
+        if (id == nullptr) {}
+            return nullptr;
+
+        uint32_t scene_id = Hash((const uint8_t *)id, strlen(id));
         SceneContext* ctx = SceneFind(scene_id);
         if (ctx == nullptr) {
+            FilePath dir = FilePath::FromUTF8Unsafe(path);
             FilePath sty = dir.Append(FilePath(L"bt_watch.sty"));
             FilePath res = dir.Append(FilePath(L"bt_watch.res"));
             FilePath str = dir.Append(FilePath(L"bt_watch.str"));
@@ -88,18 +97,17 @@ public:
             }
             ctx->scene_id = scene_id;
         }
+
         return ctx;
     }
-    bool Get(ReHandle h, const std::string& name, void** data) override {
+    bool Get(ReHandle h, const std::string& name, Attribute& attr) override {
         SceneContext* ctx = (SceneContext*)h;
 
         if (IsSceneActived(ctx)) {
             uint32_t id = Hash((const uint8_t*)name.c_str(), (uint32_t)name.size());
             SceneImage *img = ctx->GetImage(id);
-            if (img != nullptr) {
-                *data = &img->image;
+            if (img != nullptr)
                 return true;
-            }
 
             img = ctx->NewImage(id);
             int err = lvgl_res_load_pictures_from_scene(&ctx->scene, &id, &img->image, nullptr, 1);
@@ -108,14 +116,9 @@ public:
                 return false;
             }
 
-            *data = &img->image;
-            return true;
+            return attr.RegisterImage(name.c_str(), (void *)&img->image);
         }
         return false;
-    }
-    void Put(ReHandle h, void* p) override {
-        (void)h;
-        (void)p;
     }
     void Unload(ReHandle h) override {
         SceneContext* ctx = (SceneContext*)h;

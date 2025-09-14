@@ -16,11 +16,29 @@ namespace lvsim {
 class ResourceLoader {
 public:
     typedef void* ReHandle;
+
+    class Attribute {
+    public:
+        Attribute(const char** attr);
+        virtual ~Attribute() {
+            attrs_ = nullptr;
+            scope_ = nullptr;
+        }
+
+        virtual const char* GetValue(const char* name) const;
+        virtual bool RegisterImage(const char *name, void *data);
+        virtual bool RegisterFont(const char* name, void* data);
+        virtual bool RegisterText(const char* name, void* data);
+
+    private:
+        const char** attrs_;
+        void* scope_;
+    };
+
     ResourceLoader(const std::string& name) : name_(name) {}
     virtual ~ResourceLoader() {}
-    virtual ReHandle Load(const FilePath& file, void *ext) = 0;
-    virtual bool Get(ReHandle h, const std::string& name, void **data) = 0;
-    virtual void Put(ReHandle h, void* p) = 0;
+    virtual ReHandle Load(const Attribute &attr) = 0;
+    virtual bool Get(ReHandle h, const std::string& name, Attribute& attr) = 0;
     virtual void Unload(ReHandle h) = 0;
     virtual void Clear() = 0;
 

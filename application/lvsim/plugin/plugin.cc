@@ -16,6 +16,20 @@
 namespace lvsim {
 namespace fs = std::filesystem;
 
+static bool xml_resource_parse(lv_xml_component_scope_t* scope, const char* type, 
+    const char** attrs, const char *name) {
+    lvsim::ResourcePluginManager* rpm = lvsim::ResourcePluginManager::GetInstance();
+    ResourceLoader* loader = rpm->FindLoader(type);
+    if (loader != nullptr) {
+        ResourceLoader::Attribute attr(attrs);
+        ResourceLoader::ReHandle hre = loader->Load(attr);
+        if (hre != nullptr)
+            return loader->Get(hre, name, attr);
+    }
+
+    return false;
+}
+
 static void xml_image_parser(lv_xml_parser_state_t* state, const char* type,
     const char** attrs) {
     const char* name = lv_xml_get_value_of(attrs, "name");
@@ -24,38 +38,18 @@ static void xml_image_parser(lv_xml_parser_state_t* state, const char* type,
         return;
     }
 
-    const char* src_path = lv_xml_get_value_of(attrs, "src_path");
-    if (src_path == NULL) {
-        LV_LOG_WARN("'src_path' is missing from a `%s` font", name);
-        return;
-    }
-
     /* E.g. <file name="avatar" src_path="avatar1.png">*/
     if (lv_streq(type, "file")) {
-        lv_xml_register_image(&state->scope, name, src_path);
-
-    } else if (lv_streq(type, "scene")) {
-        const char* scene_id = lv_xml_get_value_of(attrs, "id");
+        const char* src_path = lv_xml_get_value_of(attrs, "src_path");
         if (src_path == NULL) {
-            LV_LOG_WARN("'scene_id' is missing from a `%s` font", name);
+            LV_LOG_WARN("'src_path' is missing from a `%s` font", name);
             return;
         }
-
-        lvsim::ResourcePluginManager* rpm = lvsim::ResourcePluginManager::GetInstance();
-        ResourceLoader *loader = rpm->FindLoader("scene");
-        if (loader != nullptr) {
-            ResourceLoader::ReHandle hre = loader->Load(FilePath::FromUTF8Unsafe(src_path), (void *)scene_id);
-            if (hre != nullptr) {
-                void* image_src = nullptr;
-                if (loader->Get(hre, name, &image_src)) {
-                    lv_xml_component_scope_t *scope = lv_xml_component_get_scope("globals");
-                    lv_xml_register_image(scope, name, image_src);
-                }
-            }
+        lv_xml_register_image(&state->scope, name, src_path);
+    } else {
+        if (!xml_resource_parse(&state->scope, type, attrs, name)) {
+            LV_LOG_INFO("Ignore non-file image `%s`", name);
         }
-    }
-    else {
-        LV_LOG_INFO("Ignore non-file image `%s`", name);
     }
 }
 
@@ -64,12 +58,6 @@ static void xml_font_parser(lv_xml_parser_state_t* state, const char* type,
     const char* name = lv_xml_get_value_of(attrs, "name");
     if (name == NULL) {
         LV_LOG_WARN("'name' is missing from a font");
-        return;
-    }
-
-    const char* src_path = lv_xml_get_value_of(attrs, "src_path");
-    if (src_path == NULL) {
-        LV_LOG_WARN("'src_path' is missing from a `%s` font", name);
         return;
     }
 
@@ -96,6 +84,12 @@ static void xml_font_parser(lv_xml_parser_state_t* state, const char* type,
             return;
         }
 #if LV_TINY_TTF_FILE_SUPPORT
+        const char* src_path = lv_xml_get_value_of(attrs, "src_path");
+        if (src_path == NULL) {
+            LV_LOG_WARN("'src_path' is missing from a `%s` font", name);
+            return;
+        }
+
         lv_font_t* font = lv_tiny_ttf_create_file(src_path, lv_xml_atoi(size));
         if (font == NULL) {
             LV_LOG_WARN("Couldn't load  `%s` tiny_ttf font", name);
@@ -121,8 +115,13 @@ static void xml_font_parser(lv_xml_parser_state_t* state, const char* type,
         LV_LOG_WARN("LV_TINY_TTF_FILE_SUPPORT is not enabled for `%s` font", name);
 
 #endif
-    }
-    else if (lv_streq(type, "bin")) {
+    } else if (lv_streq(type, "bin")) {
+        const char* src_path = lv_xml_get_value_of(attrs, "src_path");
+        if (src_path == NULL) {
+            LV_LOG_WARN("'src_path' is missing from a `%s` font", name);
+            return;
+        }
+
         lv_font_t* font = lv_binfont_create(src_path);
         if (font == NULL) {
             LV_LOG_WARN("Couldn't load `%s` bin font", name);
@@ -143,12 +142,34 @@ static void xml_font_parser(lv_xml_parser_state_t* state, const char* type,
                 break;
             }
         }
-    }
-    else {
-        LV_LOG_WARN("`%s` is a not supported font type", type);
+    } else {
+        if (!xml_resource_parse(&state->scope, type, attrs, name)) {
+            LV_LOG_WARN("`%s` is a not supported font type", type);
+        }
     }
 }
 
+ResourceLoader::Attribute::Attribute(const char** attr) : attrs_(attr) {
+    scope_ = lv_xml_component_get_scope("globals");
+}
+
+const char* ResourceLoader::Attribute::GetValue(const char* name) const {
+    return lv_xml_get_value_of(attrs_, name);
+}
+
+bool ResourceLoader::Attribute::RegisterImage(const char* name, void* data)  {
+    return lv_xml_register_image((lv_xml_component_scope_t*)scope_, name, 
+        data) == LV_RESULT_OK;
+}
+
+bool ResourceLoader::Attribute::RegisterFont(const char* name, void* data)  {
+    return lv_xml_register_font((lv_xml_component_scope_t*)scope_, name,
+        (const lv_font_t*)data) == LV_RESULT_OK;
+}
+
+bool ResourceLoader::Attribute::RegisterText(const char* name, void* data) {
+    return false;
+}
 
 ResourcePluginManager::ResourcePluginManager() {
     lv_xml_register_image_parser_cb(xml_image_parser);
