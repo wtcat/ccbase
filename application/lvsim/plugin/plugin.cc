@@ -228,9 +228,15 @@ void ResourcePluginManager::Reset() {
 
 bool ResourcePluginManager::Initialize() {
     for (auto iter : plugins_) {
-        LoaderConstructFn fn = (LoaderConstructFn)iter->GetSymbol("LoaderCreate");
-        if (fn != nullptr) {
-            if (!RegisterLoader(fn())) {
+        LoaderConstructFn ctor = (LoaderConstructFn)iter->GetSymbol("LoaderCreate");
+        if (ctor != nullptr) {
+            std::vector<ResourceLoader*> loaders;
+            if (!ctor(loaders)) {
+                printf("Failed to create loaders\n");
+                return false;
+            }
+
+            if (!RegisterLoader(loaders)) {
                 printf("Invalid plugin: %s\n", iter->name().AsUTF8Unsafe().c_str());
                 Unload();
                 return false;
@@ -247,11 +253,18 @@ ResourceLoader* ResourcePluginManager::FindLoader(const std::string& name) {
     return nullptr;
 }
 
-bool ResourcePluginManager::RegisterLoader(ResourceLoader* loader) {
-    if (loader == nullptr)
+bool ResourcePluginManager::RegisterLoader(const std::vector<ResourceLoader*> &loaders) {
+    if (loaders.size() == 0) {
+        printf("Not found any loaders\n");
         return false;
-
-    loaders_.insert(std::make_pair(loader->name(), loader));
+    }
+    for (auto iter : loaders) {
+        if (FindLoader(iter->name()) != nullptr) {
+            printf("\"%s\" loader already exist\n", iter->name().c_str());
+            continue;
+        }
+        loaders_.insert(std::make_pair(iter->name(), iter));
+    }
     return true;
 }
 

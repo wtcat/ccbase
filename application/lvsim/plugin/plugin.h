@@ -52,7 +52,7 @@ private:
 
 class ResourcePluginManager {
 public:
-    typedef ResourceLoader* (*LoaderConstructFn)();
+    typedef bool (*LoaderConstructFn)(std::vector<ResourceLoader*> &loaders);
 
     ResourcePluginManager();
     ~ResourcePluginManager();
@@ -65,7 +65,7 @@ public:
     ResourceLoader* FindLoader(const std::string& name);
     
 private:
-    bool RegisterLoader(ResourceLoader* loader);
+    bool RegisterLoader(const std::vector<ResourceLoader*> &loaders);
 private:
     DISALLOW_COPY_AND_ASSIGN(ResourcePluginManager);
     friend struct DefaultSingletonTraits<ResourcePluginManager>;

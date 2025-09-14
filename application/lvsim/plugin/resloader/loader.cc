@@ -182,6 +182,7 @@ private:
 };
 
 extern "C"
-BASE_EXPORT lvsim::ResourceLoader* LoaderCreate(void) {
-    return new SceneLoader("scene");
+BASE_EXPORT bool LoaderCreate(std::vector<lvsim::ResourceLoader*> &loaders) {
+    loaders.push_back(new SceneLoader("scene"));
+    return true;
 }
