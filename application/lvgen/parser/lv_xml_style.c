@@ -9,6 +9,7 @@
 #if LV_USE_XML
 #include "lvgen_cinsn.h"
 
+#include "lv_xml.h"
 #include "lv_xml_base_types.h"
 #include "lv_xml_parser.h"
 #include "lv_xml_style.h"
@@ -35,6 +36,7 @@
  *  STATIC PROTOTYPES
  **********************/
 static lv_style_prop_t style_prop_text_to_enum(const char * txt);
+static const char* style_param_formatter(void* ctx, const char* value);
 
 /**********************
  *  STATIC VARIABLES
@@ -241,7 +243,7 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
         else SET_STYLE_IF(bg_grad_stop, lv_xml_atoi_string(value));
         else SET_STYLE_IF(bg_grad, lv_xml_component_get_grad(scope, value, fn));
 
-        else SET_STYLE_IF(bg_image_src, lv_xml_get_image((lv_xml_parser_state_t*)scope, value));
+        else SET_STYLE_IF(bg_image_src, lv_xml_get_image(scope, value));
         else SET_STYLE_IF(bg_image_tiled, lv_xml_to_bool_string(value));
         else SET_STYLE_IF(bg_image_recolor, lv_xml_to_color(value));
         else SET_STYLE_IF(bg_image_recolor_opa, lv_xml_to_opa_string(value));
@@ -287,7 +289,7 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
         else SET_STYLE_IF(arc_opa, lv_xml_to_opa_string(value));
         else SET_STYLE_IF(arc_width, lv_xml_atoi_string(value));
         else SET_STYLE_IF(arc_rounded, lv_xml_to_bool_string(value));
-        else SET_STYLE_IF(arc_image_src, lv_xml_get_image((lv_xml_parser_state_t*)scope, value));
+        else SET_STYLE_IF(arc_image_src, lv_xml_get_image(scope, value));
 
         else SET_STYLE_IF(opa, lv_xml_to_opa_string(value));
         else SET_STYLE_IF(opa_layered, lv_xml_to_opa_string(value));
@@ -305,7 +307,7 @@ lv_result_t lv_xml_style_register(lv_xml_component_scope_t * scope, const char *
         else SET_STYLE_IF(transform_pivot_x, lv_xml_atoi_string(value));
         else SET_STYLE_IF(transform_pivot_y, lv_xml_atoi_string(value));
         else SET_STYLE_IF(transform_skew_x, lv_xml_atoi_string(value));
-        else SET_STYLE_IF(bitmap_mask_src, lv_xml_get_image((lv_xml_parser_state_t*)scope, value));
+        else SET_STYLE_IF(bitmap_mask_src, lv_xml_get_image(scope, value));
         else SET_STYLE_IF(rotary_sensitivity, lv_xml_atoi_string(value));
         else SET_STYLE_IF(recolor, lv_xml_to_color(value));
         else SET_STYLE_IF(recolor_opa, lv_xml_to_opa_string(value));
@@ -428,10 +430,8 @@ void lv_xml_style_add_to_obj(lv_xml_parser_state_t * state, lv_obj_t * obj, cons
                             assert(fn->parent != NULL);
 
                             /* Set value for style parameter */
-                            lv_snprintf(param->value, sizeof(param->value), "%s(" LV_VFN_STYLE_AT(%d) ")",
-                                callee->signature, 
-                                fn->parent->style_num++
-                            );
+                            lvgen_fnparam_set_formatter(param, (void*)style_param_formatter, 
+                                fn, (const char *)callee);
                             lvgen_new_exprinsn(fn, "lv_obj_add_style(%s, %s, %s);",
                                 LV_OBJNAME(obj),
                                 style_name + 1,
@@ -563,6 +563,17 @@ static lv_style_prop_t style_prop_text_to_enum(const char * txt)
 
     LV_LOG_WARN("No style found with %s name", txt);
     return NULL;
+}
+
+static const char* style_param_formatter(void* ctx, const char* value) {
+    static char vbuf[128];
+    struct fn_param* param = LV_CONTAINER_OF(value, struct fn_param, value);
+    struct func_context* fn = ctx, *callee = (struct func_context*)param->pointer;
+    lv_snprintf(vbuf, sizeof(vbuf), "%s(" LV_VFN_STYLE_AT(% d) ")",
+        callee->signature,
+        fn->parent->style_num++
+    );
+    return vbuf;
 }
 
 #endif /* LV_USE_XML */

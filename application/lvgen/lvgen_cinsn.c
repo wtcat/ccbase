@@ -217,6 +217,24 @@ bool lvgen_fnparam_empty(struct func_context* fn) {
     return TAILQ_EMPTY(&fn->ll_params);
 }
 
+#define IS_PRINT(c) ((c) >= 0x20 && (c) <= 0x7f)
+void lvgen_fnparam_set_formatter(struct fn_param* param, void* transform_fn, 
+    void* ctx, const char *value) {
+    if (param != NULL) {
+        if (param->name[0] == '$') {
+            param->formatter = (const char* (*)(void*, const char*))transform_fn;
+            param->ctx = ctx;
+        }
+        if (IS_PRINT(value[0]) &&
+            IS_PRINT(value[1]) &&
+            IS_PRINT(value[2]) &&
+            IS_PRINT(value[3]))
+            lvgen_fnparam_copy_value(param, value);
+        else
+            param->pointer = (void *)value;
+    }
+}
+
 struct func_context* lvgen_new_func(struct _fn_list *fn_ll, struct module_context *mod,
     const char *signature) {
     struct func_context* fn;

@@ -16,6 +16,8 @@ extern "C"{
 /**********************
  *      MACROS
  **********************/
+#define LV_CONTAINER_OF(p, s, m) (s *)((char *)p - offsetof(s, m)) 
+
 #define LV_FN_PREFIX        "uv__"
 #define LV_VFN_PARAM2       "priv"
 #define LV_VFN_STYLE_AT(n)  "&" LV_VFN_PARAM2 "->styles[" #n "]"

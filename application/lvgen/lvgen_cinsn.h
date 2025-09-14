@@ -110,8 +110,14 @@ struct fn_param {
     TAILQ_ENTRY(fn_param) link;
     char key[LV_SYMBOL_LEN];
     char name[LV_SYMBOL_LEN];
-    char value[LV_SYMBOL_LEN];
+    union {
+        char value[LV_SYMBOL_LEN];
+        void* pointer;
+    };
     char type[LV_SYMBOL_LEN];
+
+    const char* (*formatter)(void* ctx, const char* value);
+    void* ctx;
 };
 
 struct module_depend {
@@ -140,12 +146,6 @@ struct func_context {
     struct var_insn args[LV_MAX_ARGS];
     const char*     rvar;
     int             rtype;
-    TAILQ_HEAD(, func_callinsn) ll_insn;
-    TAILQ_HEAD(, _lv_obj) ll_objs;
-    TAILQ_HEAD(, fn_param) ll_params;
-    struct func_context* parent;
-    struct module_context* owner;
-    
     int             args_num;
     int             style_num;
     int             image_num;
@@ -153,6 +153,13 @@ struct func_context {
     int             export_cnt;
     int             ref_cnt;
     int             grad_cnt;
+
+    TAILQ_HEAD(, func_callinsn) ll_insn;
+    TAILQ_HEAD(, _lv_obj) ll_objs;
+    TAILQ_HEAD(, fn_param) ll_params;
+
+    struct func_context* parent;
+    struct module_context* owner;
 };
 
 struct global_context {
@@ -180,6 +187,8 @@ struct fn_param* lvgen_get_fnparam(struct func_context* fn, const char* key);
 struct fn_param* lvgen_new_fnparam_by_name(struct func_context* fn, const char* name);
 bool lvgen_fnparam_empty(struct func_context* fn);
 int lvgen_fnparam_copy_value(struct fn_param* param, const char* value);
+void lvgen_fnparam_set_formatter(struct fn_param* param, void* transform_fn,
+    void* ctx, const char* value);
 
 struct func_context* lvgen_new_func(struct _fn_list* fn_ll, struct module_context *mod,
     const char* signature);

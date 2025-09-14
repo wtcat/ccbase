@@ -71,6 +71,7 @@ void lv_xml_label_apply(lv_xml_parser_state_t * state, const char ** attrs)
             }
         }
         if (lv_streq("long_mode", name)) {
+            lvgen_fnparam_set_formatter(param, (void *)long_mode_text_to_enum_value, NULL, value);
             lvgen_new_exprinsn(fn, "lv_label_set_long_mode(%s, %s);",
                 LV_OBJNAME(item),
                 lv_xml_obj_get_value(param, long_mode_text_to_enum_value(value))

@@ -42,7 +42,9 @@ typedef struct _lv_xml_component_scope_t {
     const char * extends;
     uint32_t is_widget : 1;                         /*1: not component but widget registered as a component for preview*/
     struct _lv_xml_component_scope_t * next;
+    struct _lv_xml_component_scope_t* parent_scope;
     void* active_func;
+    bool fn_completed;
 } lv_xml_component_scope_t;
 
 typedef struct {

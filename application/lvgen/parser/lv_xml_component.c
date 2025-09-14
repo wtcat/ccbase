@@ -128,15 +128,12 @@ lv_obj_t * lv_xml_component_process(lv_xml_parser_state_t * state, const char * 
 
     lv_obj_t* item = NULL;
 
-    if (scope->active_func != NULL)
-        lvgen_func_reset(fn);
-    
-    scope->active_func = lv_xml_create_scope_fn(scope, fn, name);
+    if (scope->active_func == NULL)
+        scope->active_func = lv_xml_create_scope_fn(scope, fn, name);
+    else
+        scope->fn_completed = true;
+
     item = lv_xml_create_in_scope(state->parent, &state->scope, scope, attrs);
-    if (item == NULL) {
-        LV_LOG_WARN("Couldn't create component '%s'", name);
-        return NULL;
-    }
     
     lv_obj_t* pitem;
     if (fn != NULL)
@@ -850,10 +847,18 @@ static lv_obj_t* lv_xml_component_callfn(lv_xml_parser_state_t* state,
         struct fn_param* fn_p = lvgen_get_fnparam(fn, param->name + 1);
         const char* value;
 
-        if (fn_p == NULL)
-            value = param->value;
-        else
+        if (fn_p == NULL) {
+            if (param->formatter) {
+                if (param->ctx)
+                    value = param->formatter(param->ctx, param->value);
+                else
+                    value = param->formatter(param->value, NULL);
+            } else {
+                value = param->value;
+            }
+        } else {
             value = fn_p->name + 1;
+        }
 
         if (next_param)
             offset += lv_snprintf(inbuf + offset, sizeof(inbuf), "%s, ", value);

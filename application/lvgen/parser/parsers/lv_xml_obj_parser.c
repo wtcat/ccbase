@@ -59,7 +59,7 @@ const char* lv_xml_obj_get_value(struct fn_param* param, const char* value) {
     if (param == NULL)
         return value;
 
-    lvgen_fnparam_copy_value(param, value);
+    //lvgen_fnparam_copy_value(param, value);
 
     return param->name + 1;
 }
@@ -90,42 +90,52 @@ void lv_xml_obj_apply(lv_xml_parser_state_t * state, const char ** attrs)
 #endif
         
         if (lv_streq("x", name)) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_to_size, NULL, value);
             lvgen_new_exprinsn(fn, "lv_obj_set_x(%s, %s);",
                 LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_to_size(value)));
         }
         else if (lv_streq("y", name)) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_to_size, NULL, value);
             lvgen_new_exprinsn(fn, "lv_obj_set_y(%s, %s);",
                 LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_to_size(value)));
         }
         else if (lv_streq("width", name)) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_to_size, NULL, value);
             lvgen_new_exprinsn(fn, "lv_obj_set_width(%s, %s);",
                 LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_to_size(value)));
         }
         else if (lv_streq("height", name)) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_to_size, NULL, value);
             lvgen_new_exprinsn(fn, "lv_obj_set_height(%s, %s);",
                 LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_to_size(value)));
         }
         else if (lv_streq("align", name)) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_align_to_enum, NULL, value);
             lvgen_new_exprinsn(fn, "lv_obj_set_align(%s, %s);",
                 LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_align_to_enum(value)));
         }
         else if (lv_streq("flex_flow", name)) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_flex_flow_to_enum, NULL, value);
             lvgen_new_exprinsn(fn, "lv_obj_set_flex_flow(%s, %s);",
                 LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_flex_flow_to_enum(value)));
         }
         else if (lv_streq("flex_grow", name)) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_atoi_string, NULL, value);
             lvgen_new_exprinsn(fn, "lv_obj_set_flex_grow(%s, %s);",
                 LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_atoi_string(value)));
         }
         else if (lv_streq("ext_click_area", name)) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_atoi_string, NULL, value);
             lvgen_new_exprinsn(fn, "lv_obj_set_ext_click_area(%s, %s);",
                 LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_atoi_string(value)));
         }
         else if (lvgen_cc_find_sym("lv_obj_flag_t", name, &pv, NULL)) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_to_bool_string, NULL, value);
             lvgen_new_exprinsn(fn, "lv_obj_set_flag(%s, %s, %s);",
                 LV_OBJNAME(item), pv, lv_xml_obj_get_value(param, lv_xml_to_bool_string(value)));
         }
         else if (lvgen_cc_find_sym("lv_state_t", name, &pv, NULL)) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_to_bool_string, NULL, value);
             lvgen_new_exprinsn(fn, "lv_obj_set_state(%s, %s, %s);",
                 LV_OBJNAME(item), pv, lv_xml_obj_get_value(param, lv_xml_to_bool_string(value)));
         }
@@ -259,55 +269,72 @@ static void apply_styles(lv_xml_parser_state_t * state, lv_obj_t * obj, const ch
 
     if (lvgen_cc_find_sym("styles", prop_name + sizeof("style_") - 1, NULL, &pt)) {
         if (!lv_strcmp(pt, "size")) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_to_size, NULL, value);
             prop_value = !param? lv_xml_to_size(value): lv_xml_obj_get_value(param, lv_xml_to_size(value));
         }
         else if (!lv_strcmp(pt, "int")) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_atoi_string, NULL, value);
             prop_value = !param ? lv_xml_atoi_string(value) : lv_xml_obj_get_value(param, lv_xml_atoi_string(value));
         }
         else if (!lv_strcmp(pt, "lv_base_dir_t")) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_base_dir_to_enum, NULL, value);
             prop_value = !param ? lv_xml_base_dir_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_base_dir_to_enum(value));
         }
         else if (!lv_strcmp(pt, "opa")) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_to_opa_string, NULL, value);
             prop_value = !param ? lv_xml_to_opa_string(value) : lv_xml_obj_get_value(param, lv_xml_to_opa_string(value));
         }
         else if (!lv_strcmp(pt, "color")) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_to_color, NULL, value);
             prop_value = !param ? lv_xml_to_color(value) : lv_xml_obj_get_value(param, lv_xml_to_color(value));
         }
         else if (!lv_strcmp(pt, "lv_grad_dir_t")) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_grad_dir_to_enum, NULL, value);
             prop_value = !param ? lv_xml_grad_dir_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_grad_dir_to_enum(value));
         }
         else if (!lv_strcmp(pt, "image")) {
+            //lvgen_fnparam_set_formatter(param, lv_xml_grad_dir_to_enum, NULL, value);
             //prop_value = !param ? lv_xml_grad_dir_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_grad_dir_to_enum(value));
         }
         else if (!lv_strcmp(pt, "bool")) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_to_bool_string, NULL, value);
             prop_value = !param ? lv_xml_to_bool_string(value) : lv_xml_obj_get_value(param, lv_xml_to_bool_string(value));
         }
         else if (!lv_strcmp(pt, "side")) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_border_side_to_enum, NULL, value);
             prop_value = !param ? lv_xml_border_side_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_border_side_to_enum(value));
         }
         else if (!lv_strcmp(pt, "font")) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_get_font, &state->scope, value);
             //TODO: fix
             prop_value = !param ? lv_xml_get_font(&state->scope, value) : lv_xml_obj_get_value(param, lv_xml_get_font(&state->scope, value));
         }
         else if (!lv_strcmp(pt, "lv_text_align_t")) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_text_align_to_enum, NULL, value);
             prop_value = !param ? lv_xml_text_align_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_text_align_to_enum(value));
         }
         else if (!lv_strcmp(pt, "lv_text_decor_t")) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_text_decor_to_enum, NULL, value);
             prop_value = !param ? lv_xml_text_decor_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_text_decor_to_enum(value));
         }
         else if (!lv_strcmp(pt, "lv_blend_mode_t")) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_blend_mode_to_enum, NULL, value);
             prop_value = !param ? lv_xml_blend_mode_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_blend_mode_to_enum(value));
         }
         else if (!lv_strcmp(pt, "lv_layout_t")) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_layout_to_enum, NULL, value);
             prop_value = !param ? lv_xml_layout_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_layout_to_enum(value));
         }
         else if (!lv_strcmp(pt, "lv_flex_flow_t")) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_flex_flow_to_enum, NULL, value);
             prop_value = !param ? lv_xml_flex_flow_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_flex_flow_to_enum(value));
         }
         else if (!lv_strcmp(pt, "enum_flex_align")) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_flex_align_to_enum, NULL, value);
             prop_value = !param ? lv_xml_flex_align_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_flex_align_to_enum(value));
         }
         else if (!lv_strcmp(pt, "lv_grid_align_t")) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_grid_align_to_enum, NULL, value);
             prop_value = !param ? lv_xml_grid_align_to_enum(value) : lv_xml_obj_get_value(param, lv_xml_grid_align_to_enum(value));
         }
         else {

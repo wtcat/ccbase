@@ -177,6 +177,7 @@ void * lv_xml_create_in_scope(lv_obj_t * parent, lv_xml_component_scope_t * pare
     /* Initialize the parser state */
     lv_xml_parser_state_t state;
     lv_xml_parser_state_init(&state);
+    scope->parent_scope = parent_scope;
     state.scope = *scope; /*Scope won't be modified here, so it's safe to copy it by value*/
     state.parent = parent;
     state.parent_attrs = attrs;
@@ -422,9 +423,8 @@ lv_result_t lv_xml_register_image(lv_xml_component_scope_t * scope, const char *
     return LV_RESULT_OK;
 }
 
-const void * lv_xml_get_image(lv_xml_parser_state_t* state, const char * name)
+const void * lv_xml_get_image(lv_xml_component_scope_t* scope, const char * name)
 {
-    lv_xml_component_scope_t* scope = &state->scope;
     lv_xml_image_t* img;
     
     while (scope != NULL) {
@@ -432,7 +432,7 @@ const void * lv_xml_get_image(lv_xml_parser_state_t* state, const char * name)
             if (lv_streq(img->name, name)) 
                 return img->src;
         }
-        scope = state->parent_scope;
+        scope = scope->parent_scope;
     }
 
     /*If not found in the component check the global space*/
@@ -611,6 +611,12 @@ static void view_start_element_handler(void * user_data, const char * name, cons
 {
     lv_xml_parser_state_t * state = (lv_xml_parser_state_t *)user_data;
     bool is_view = false;
+
+    if (state->scope.fn_completed) {
+        resolve_params(&state->scope, state->parent_scope, attrs, state->parent_attrs);
+        resolve_consts(attrs, &state->scope);
+        return;
+    }
 
     if(lv_streq(name, "view")) {
         const char * extends = lv_xml_get_value_of(attrs, "extends");

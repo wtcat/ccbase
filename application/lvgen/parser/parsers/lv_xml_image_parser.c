@@ -55,23 +55,25 @@ void lv_xml_image_apply(lv_xml_parser_state_t * state, const char ** attrs)
         const char * value = attrs[i + 1];
         struct fn_param* param = lv_xml_obj_get_parameter(state->parent_scope, fn, name);
 
-        if (lv_streq("src", name)) { //lv_image_set_src(item, lv_xml_get_image(&state->scope, value));
+        if (lv_streq("src", name)) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_get_image, 
+                lv_xml_component_get_scope(state->scope.name), value);
             lvgen_new_exprinsn(fn, "lv_image_set_src(%s, %s);", 
-                LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_get_image(state, value)));
+                LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_get_image(&state->scope, value)));
         }
-        else if (lv_streq("inner_align", name)) { //lv_image_set_inner_align(item, image_align_to_enum(value));
+        else if (lv_streq("inner_align", name)) {
             lvgen_new_exprinsn(fn, "lv_image_set_inner_align(%s, %s);",
                 LV_OBJNAME(item), lv_xml_obj_get_value(param, image_align_to_enum(value)));
         }
-        else if (lv_streq("rotation", name)) {//lv_image_set_rotation(item, lv_xml_atoi(value));
+        else if (lv_streq("rotation", name)) {
             lvgen_new_exprinsn(fn, "lv_image_set_rotation(%s, %s);",
                 LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_atoi_string(value)));
         }
-        else if (lv_streq("scale_x", name)) { //lv_image_set_scale_x(item, lv_xml_atoi(value));
+        else if (lv_streq("scale_x", name)) {
             lvgen_new_exprinsn(fn, "lv_image_set_scale_x(%s, %s);",
                 LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_atoi_string(value)));
         }
-        else if (lv_streq("scale_y", name)) { //lv_image_set_scale_y(item, lv_xml_atoi(value));
+        else if (lv_streq("scale_y", name)) {
             lvgen_new_exprinsn(fn, "lv_image_set_scale_y(%s, %s);",
                 LV_OBJNAME(item), lv_xml_obj_get_value(param, lv_xml_atoi_string(value)));
         }
