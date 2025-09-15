@@ -40,6 +40,7 @@ static void end_metadata_handler(void * user_data, const char * name);
 static void process_const_element(lv_xml_parser_state_t * state, const char ** attrs);
 static void process_font_element(lv_xml_parser_state_t * state, const char * type, const char ** attrs);
 static void process_image_element(lv_xml_parser_state_t * state, const char * type, const char ** attrs);
+static void process_string_element(lv_xml_parser_state_t* state, const char* type, const char** attrs);
 static void process_prop_element(lv_xml_parser_state_t * state, const char ** attrs);
 static char * extract_view_content(const char * xml_definition);
 
@@ -78,6 +79,7 @@ void lv_xml_component_scope_init(lv_xml_component_scope_t * scope)
     lv_ll_init(&scope->event_ll, sizeof(lv_xml_event_cb_t));
     lv_ll_init(&scope->image_ll, sizeof(lv_xml_image_t));
     lv_ll_init(&scope->font_ll, sizeof(lv_xml_font_t));
+    lv_ll_init(&scope->string_ll, sizeof(lv_xml_string_t));
 }
 
 
@@ -281,6 +283,12 @@ lv_result_t lv_xml_component_unregister(const char * name)
     }
     lv_ll_clear(&scope->image_ll);
 
+    lv_xml_string_t* string;
+    LV_LL_READ(&scope->string_ll, string) {
+        lv_free((char*)string->name);
+    }
+    lv_ll_clear(&scope->string_ll);
+
     lv_xml_style_t * style;
     LV_LL_READ(&scope->style_ll, style) {
         lv_free((char *)style->name);
@@ -452,6 +460,14 @@ static void process_image_element(lv_xml_parser_state_t * state, const char * ty
     }
     else {
         LV_LOG_INFO("Ignore non-file image `%s`", name);
+    }
+}
+
+static void process_string_element(lv_xml_parser_state_t* state, const char* type, const char** attrs)
+{
+    if (_string_parser_callback) {
+        _string_parser_callback(state, type, attrs);
+        return;
     }
 }
 
@@ -700,6 +716,11 @@ static void start_metadata_handler(void * user_data, const char * name, const ch
         case LV_XML_PARSER_SECTION_IMAGES:
             if(old_section != state->section) return;   /*Ignore the section opening, e.g. <styles>*/
             process_image_element(state, name, attrs);
+            break;
+
+        case LV_XML_PARSER_SECTION_STRINGS:
+            if (old_section != state->section) return;   /*Ignore the section opening, e.g. <styles>*/
+            process_string_element(state, name, attrs);
             break;
 
         case LV_XML_PARSER_SECTION_SUBJECTS:

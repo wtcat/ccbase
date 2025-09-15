@@ -47,6 +47,10 @@ lv_result_t lv_xml_register_image(lv_xml_component_scope_t * scope, const char *
 
 const void * lv_xml_get_image(lv_xml_component_scope_t * scope, const char * name);
 
+lv_result_t lv_xml_register_string(lv_xml_component_scope_t* scope, const char* name, const void* text);
+
+const void* lv_xml_get_string(lv_xml_component_scope_t* scope, const char* name);
+
 /**
  * Map globally available subject name to an actual subject variable
  * @param name      name of the subject

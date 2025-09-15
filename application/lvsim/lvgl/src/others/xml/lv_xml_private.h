@@ -46,6 +46,10 @@ typedef struct {
     lv_event_cb_t cb;
 } lv_xml_event_cb_t;
 
+typedef struct {
+    const char* name;
+    const void* text;
+} lv_xml_string_t;
 
 /**********************
  * GLOBAL PROTOTYPES

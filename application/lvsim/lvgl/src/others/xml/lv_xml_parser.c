@@ -77,6 +77,10 @@ void lv_xml_parser_start_section(lv_xml_parser_state_t * state, const char * nam
         state->section = LV_XML_PARSER_SECTION_FONTS;
         return;
     }
+    else if (lv_streq(name, "strings")) {
+        state->section = LV_XML_PARSER_SECTION_STRINGS;
+        return;
+    }
     else if(lv_streq(name, "subjects")) {
         state->section = LV_XML_PARSER_SECTION_SUBJECTS;
         return;
