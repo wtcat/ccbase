@@ -149,6 +149,22 @@ static void xml_font_parser(lv_xml_parser_state_t* state, const char* type,
     }
 }
 
+static void xml_string_parser(lv_xml_parser_state_t* state, const char* type,
+    const char** attrs) {
+    const char* name = lv_xml_get_value_of(attrs, "name");
+    if (name == NULL) {
+        LV_LOG_WARN("'name' is missing from a font");
+        return;
+    }
+
+    /* E.g. <string name="OK_ID" src_path="test.eng" "id=scene_xxx">*/
+    if (lv_streq(type, "string")) {
+        xml_resource_parse(&state->scope, type, attrs, name);
+    } else {
+        LV_LOG_INFO("Ignore non-file image `%s`", name);
+    }
+}
+
 ResourceLoader::Attribute::Attribute(const char** attr) : attrs_(attr) {
     scope_ = lv_xml_component_get_scope("globals");
 }
@@ -168,17 +184,20 @@ bool ResourceLoader::Attribute::RegisterFont(const char* name, void* data)  {
 }
 
 bool ResourceLoader::Attribute::RegisterText(const char* name, void* data) {
-    return false;
+    return lv_xml_register_string((lv_xml_component_scope_t*)scope_, name,
+        data) == LV_RESULT_OK;
 }
 
 ResourcePluginManager::ResourcePluginManager() {
     lv_xml_register_image_parser_cb(xml_image_parser);
     lv_xml_register_font_parser_cb(xml_font_parser);
+    lv_xml_register_string_parser_cb(xml_string_parser);
 }
 
 ResourcePluginManager::~ResourcePluginManager() {
     lv_xml_register_image_parser_cb(nullptr);
     lv_xml_register_font_parser_cb(nullptr);
+    lv_xml_register_string_parser_cb(nullptr);
     Unload();
 }
 

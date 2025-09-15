@@ -6,3 +6,4 @@ target_sources(${PROJECT_NAME}
 )
 
 add_subdirectory(resloader)
+add_subdirectory(bitmap)

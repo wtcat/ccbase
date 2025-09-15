@@ -260,6 +260,12 @@ private:
                 lv_free((char*)font->name);
             }
             lv_ll_clear(&scope->font_ll);
+
+            LV_LL_READ(&scope->string_ll, ll_ptr) {
+                lv_xml_string_t* string = (lv_xml_string_t*)ll_ptr;
+                lv_free((char*)string->name);
+            }
+            lv_ll_clear(&scope->string_ll);
         }
     }
 
