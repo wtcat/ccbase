@@ -83,11 +83,12 @@ void lv_xml_obj_apply(lv_xml_parser_state_t * state, const char ** attrs)
 
         param = lv_xml_obj_get_parameter(state->parent_scope, fn, name);
 
-#if LV_USE_OBJ_NAME
+
         if(lv_streq("name", name)) {
-            lv_obj_set_name(item, value);
+            lvgen_new_exprinsn(fn, "lv_obj_set_name(%s, \"%s\");",
+                LV_OBJNAME(item), lv_xml_obj_get_value(param, value));
+            continue;
         }
-#endif
         
         if (lv_streq("x", name)) {
             lvgen_fnparam_set_formatter(param, (void*)lv_xml_to_size, NULL, value);
