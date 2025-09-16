@@ -179,6 +179,11 @@ int main(int argc, char* argv[]) {
     base::WorkerPool worker_pool;
 
 
+    file_util::FileEnumerator iterator(FilePath(L"."), false, file_util::FileEnumerator::FILES);
+    for (FilePath path = iterator.Next(); path.value().size() > 0; ) {
+        printf("Path: %s\n", path.AsUTF8Unsafe().c_str());
+        path = iterator.Next();
+    }
     //std::vector<int, TestAllocator<int>> vec;
     //for (int i = 0; i < 30; i++)
     //    vec.push_back(i);
