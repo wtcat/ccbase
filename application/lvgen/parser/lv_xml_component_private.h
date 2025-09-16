@@ -37,6 +37,7 @@ typedef struct _lv_xml_component_scope_t {
     lv_ll_t subjects_ll;
     lv_ll_t font_ll;
     lv_ll_t image_ll;
+    lv_ll_t string_ll;
     lv_ll_t event_ll;
     const char * view_def;
     const char * extends;

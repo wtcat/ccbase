@@ -172,8 +172,8 @@ struct fn_param* lvgen_get_fnparam(struct func_context* fn, const char* key) {
 }
 
 int lvgen_fnparam_copy_value(struct fn_param* param, const char* value) {
-    if (value[0] != '$' && !lv_strcmp(param->type, "string"))
-        return lv_snprintf(param->value, sizeof(param->value), "\"%s\"", value);
+    //if (value[0] != '$' && !lv_strcmp(param->type, "string"))
+    //    return lv_snprintf(param->value, sizeof(param->value), "\"%s\"", value);
 
     return (int)lv_strlcpy(param->value, value, LV_SYMBOL_LEN);
 }

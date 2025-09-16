@@ -42,6 +42,7 @@ static void end_metadata_handler(void * user_data, const char * name);
 static void process_const_element(lv_xml_parser_state_t * state, const char ** attrs);
 static void process_font_element(lv_xml_parser_state_t * state, const char * type, const char ** attrs);
 static void process_image_element(lv_xml_parser_state_t * state, const char * type, const char ** attrs);
+static void process_string_element(lv_xml_parser_state_t* state, const char* type, const char** attrs);
 static void process_prop_element(lv_xml_parser_state_t * state, const char ** attrs);
 static char * extract_view_content(const char * xml_definition);
 static lv_obj_t* lv_xml_component_callfn(lv_xml_parser_state_t* state,
@@ -117,6 +118,7 @@ void lv_xml_component_scope_init(lv_xml_component_scope_t * scope)
     lv_ll_init(&scope->event_ll, sizeof(lv_xml_event_cb_t));
     lv_ll_init(&scope->image_ll, sizeof(lv_xml_image_t));
     lv_ll_init(&scope->font_ll, sizeof(lv_xml_font_t));
+    lv_ll_init(&scope->string_ll, sizeof(lv_xml_string_t));
 }
 
 
@@ -325,6 +327,13 @@ lv_result_t lv_xml_component_unregister(const char * name)
     }
     lv_ll_clear(&scope->image_ll);
 
+    lv_xml_string_t* str;
+    LV_LL_READ(&scope->string_ll, str) {
+        lv_free((char*)str->name);
+        lv_free((char*)str->text);
+    }
+    lv_ll_clear(&scope->string_ll);
+
     lv_xml_style_t * style;
     LV_LL_READ(&scope->style_ll, style) {
         lv_free((char *)style->name);
@@ -495,6 +504,31 @@ static void process_image_element(lv_xml_parser_state_t * state, const char * ty
         lv_xml_register_image(&state->scope, name, img_src);
     } else {
         LV_LOG_INFO("Ignore non-file image `%s`", name);
+    }
+}
+
+static void process_string_element(lv_xml_parser_state_t* state, const char* type, const char** attrs)
+{
+    const char* name = lv_xml_get_value_of(attrs, "name");
+    if (name == NULL) {
+        LV_LOG_WARN("'name' is missing from a font");
+        return;
+    }
+
+    const char* src_path = lv_xml_get_value_of(attrs, "src_path");
+    if (src_path == NULL) {
+        LV_LOG_WARN("'src_path' is missing from a `%s` font", name);
+        return;
+    }
+
+    /* E.g. <file name="avatar" src_path="avatar1.png">*/
+    if (lv_streq(type, "string")) {
+        char fmt_text[128];
+        lv_snprintf(fmt_text, sizeof(fmt_text), LV_STRING_FMT(name));
+        lv_xml_register_string(&state->scope, name, fmt_text);
+    }
+    else {
+        LV_LOG_INFO("Ignore non-file string `%s`", name);
     }
 }
 
@@ -786,6 +820,11 @@ static void start_metadata_handler(void * user_data, const char * name, const ch
             process_image_element(state, name, attrs);
             break;
 
+        case LV_XML_PARSER_SECTION_STRINGS:
+            if (old_section != state->section) return;   /*Ignore the section opening, e.g. <styles>*/
+            process_string_element(state, name, attrs);
+            break;
+            
         case LV_XML_PARSER_SECTION_SUBJECTS:
             if(old_section != state->section) return;   /*Ignore the section opening, e.g. <subjects>*/
             process_subject_element(state, name, attrs);
@@ -840,6 +879,7 @@ static lv_obj_t* lv_xml_component_callfn(lv_xml_parser_state_t* state,
     struct func_context* fn_callee = subscope->active_func;
     struct fn_param* param, * next_param;
     lv_obj_t* item = NULL;
+    char fmtbuf[256];
     char inbuf[256];
     int offset = 0;
 
@@ -855,6 +895,13 @@ static lv_obj_t* lv_xml_component_callfn(lv_xml_parser_state_t* state,
                     value = param->formatter(param->value, NULL);
             } else {
                 value = param->value;
+            }
+
+            if (lv_streq(param->type, "string")) {
+                if (value == param->value) {
+                    lv_snprintf(fmtbuf, sizeof(fmtbuf), "\"%s\"", value);
+                    value = fmtbuf;
+                }
             }
         } else {
             value = fn_p->name + 1;

@@ -448,6 +448,53 @@ const void * lv_xml_get_image(lv_xml_component_scope_t* scope, const char * name
     return NULL;
 }
 
+lv_result_t lv_xml_register_string(lv_xml_component_scope_t* scope, const char* name, const void* src)
+{
+    if (scope == NULL) scope = lv_xml_component_get_scope("globals");
+    if (scope == NULL) {
+        LV_LOG_WARN("No component found to register image `%s`", name);
+        return LV_RESULT_INVALID;
+    }
+
+    lv_xml_string_t* str;
+    LV_LL_READ(&scope->string_ll, str) {
+        if (lv_streq(str->name, name)) {
+            LV_LOG_INFO("String %s is already registered. Don't register it again.", name);
+            return LV_RESULT_OK;
+        }
+    }
+
+    str = lv_ll_ins_head(&scope->string_ll);
+    str->name = lv_strdup(name);
+    str->text = lv_strdup(src);
+
+    return LV_RESULT_OK;
+}
+
+const void* lv_xml_get_string(lv_xml_component_scope_t* scope, const char* name)
+{
+    lv_xml_string_t* str;
+
+    while (scope != NULL) {
+        LV_LL_READ(&scope->string_ll, str) {
+            if (lv_streq(str->name, name))
+                return str->text;
+        }
+        scope = scope->parent_scope;
+    }
+
+    /*If not found in the component check the global space*/
+    scope = lv_xml_component_get_scope("globals");
+    if (scope) {
+        LV_LL_READ(&scope->string_ll, str) {
+            if (lv_streq(str->name, name))
+                return str->text;
+        }
+    }
+
+    return name;
+}
+
 lv_result_t lv_xml_register_event_cb(lv_xml_component_scope_t * scope, const char * name, lv_event_cb_t cb)
 {
     if(scope == NULL) scope = lv_xml_component_get_scope("globals");

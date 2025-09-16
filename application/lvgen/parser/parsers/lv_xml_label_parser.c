@@ -58,15 +58,17 @@ void lv_xml_label_apply(lv_xml_parser_state_t * state, const char ** attrs)
 
         //lv_xml_obj_get_value(param, )
         if (lv_streq("text", name)) {
+            lvgen_fnparam_set_formatter(param, (void*)lv_xml_get_string,
+                lv_xml_component_get_scope(state->scope.name), value);
             if (param == NULL) {
                 lvgen_new_exprinsn(fn, "lv_label_set_text(%s, \"%s\");",
                     LV_OBJNAME(item),
-                    lv_xml_obj_get_value(param, value)
+                    lv_xml_obj_get_value(param, lv_xml_get_string(&state->scope, value))
                 );
             } else {
                 lvgen_new_exprinsn(fn, "lv_label_set_text(%s, %s);",
                     LV_OBJNAME(item),
-                    lv_xml_obj_get_value(param, value)
+                    lv_xml_obj_get_value(param, lv_xml_get_string(&state->scope, value))
                 );
             }
         }

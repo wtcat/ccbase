@@ -26,6 +26,9 @@ extern "C"{
 #define LV_IMAGE_RES_NAME   "res_img"
 #define LV_IMAGE_SRC_FMT(name)  "&" LV_VFN_PARAM2 "->" LV_IMAGE_RES_NAME "[K_%s]", name
 
+#define LV_TEXT_RES_NAME   "res_txt"
+#define LV_STRING_FMT(name)  "&" LV_VFN_PARAM2 "->" LV_TEXT_RES_NAME "[K_%s]", name
+
 
 #define LV_LOG_WARN(fmt, ...) printf("%s:" fmt "\n", __func__, ##__VA_ARGS__)
 #define LV_LOG_ERROR LV_LOG_WARN
