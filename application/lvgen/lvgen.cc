@@ -10,6 +10,9 @@
 #include "base/file_path.h"
 #include "base/file_util.h"
 #include "base/memory/singleton.h"
+
+#include "thirdparty/leveldb/include/leveldb/db.h"
+
 #include "lvgen.h"
 
 namespace app {
@@ -43,7 +46,7 @@ bool LvCodeGenerator::LoadViews(const FilePath& dir) {
     return ScanDirectory(dir, 0, true);
 }
 
-bool LvCodeGenerator::Generate(const FilePath &outdir) const{
+bool LvCodeGenerator::Generate(const FilePath &outdir, leveldb::DB* db) const {
     if (lvgen_generate()) {
         std::string buf;
         buf.reserve(8192);
@@ -53,7 +56,7 @@ bool LvCodeGenerator::Generate(const FilePath &outdir) const{
 
         TAILQ_FOREACH(ll_ptr, &ctx->ll_modules, link) {
             buf.clear();
-            GenerateModule((const LvModuleContext*)ll_ptr, buf, outdir);
+            GenerateModule((const LvModuleContext*)ll_ptr, buf, outdir, db);
         }
 
         return true;
@@ -183,7 +186,7 @@ bool LvCodeGenerator::ParseView(const std::string& file, bool is_view) {
 }
 
 bool LvCodeGenerator::GenerateModule(const LvModuleContext* mod, std::string &buf,
-    const FilePath &outdir) const {
+    const FilePath &outdir, leveldb::DB *db) const {
 
     if (!TAILQ_EMPTY(&mod->ll_funs)) {
         //Generate module header file
@@ -196,7 +199,7 @@ bool LvCodeGenerator::GenerateModule(const LvModuleContext* mod, std::string &bu
 
             //Generate module source file
             buf.clear();
-            if (GenerateModuleSource(mod, buf)) {
+            if (GenerateModuleSource(mod, buf, db)) {
                 snprintf(tbuf, sizeof(tbuf), "%s.c", mod->name);
                 return file_util::WriteFile(outdir.Append(FilePath::FromUTF8Unsafe(tbuf)),
                     buf.data(), (int)buf.size()) > 0;
@@ -240,14 +243,17 @@ bool LvCodeGenerator::GenerateModuleHeader(const LvModuleContext* mod, std::stri
     return true;
 }
 
-bool LvCodeGenerator::GenerateModuleSource(const LvModuleContext* mod, std::string& buf) const {
+bool LvCodeGenerator::GenerateModuleSource(const LvModuleContext* mod, std::string& buf, 
+    leveldb::DB* db) const {
     scoped_ptr<char> strbuf(new char[kStringBufferSize]);
     LvModuleDepend* mdep;
+    size_t inc_offset;
 
     //Add copyright information
     GenerateCopyright(buf);
 
     //Add header file depends
+    inc_offset = buf.size();
     buf.append("#include \"lvgl.h\"\n");
     buf.append("#include \"lvgen_cdefs.h\"\n");
 
@@ -255,6 +261,9 @@ bool LvCodeGenerator::GenerateModuleSource(const LvModuleContext* mod, std::stri
         snprintf(strbuf.get(), kStringBufferSize, "#include \"%s.h\"\n", mdep->mod->name);
         buf.append(strbuf.get());
     }
+
+    if (mod->is_view)
+        GenerateKV(db, buf.c_str() + inc_offset, "%s/include", mod->name);
     buf.append("\n\n");
 
     //Add function definition
@@ -276,6 +285,21 @@ bool LvCodeGenerator::GenerateModuleSource(const LvModuleContext* mod, std::stri
 
         if (fn->image_num > max_images)
             max_images = fn->image_num;
+    }
+
+    if (mod->is_view) {
+        // Add function definition
+        GenerateKV(db, fn_text.c_str(), "%s/function", mod->name);
+
+        // Add function entry
+        char entry_name[128];
+        snprintf(entry_name, sizeof(entry_name), "uv__%s_create", mod->name);
+        GenerateKV(db, entry_name, "%s/entry", mod->name);
+
+        // Add style numbers
+        char value_str[16] = { 0 };
+        itoa(max_styles, value_str, 10);
+        GenerateKV(db, value_str, "%s/style", mod->name);
     }
 
     //Add type definition
@@ -433,6 +457,18 @@ void LvCodeGenerator::GenerateCopyright(std::string& buf) const {
         " */\n\n",
         explod.year);
     buf.append(tbuf);
+}
+
+void LvCodeGenerator::GenerateKV(leveldb::DB* db, const char* value, const char* fmt, ...) const {
+    if (db != nullptr) {
+        char key[256];
+        va_list ap;
+
+        va_start(ap, fmt);
+        vsnprintf(key, sizeof(key), fmt, ap);
+        va_end(ap);
+        db->Put(leveldb::WriteOptions(), key, value);
+    }
 }
 
 } //namespace app

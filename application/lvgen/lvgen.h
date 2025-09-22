@@ -14,8 +14,14 @@
 #include "base/file_path.h"
 #include "thirdparty/tinyxml2/tinyxml2.h"
 
+// Forward declare
 template<typename Type>
 struct DefaultSingletonTraits;
+
+namespace leveldb {
+class DB;
+}
+
 
 namespace app {
 namespace xml = tinyxml2;
@@ -51,7 +57,7 @@ public:
     bool LoadAttributes(const FilePath& file);
     const LvAttribute* FindAttribute(const std::string& ns, const std::string& key);
     bool LoadViews(const FilePath& dir);
-    bool Generate(const FilePath& outdir) const;
+    bool Generate(const FilePath& outdir, leveldb::DB *db) const;
 
 private:
     LvCodeGenerator();
@@ -60,13 +66,14 @@ private:
     bool ParseView(const std::string& file, bool is_view);
 
     bool GenerateModule(const LvModuleContext *mod, std::string& buf, 
-        const FilePath& outdir) const;
+        const FilePath& outdir, leveldb::DB* db) const;
     bool GenerateModuleHeader(const LvModuleContext* mod, std::string &buf) const;
-    bool GenerateModuleSource(const LvModuleContext* mod, std::string &buf) const;
+    bool GenerateModuleSource(const LvModuleContext* mod, std::string &buf, leveldb::DB* db) const;
     bool GenerateFunction(const LvFunctionContext* fn, std::string& buf) const;
     bool GenerateFunctionSignature(const LvFunctionContext* fn, char* tbuf, size_t maxsize) const;
     bool GenerateFunctionInstruction(const LvFunctionContext* fn, std::string &buf, const char* indent) const;
     void GenerateCopyright(std::string& buf) const;
+    void GenerateKV(leveldb::DB* db, const char* value, const char* fmt, ...) const;
 
     xml::XMLElement* FindChild(xml::XMLElement* parent, const char* elem);
     template<typename Func>

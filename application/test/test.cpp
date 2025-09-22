@@ -180,10 +180,19 @@ int main(int argc, char* argv[]) {
     MessageLoop message_loop;
     base::WorkerPool worker_pool;
 
-    leveldb::DB* db;
+    leveldb::DB* db = nullptr;
     leveldb::Options options;
     options.create_if_missing = true;
-    leveldb::Status status = leveldb::DB::Open(options, "/tmp/testdb", &db);
+    leveldb::DB::Open(options, "code/DB", &db);
+
+    std::string value;
+    value.reserve(4096);
+    if (db != nullptr) {
+        db->Get(leveldb::ReadOptions(), "view/function", &value);
+        db->Get(leveldb::ReadOptions(), "view/entry", &value);
+        db->Get(leveldb::ReadOptions(), "view/include", &value);
+        db->Get(leveldb::ReadOptions(), "view/style", &value);
+    }
 
     file_util::FileEnumerator iterator(FilePath(L"."), false, file_util::FileEnumerator::FILES);
     for (FilePath path = iterator.Next(); path.value().size() > 0; ) {
