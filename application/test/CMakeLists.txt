@@ -15,4 +15,5 @@ collect_link_libraries(libs ${TARGET_NAME})
 target_link_libraries(${TARGET_NAME}
     ${libs}
     ${LIB_OPENCV}
+    leveldbX
 )

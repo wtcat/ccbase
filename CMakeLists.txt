@@ -31,7 +31,7 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 
 #Options
-option(USE_LEVELDB "Enable levelDB" OFF)
+option(USE_LEVELDB "Enable levelDB" ON)
 option(USE_SPDLOG  "Enable spdlog"  OFF)
 option(USE_XML     "Enable tinyXML library" ON)
 

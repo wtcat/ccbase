@@ -342,7 +342,7 @@ bool ViewCodeBuilder::CodeWriteFoot(std::string& code) {
 bool ViewCodeBuilder::CodeWriteBody(std::string& code) {
     std::string tcode;
 
-    AddExampleCode(code);
+    //AddExampleCode(code);
 
     tcode.reserve(1024);
     AddResourceCode(tcode);

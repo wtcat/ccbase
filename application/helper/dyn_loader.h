@@ -38,6 +38,7 @@ public:
     }
 
 private:
+    DISALLOW_COPY_AND_ASSIGN(DynLoader);
     LoaderHandle handle_;
     FilePath path_;
     bool loaded_;

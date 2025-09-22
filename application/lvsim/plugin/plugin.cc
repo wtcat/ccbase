@@ -211,19 +211,13 @@ bool ResourcePluginManager::Load(const FilePath& dir) {
         return false;
     }
  
-    const fs::path root_path(dir.MaybeAsASCII());
-    for (const auto& entry : fs::directory_iterator(root_path)) {
-        /* Don't recursive search */
-        if (fs::is_directory(entry))
-            continue;
-
-        if (fs::is_regular_file(entry)) {
-            auto file_ext = entry.path().filename().extension();
-            if (file_ext == ".dll" || file_ext == ".so") {
-                scoped_refptr<helper::DynLoader> dyn(new helper::DynLoader);
-                if (dyn->Load(FilePath::FromUTF8Unsafe(entry.path().string())))
-                    plugins_.push_back(dyn);
-            }
+    file_util::FileEnumerator iterator(dir, false, file_util::FileEnumerator::FILES);
+    for (FilePath path = iterator.Next(); path.value().size() > 0; path = iterator.Next()) {
+        FilePath extname(path.Extension());
+        if (extname.AsUTF8Unsafe() == ".dll" || extname.AsUTF8Unsafe() == ".so") {
+            scoped_refptr<helper::DynLoader> dyn(new helper::DynLoader);
+            if (dyn->Load(path))
+                plugins_.push_back(dyn);
         }
     }
 

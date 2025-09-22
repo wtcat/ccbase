@@ -19,6 +19,8 @@
 #include "base/threading/thread.h"
 #include "base/threading/worker_pool.h"
 
+#include "leveldb/db.h"
+
 //#include "spdlog/spdlog.h"
 //#include "spdlog/sinks/basic_file_sink.h"
 //
@@ -178,6 +180,10 @@ int main(int argc, char* argv[]) {
     MessageLoop message_loop;
     base::WorkerPool worker_pool;
 
+    leveldb::DB* db;
+    leveldb::Options options;
+    options.create_if_missing = true;
+    leveldb::Status status = leveldb::DB::Open(options, "/tmp/testdb", &db);
 
     file_util::FileEnumerator iterator(FilePath(L"."), false, file_util::FileEnumerator::FILES);
     for (FilePath path = iterator.Next(); path.value().size() > 0; ) {
