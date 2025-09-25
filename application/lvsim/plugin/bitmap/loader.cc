@@ -2,69 +2,32 @@
  * Copyright 2025 wtcat
  */
 
+#include "plugin/bitmap/lvgl_bitmap_font.h"
+
 #define BASE_IMPLEMENTATION
 #include "base/base_export.h"
 
 #include "plugin/plugin.h"
 #include "base/linked_list.h"
 
-#if 0
+
 class BitmapLoader : public lvsim::ResourceLoader {
 public:
-    struct SceneImage : public base::LinkNode<SceneImage> {
-        SceneImage(uint32_t uid) : image(), id(uid) {}
-        lv_image_dsc_t image;
-        uint32_t id;
+    struct BitmapFont : public base::LinkNode<BitmapFont> {
+        BitmapFont(const std::string &font_name, int font_no) : 
+            name(font_name), no(font_no), registered(false) {}
+        std::string name;
+        lv_font_t   font;
+        uint32_t    no;
+        bool        registered;
     };
 
-    struct SceneContext : public base::LinkNode<SceneContext> {
-        SceneImage* NewImage(uint32_t id) {
-            SceneImage* img = new SceneImage(id);
-            list.Append(img);
-            return img;
-        }
-        void DeleteImage(SceneImage* img) {
-            img->RemoveFromList();
-            delete img;
-        }
-        SceneImage* GetImage(uint32_t id) {
-            for (base::LinkNode<SceneImage>* node = list.head();
-                node != list.end(); node = node->next()) {
-                if (node->value()->id == id)
-                    return node->value();
-            }
-            return nullptr;
-        }
-        void UnloadImages(void) {
-            for (base::LinkNode<SceneImage>* node = list.head();
-                node != list.end(); node = node->next()) {
-                lvgl_res_unload_pictures(&node->value()->image, 1);
-            }
-        }
-
-        ~SceneContext() {
-            base::LinkNode<SceneImage>* node = list.head();
-            base::LinkNode<SceneImage>* next;
-            
-            UnloadImages();
-            while (node != list.end()) {
-                next = node->next();
-                DeleteImage(node->value());
-                node = next;
-            }
-        }
-
-        base::LinkedList<SceneImage> list;
-        lvgl_res_scene_t scene;
-        uint32_t scene_id;
-    };
-
-    SceneLoader(const std::string& name) : ResourceLoader(name) {
-        lvgl_res_loader_init(480, 480);
+    BitmapLoader(const std::string& name) : ResourceLoader(name) {
+        lvgl_bitmap_font_init(NULL);
     }
-    virtual ~SceneLoader() { 
+    virtual ~BitmapLoader() {
         Clear(); 
-        lvgl_res_loader_deinit();
+        lvgl_bitmap_font_deinit();
     }
 
     ReHandle Load(const Attribute &attr) override {
@@ -72,117 +35,76 @@ public:
         if (path == nullptr)
             return nullptr;
 
-        const char *id = attr.GetValue("id");
-        if (id == nullptr)
+        BitmapFont* bfont = NewFont(path, 0);
+        int err = lvgl_bitmap_font_open(&bfont->font, path);
+        if (err) {
+            DeleteFont(bfont);
             return nullptr;
-
-        uint32_t scene_id = Hash((const uint8_t *)id, strlen(id));
-        SceneContext* ctx = SceneFind(scene_id);
-        if (ctx == nullptr) {
-            FilePath dir = FilePath::FromUTF8Unsafe(path);
-            FilePath sty = dir.Append(FilePath(L"bt_watch.sty"));
-            FilePath res = dir.Append(FilePath(L"bt_watch.res"));
-            FilePath str = dir.Append(FilePath(L"bt_watch.str"));
-
-            ctx = SceneAllocate();
-            int err = lvgl_res_load_scene(scene_id, &ctx->scene,
-                sty.AsUTF8Unsafe().c_str(),
-                res.AsUTF8Unsafe().c_str(),
-                str.AsUTF8Unsafe().c_str()
-            );
-            if (err != 0) {
-                SceneFree(ctx);
-                return nullptr;
-            }
-            ctx->scene_id = scene_id;
         }
-
-        return ctx;
+        return bfont;
     }
+
     bool Get(ReHandle h, const std::string& name, Attribute& attr) override {
-        SceneContext* ctx = (SceneContext*)h;
+        BitmapFont* bfont = (BitmapFont*)h;
 
-        if (IsSceneActived(ctx)) {
-            uint32_t id = Hash((const uint8_t*)name.c_str(), (uint32_t)name.size());
-            SceneImage *img = ctx->GetImage(id);
-            if (img != nullptr)
-                return true;
-
-            img = ctx->NewImage(id);
-            int err = lvgl_res_load_pictures_from_scene(&ctx->scene, &id, &img->image, nullptr, 1);
-            if (err != 0) {
-                ctx->DeleteImage(img);
-                return false;
-            }
-
-            return attr.RegisterImage(name.c_str(), (void *)&img->image);
+        if (IsFontOpend(bfont)) {
+            if (!bfont->registered)
+                bfont->registered = attr.RegisterFont(name.c_str(), &bfont->font);
+            return bfont->registered;
         }
         return false;
     }
-    void Unload(ReHandle h) override {
-        SceneContext* ctx = (SceneContext*)h;
 
-        if (IsSceneActived(ctx)) {
-            ctx->UnloadImages();
-            lvgl_res_unload_scene_compact(ctx->scene_id);
-            lvgl_res_unload_scene(&ctx->scene);
-            SceneFree(ctx);
-        }
+    void Unload(ReHandle h) override {
+        BitmapFont* bfont = (BitmapFont*)h;
+        if (IsFontOpend(bfont)) 
+            UnloadFont(bfont);
     }
+
     void Clear() override {
-        base::LinkNode<SceneContext>* node = scene_list_.head();
-        base::LinkNode<SceneContext>* next;
-        while (node != scene_list_.end()) {
+        Destroy();
+    }
+
+private:
+    BitmapFont* NewFont(const std::string& font_name, uint32_t font_no) {
+        BitmapFont* font = new BitmapFont(font_name, font_no);
+        font_list_.Append(font);
+        return font;
+    }
+    void DeleteFont(BitmapFont* font) {
+        font->RemoveFromList();
+        delete font;
+    }
+    bool IsFontOpend(BitmapFont* bfont) {
+        for (base::LinkNode<BitmapFont>* node = font_list_.head();
+            node != font_list_.end(); 
+            node = node->next()) {
+            if (node->value() == bfont)
+                return true;
+        }
+        return false;
+    }
+    void UnloadFont(BitmapFont* bfont) {
+        lvgl_bitmap_font_close(&bfont->font);
+        DeleteFont(bfont);
+    }
+    void Destroy() {
+        base::LinkNode<BitmapFont>* node = font_list_.head();
+        base::LinkNode<BitmapFont>* next;
+
+        while (node != font_list_.end()) {
             next = node->next();
-            Unload(node->value());
+            UnloadFont(node->value());
             node = next;
         }
     }
 
 private:
-    SceneContext *SceneFind(uint32_t id) {
-        for (base::LinkNode<SceneContext>* node = scene_list_.head();
-            node != scene_list_.end(); node = node->next()) {
-            if (node->value()->scene_id == id)
-                return node->value();
-        }
-        return nullptr;
-    }
-    bool IsSceneActived(SceneContext* ctx) {
-        if (ctx == nullptr)
-            return false;
-
-        for (base::LinkNode<SceneContext>* node = scene_list_.head();
-            node != scene_list_.end(); node = node->next()) {
-            if (node->value() == ctx)
-                return true;
-        }
-        return false;
-    }
-    SceneContext* SceneAllocate() {
-        SceneContext* scene = new SceneContext;
-        scene_list_.Append(scene);
-        return scene;
-    }
-    void SceneFree(SceneContext* scene) {
-        scene->RemoveFromList();
-        delete scene;
-    }
-    uint32_t Hash(const uint8_t* key, uint32_t len) {
-        uint32_t hash = 0;
-        for (const uint8_t* end = key + len; key < end; key++) {
-            hash *= 16777619;
-            hash ^= (uint32_t)(*key);
-        }
-        return hash;
-    }
-private:
-    base::LinkedList<SceneContext> scene_list_;
+    base::LinkedList<BitmapFont> font_list_;
 };
 
 extern "C"
 BASE_EXPORT bool LoaderCreate(std::vector<lvsim::ResourceLoader*> &loaders) {
-    loaders.push_back(new SceneLoader("scene"));
+    loaders.push_back(new BitmapLoader("bitmap"));
     return true;
 }
-#endif 

@@ -35,7 +35,7 @@ int lvgl_bitmap_font_deinit(void);
 int lvgl_bitmap_font_open(lv_font_t* font, const char * font_path);
 void lvgl_bitmap_font_close(lv_font_t* font);
 int lvgl_bitmap_font_set_emoji_font(lv_font_t* lv_font, const char* emoji_font_path);
-int lvgl_bitmap_font_get_emoji_dsc(const lv_font_t* lv_font, uint32_t unicode, lv_img_dsc_t* dsc, lv_point_t* pos, bool force_retrieve);
+int lvgl_bitmap_font_get_emoji_dsc(const lv_font_t* lv_font, uint32_t unicode, lv_image_dsc_t* dsc, lv_point_t* pos, bool force_retrieve);
 /**
 * @brief set default code point for bitmap font
 *

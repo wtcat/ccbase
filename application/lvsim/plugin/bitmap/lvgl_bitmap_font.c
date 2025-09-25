@@ -2,9 +2,11 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include <lvgl.h>
 #include "font_port.h"
 #include "lvgl_bitmap_font.h"
 
+static lv_draw_buf_t glyf_draw_buf;
 
 bool bitmap_font_get_glyph_dsc_cb(const lv_font_t * lv_font, lv_font_glyph_dsc_t * dsc_out, uint32_t unicode, uint32_t unicode_next)
 {
@@ -57,19 +59,35 @@ bool bitmap_font_get_glyph_dsc_cb(const lv_font_t * lv_font, lv_font_glyph_dsc_t
 	dsc_out->ofs_y = metric->bby - font->descent;
 	dsc_out->box_w = metric->bbw;
 	dsc_out->box_h = metric->bbh;
-	dsc_out->stride = font->bpp * metric->bbw;
+	dsc_out->gid.index = unicode;
+	dsc_out->is_placeholder = false;
+
+	if(unicode >= 0x1F300)
+	{
+		dsc_out->ofs_x = 0;
+		dsc_out->ofs_y = font->ascent - metric->bbh - metric->bby;
+		dsc_out->format = LV_FONT_GLYPH_FORMAT_IMAGE;
+		return true;
+	}
+	else
+	{
+		dsc_out->format = (lv_font_glyph_format_t)font->bpp;
+	}
 
 //	SYS_LOG_INF("dsc out %d x %d y %d w %d h %d\n\n", dsc_out->adv_w, dsc_out->ofs_x, dsc_out->ofs_y, dsc_out->box_w, dsc_out->box_h);
 	return true;
 
 }
 
-const uint8_t * bitmap_font_get_bitmap_cb(const lv_font_t * lv_font, uint32_t unicode)
+const void * bitmap_font_get_bitmap_cb(lv_font_glyph_dsc_t *glyph_dsc, lv_draw_buf_t *draw_buf)
 {
+	const lv_font_t * lv_font = glyph_dsc->resolved_font;
+	uint32_t unicode = glyph_dsc->gid.index;
 	uint8_t* data;
 	lv_font_fmt_bitmap_dsc_t* font_dsc;
 	bitmap_font_t* font;
 	bitmap_cache_t* cache;
+	glyph_metrics_t* metric = NULL;
 
 	if(lv_font == NULL)
 	{
@@ -89,18 +107,45 @@ const uint8_t * bitmap_font_get_bitmap_cb(const lv_font_t * lv_font, uint32_t un
 	{
 		if(bitmap_font_get_max_emoji_num() == 0)
 		{
+			metric = bitmap_font_get_glyph_dsc(font, cache, 0x20);
 			data = bitmap_font_get_bitmap(font, cache, 0x20);
 		}
 		else
 		{
 			data = bitmap_font_get_emoji_bitmap(font_dsc->emoji_font, unicode);
+			return data;
 		}
 	}
 	else
 	{
+		metric = bitmap_font_get_glyph_dsc(font, cache, unicode);
 		data = bitmap_font_get_bitmap(font, cache, unicode);
 	}
-	return data;
+
+	if(!data || !metric)
+	{
+		return NULL;
+	}
+
+	uint32_t cf = LV_COLOR_FORMAT_A1;
+	uint32_t stride = (metric->bbw * font->bpp + 7)/8;
+	uint32_t data_size = stride*metric->bbh;
+	switch(font->bpp)
+	{
+	case 2:
+		cf = LV_COLOR_FORMAT_A2;
+		break;
+	case 4:
+		cf = LV_COLOR_FORMAT_A4;
+		break;
+	case 8:
+		cf = LV_COLOR_FORMAT_A8;
+		break;
+	}
+	SYS_LOG_DBG("unicode 0x%x, w %d, h %d, cf %d, stride %d, data_size %d, data %p\n", unicode, metric->bbw, metric->bbh, cf, stride, data_size, data);
+	lv_draw_buf_init(&glyf_draw_buf, metric->bbw, metric->bbh, cf, stride, data, data_size);
+
+	return &glyf_draw_buf;
 }
 
 int lvgl_bitmap_font_init(const char *def_font_path)
@@ -149,10 +194,11 @@ int lvgl_bitmap_font_set_emoji_font(lv_font_t* lv_font, const char* emoji_font_p
 	return 0;
 }
 
-int lvgl_bitmap_font_get_emoji_dsc(const lv_font_t* lv_font, uint32_t unicode, lv_img_dsc_t* dsc, lv_point_t* pos, bool force_retrieve)
+int lvgl_bitmap_font_get_emoji_dsc(const lv_font_t* lv_font, uint32_t unicode, lv_image_dsc_t* dsc, lv_point_t* pos, bool force_retrieve)
 {
 	lv_font_fmt_bitmap_dsc_t* font_dsc;
 	glyph_metrics_t* metric;
+	lv_image_dsc_t* emoji_dsc;
 
 	if(bitmap_font_get_max_emoji_num() == 0)
 	{
@@ -184,15 +230,13 @@ int lvgl_bitmap_font_get_emoji_dsc(const lv_font_t* lv_font, uint32_t unicode, l
 	{
 		return -1;
 	}
-	
-	dsc->header.cf = 0; //LV_IMG_CF_ARGB_6666;
-	dsc->header.w = metric->bbw;
-	dsc->header.h = metric->bbh;
-	//dsc->header.always_zero = 0;
-	//dsc->header.reserved = 0;
-	dsc->data_size = metric->bbw*metric->bbh*3;
-//	SYS_LOG_INF("emoji metric %d %d, dsc %d %d, size %d\n", metric->bbw, metric->bbh, dsc->header.w, dsc->header.h, dsc->data_size);
-	dsc->data = bitmap_font_get_emoji_bitmap(font_dsc->emoji_font, unicode);
+
+	emoji_dsc = (lv_image_dsc_t*)bitmap_font_get_emoji_bitmap(font_dsc->emoji_font, unicode);
+	if(!emoji_dsc)
+	{
+		return -1;
+	}
+	memcpy(dsc, emoji_dsc, sizeof(lv_image_dsc_t));
 
 	if(pos)
 	{
@@ -289,6 +333,14 @@ int lvgl_bitmap_font_open(lv_font_t* font, const char * font_path)
 	}
 	dsc->cache = bitmap_font_get_cache(dsc->font);
 
+	lv_font_fmt_txt_dsc_t* font_fmt_dsc = (lv_font_fmt_txt_dsc_t*)bitmap_font_cache_malloc(sizeof(lv_font_fmt_txt_dsc_t));
+	if(!font_fmt_dsc)
+	{
+		goto ERR_EXIT;
+	}
+	memset(font_fmt_dsc, 0, sizeof(lv_font_fmt_txt_dsc_t));
+	font_fmt_dsc->bpp = dsc->font->bpp;
+	font->dsc = font_fmt_dsc;
 	font->get_glyph_dsc = bitmap_font_get_glyph_dsc_cb;        /*Set a callback to get info about gylphs*/
 	font->get_glyph_bitmap = bitmap_font_get_bitmap_cb;		/*Set a callback to get bitmap of gylphs*/
 
@@ -320,11 +372,19 @@ ERR_EXIT:
 void lvgl_bitmap_font_close(lv_font_t* font)
 {
 	lv_font_fmt_bitmap_dsc_t * dsc;
+	lv_font_fmt_txt_dsc_t* font_fmt_dsc;
 
 	if(font == NULL)
 	{
 		SYS_LOG_ERR("null font pointer\n");
 		return;
+	}
+
+	font_fmt_dsc = (lv_font_fmt_txt_dsc_t*)font->dsc;
+	if(font_fmt_dsc)
+	{
+		bitmap_font_cache_free(font_fmt_dsc);
+		font->dsc = NULL;
 	}
 
 	dsc = (lv_font_fmt_bitmap_dsc_t*)font->user_data;
@@ -341,4 +401,5 @@ void lvgl_bitmap_font_close(lv_font_t* font)
 	mem_free(dsc);
 	font->user_data = NULL;
 }
+
 

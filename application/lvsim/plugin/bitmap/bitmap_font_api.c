@@ -4,6 +4,7 @@
 
 #include "font_port.h"
 #include "bitmap_font_api.h"
+#include <lvgl.h>
 
 #ifndef CONFIG_SIMULATOR
 #include <sdfs.h>
@@ -111,6 +112,7 @@ static uint8_t* decomp_tmp2 = NULL;
 void bitmap_font_load_high_freq_chars(const uint8_t* file_path);
 static int32_t _search_emoji_glyf_id(bitmap_emoji_font_t* font, uint32_t unicode, uint32_t* glyf_id);
 
+extern void decompress_glyf_bitmap(const uint8_t * in, uint8_t * out, int16_t w, int16_t h, uint8_t bpp, bool prefilter, uint8_t* linebuf1, uint8_t* linebuf2);
 
 static void bitmap_font_get_decompress_param(int bmp_size, int font_size, int* in_size, int* line_size)
 {
@@ -420,11 +422,12 @@ bitmap_emoji_font_t* bitmap_emoji_font_open(const char* file_path)
 
 	if(!emoji_font_use_mmap())
 	{
-		opend_emoji_font.cache->unit_size = glyf_size;
+		opend_emoji_font.cache->unit_size = glyf_size + sizeof(lv_image_dsc_t);
 	}
 	else
 	{
-		opend_emoji_font.cache->unit_size = sizeof(uint32_t);
+		opend_emoji_font.cache->unit_size = sizeof(lv_image_dsc_t);
+
 	}
 
 
@@ -445,7 +448,7 @@ bitmap_emoji_font_t* bitmap_emoji_font_open(const char* file_path)
 		ret = sd_fmap(file_path, (void**)&opend_emoji_font.emoji_mmap_addr, &file_len);	
 		if(ret < 0)
 		{
-			os_printk("mmap style file failed\n");
+			SYS_LOG_INF("mmap style file failed\n");
 			opend_emoji_font.emoji_mmap_addr = NULL;
 		}		
 #else
@@ -626,10 +629,10 @@ bitmap_font_t* bitmap_font_open(const char* file_path)
 	bmp_font->glyf_offset = bmp_font->loca_offset + loca_size;
 	bmp_font->ref_count = 1;
 
-	uint32_t bmp_size = bmp_font->font_size*bmp_font->font_size/(8/bmp_font->bpp);
+	uint32_t bmp_size = (bmp_font->font_size+7)/(8/bmp_font->bpp);
+	bmp_size *= bmp_font->font_size;
 	bmp_size = ((bmp_size + 3)/4) * 4;
 	bmp_font->cache->unit_size = bmp_size;
-//	bmp_font->cache->cached_max = font_cache_size/(bmp_size + sizeof(uint32_t*) + sizeof(glyph_metrics_t));
 	SYS_LOG_INF("font attr per data size %d, max cached number %d\n", bmp_font->cache->unit_size, bmp_font->cache->cached_max);
 	ret = _bitmap_cache_init(bmp_font->cache, file_path, file_size);
 	if(ret < 0)
@@ -843,7 +846,7 @@ int bitmap_font_set_default_emoji_code(bitmap_emoji_font_t* font, uint32_t emoji
 			multi = glyf_size/font->cache->unit_size + 1;
 			cache_index = font->cache->cached_max-multi;
 			font->cache->default_data = &(font->cache->data[cache_index*font->cache->unit_size]);
-			data = font->cache->default_data;
+			data = font->cache->default_data + sizeof(lv_image_dsc_t);
 
 			ret = fs_read(&font->font_fp, data, glyf_size);
 			if(ret < glyf_size)
@@ -852,15 +855,31 @@ int bitmap_font_set_default_emoji_code(bitmap_emoji_font_t* font, uint32_t emoji
 				return -1;
 			}		
 
+			lv_image_dsc_t* emoji_dsc = (lv_image_dsc_t*)font->cache->default_data;
+			emoji_dsc->data = data;
+			emoji_dsc->header.w = entry->width;
+			emoji_dsc->header.h = entry->height;
+			emoji_dsc->header.stride = entry->width * 3;
+			emoji_dsc->header.cf = LV_COLOR_FORMAT_ARGB8565;
+			emoji_dsc->header.magic = LV_IMAGE_HEADER_MAGIC;
+			emoji_dsc->header.flags = 0;
+			emoji_dsc->data_size = entry->width*entry->height*3;			
 			font->cache->cached_max -= multi;
 		}
 		else
 		{
 			cache_index = font->cache->cached_max-1;
 			font->cache->default_data = &(font->cache->data[cache_index*font->cache->unit_size]);
-			uint32_t* loca_data = (uint32_t*)font->cache->default_data;
-			*loca_data = glyf_loca;
 
+			lv_image_dsc_t* emoji_dsc = (lv_image_dsc_t*)font->cache->default_data;
+			emoji_dsc->data = (uint8_t*)font->emoji_mmap_addr+glyf_loca;
+			emoji_dsc->header.w = entry->width;
+			emoji_dsc->header.h = entry->height;
+			emoji_dsc->header.stride = entry->width * 3;
+			emoji_dsc->header.cf = LV_COLOR_FORMAT_ARGB8565;
+			emoji_dsc->header.magic = LV_IMAGE_HEADER_MAGIC;
+			emoji_dsc->header.flags = 0;
+			emoji_dsc->data_size = entry->width*entry->height*3;
 			font->cache->cached_max--;
 		}
 	}
@@ -942,7 +961,6 @@ int bitmap_font_set_default_bitmap(bitmap_font_t* font, uint8_t* bitmap, uint32_
 			cache_index = font->cache->cached_max-multi;
 			font->cache->default_data = &(font->cache->data[cache_index*font->cache->unit_size]);
 			data = font->cache->default_data;
-			
 			memcpy(data, bitmap, bmp_size);	
 			
 			font->cache->cached_max -= multi;			
@@ -995,10 +1013,8 @@ int bitmap_font_set_default_bitmap(bitmap_font_t* font, uint8_t* bitmap, uint32_
 			
 			cache_index = font->cache->cached_max-multi;
 			font->cache->default_data = &(font->cache->data[cache_index*font->cache->unit_size]);
-			data = font->cache->default_data;
-			
-			memset(data, 0, bmp_size);	
-			
+			data = font->cache->default_data; 
+			memset(data, 0, bmp_size);		
 			font->cache->cached_max -= multi;
 		}
 	}
@@ -1371,21 +1387,11 @@ uint8_t * bitmap_font_get_emoji_bitmap(bitmap_emoji_font_t* font, uint32_t unico
 	uint8_t* data;
 	int ret;
 	int glyf_id = 0;
-	uint32_t* loca_data = NULL;
 
 	//SYS_LOG_INF("get 0x%x data, default code 0x%x\n", unicode, font->default_code);
 	if(unicode == font->default_code)
 	{
-		//SYS_LOG_INF("get default code data");
-		if(!emoji_font_use_mmap())
-		{
-			return font->cache->default_data;
-		}
-		else
-		{
-			loca_data = (uint32_t*)font->cache->default_data;
-			return (uint8_t*)font->emoji_mmap_addr+(*loca_data);
-		}
+		return font->cache->default_data;
 	}
 
 	ret = _search_emoji_glyf_id(font, unicode, &glyf_id);
@@ -1405,20 +1411,7 @@ uint8_t * bitmap_font_get_emoji_bitmap(bitmap_emoji_font_t* font, uint32_t unico
 		}
 	}
 
-	if(!emoji_font_use_mmap())
-	{
-		return data;
-	}
-	else
-	{
-		loca_data = (uint32_t*)data;
-		if (loca_data) {
-			return (uint8_t*)font->emoji_mmap_addr + (*loca_data);
-		} else {
-			SYS_LOG_ERR("loca_data is NULL \n");
-			return NULL;
-		}
-	}
+	return data;
 }
 
 glyph_metrics_t* _font_get_emoji_glyph_dsc(bitmap_emoji_font_t* font, uint32_t unicode, uint32_t glyf_id, int32_t cache_index)
@@ -1458,6 +1451,7 @@ glyph_metrics_t* _font_get_emoji_glyph_dsc(bitmap_emoji_font_t* font, uint32_t u
 	
 	if(!emoji_font_use_mmap())
 	{
+		uint8_t* glyf_data = data + sizeof(lv_image_dsc_t);
 		ret = fs_seek(&font->font_fp, glyf_loca, FS_SEEK_SET);
 		if(ret < 0)
 		{
@@ -1465,23 +1459,39 @@ glyph_metrics_t* _font_get_emoji_glyph_dsc(bitmap_emoji_font_t* font, uint32_t u
 			return NULL;
 		}
 
-		ret = fs_read(&font->font_fp, data, glyf_size);
+		ret = fs_read(&font->font_fp, glyf_data, glyf_size);
 		if(ret < glyf_size)
 		{
 			SYS_LOG_ERR("read font file error\n");
 			return NULL;
 		}
+		mem_dcache_clean(glyf_data, glyf_size);
 
-		mem_dcache_clean(data, glyf_size);
+		lv_image_dsc_t* emoji_dsc = (lv_image_dsc_t*)data;
+		emoji_dsc->data = glyf_data;
+		emoji_dsc->header.w = entry->width;
+		emoji_dsc->header.h = entry->height;
+		emoji_dsc->header.stride = entry->width * 3;
+		emoji_dsc->header.cf = LV_COLOR_FORMAT_ARGB8565;
+		emoji_dsc->header.magic = LV_IMAGE_HEADER_MAGIC;
+		emoji_dsc->header.flags = 0;
+		emoji_dsc->data_size = entry->width*entry->height*3;	
 	}
 	else
 	{
 		//no need to fetch bitmap now, but need to store glyf loca	
-		uint32_t* loca_data = (uint32_t*)data;
-		*loca_data = glyf_loca;
+		lv_image_dsc_t* emoji_dsc = (lv_image_dsc_t*)data;
+		emoji_dsc->data = (uint8_t*)font->emoji_mmap_addr+glyf_loca;
+		emoji_dsc->header.w = entry->width;
+		emoji_dsc->header.h = entry->height;
+		emoji_dsc->header.stride = entry->width * 3;
+		emoji_dsc->header.cf = LV_COLOR_FORMAT_ARGB8565;
+		emoji_dsc->header.magic = LV_IMAGE_HEADER_MAGIC;
+		emoji_dsc->header.flags = 0;
+		emoji_dsc->data_size = entry->width*entry->height*3;
 	}
-	return metric_item;
 
+	return metric_item;
 }
 
 glyph_metrics_t* bitmap_font_get_emoji_glyph_dsc(bitmap_emoji_font_t* font, uint32_t unicode, bool force_retrieve)
@@ -1501,8 +1511,6 @@ glyph_metrics_t* bitmap_font_get_emoji_glyph_dsc(bitmap_emoji_font_t* font, uint
 	{
 		return &font->cache->default_metric;
 	}
-
-	//SYS_LOG_INF("get emoji glyph dsc %p, unicode 0x%x, cache %p\n", font, unicode, font->cache);
 
 	cache_index = _try_get_cached_index(font->cache, unicode);
 	if(cache_index >= 0)
@@ -1540,7 +1548,6 @@ glyph_metrics_t* bitmap_font_get_emoji_glyph_dsc(bitmap_emoji_font_t* font, uint
 
 		
 		cache_index = _get_cache_index(font->cache, unicode, 1);
-		//printf("cache_index %d\n", cache_index);
 		metric_item = _font_get_emoji_glyph_dsc(font, unicode, glyf_id, cache_index);
 		if(metric_item == NULL)
 		{
@@ -1611,7 +1618,117 @@ uint8_t * bitmap_font_get_bitmap(bitmap_font_t* font, bitmap_cache_t* cache, uin
 	return data;
 }
 
-extern void decompress_glyf_bitmap(const uint8_t * in, uint8_t * out, int16_t w, int16_t h, uint8_t bpp, bool prefilter, uint8_t* linebuf1, uint8_t* linebuf2);
+void stride_glyf_bitmap(const uint8_t * in, uint8_t * out, int16_t w, int16_t h, uint8_t bpp)
+{
+    int32_t y;
+    int32_t x;
+	int32_t k;
+	uint8_t out_k;
+	uint32_t stride = (w * bpp + 7)/8;
+	uint32_t bit_off = 0;
+	uint8_t out_x;
+
+	for(y = 0; y < h; y++) {
+		if(bpp == 2) {
+			if(w % 4 == 0 && bit_off == 0) {
+				memcpy(out, in, stride);
+				in += stride;
+			} else {
+				if(bit_off == 0) {
+					memcpy(out, in, stride-1);
+					out_x = in[stride-1];
+					bit_off = (w - 4*(stride-1))*2;
+					out[stride-1] = (out_x>>(8-bit_off))<<(8-bit_off);
+					in += (stride - 1);
+				} else {
+					for(x=0,k=0; x < w; k++,x+=4)
+					{
+						if(x+3<w)
+						{
+							out_k = in[x/4];
+							out[k] = out_k<<bit_off;
+							out_k = in[x/4+1]>>(8-bit_off);
+							out[k] |= out_k;
+						}
+						else
+						{
+							uint8_t tail = (w - x)*2;
+							out[k] = in[x/4];
+							if(bit_off + tail <= 8)
+							{
+								out[k] = (out[k]>>(8-bit_off-tail))<<bit_off;
+								if(bit_off + tail < 8)
+								{
+									bit_off = bit_off+tail;
+									in += (stride-1);
+								}
+								else
+								{
+									bit_off = 0;
+									in += stride;
+								}
+							}
+							else
+							{
+								out[k] = out[k]<<bit_off;
+								tail = bit_off+tail-8;
+								out_k = (in[x/4+1]>>(8-tail))<<(8-tail);
+								bit_off = tail;
+								in += stride;
+							}
+							break;
+						}
+					}
+
+					if(x >= w)
+					{
+						in += (stride-1);
+					}
+					
+				}
+			}
+		} else if(bpp == 4) {
+			if(w % 2 == 0 && bit_off == 0) {
+				memcpy(out, in, w/2);
+				in += stride;
+			} else {
+				if(bit_off == 0) {
+					memcpy(out, in, stride-1);
+					out[stride-1] = in[stride-1]&0xf0;
+					bit_off = 4;
+					in += (stride - 1);
+				} else {
+					for(x=0;x < w; x+=2)
+					{
+						if(x+1 < w)
+						{
+							out[x/2] = ((in[x/2]&0xf)<<4) | ((in[x/2+1]&0xf0)>>4);							
+						}
+						else
+						{
+							out[x/2] = ((in[x/2]&0xf)<<4);
+							bit_off = 0;
+							in += stride;
+							break;
+						}
+					}
+
+					if(x >= w)
+					{
+						bit_off = 4;
+						in += (stride - 1);
+					}
+					
+				}				
+			}		
+		} else {
+
+		}
+
+		out += stride;
+	}	
+}
+
 glyph_metrics_t* _font_get_glyph_dsc(bitmap_font_t* font, bitmap_cache_t* cache, high_freq_cache_t* hcache,  uint32_t glyf_id, int32_t* pcache_index, uint32_t load_cache_type)
 {
 	uint32_t glyf_loca;
@@ -1622,6 +1739,7 @@ glyph_metrics_t* _font_get_glyph_dsc(bitmap_font_t* font, bitmap_cache_t* cache,
 	uint32_t off;
 	uint32_t bmp_size;
 	uint8_t* data = NULL;
+	uint8_t* cache_data = NULL;
 	uint8_t* metrics;
 	bbxy_t tmp;
 	glyph_metrics_t* metric_item = NULL;
@@ -1899,42 +2017,8 @@ glyph_metrics_t* _font_get_glyph_dsc(bitmap_font_t* font, bitmap_cache_t* cache,
 
 	}
 
-
-	off = 0;
-	bmp_size = metric_item->bbw*metric_item->bbh;
-	if(font->bpp == 4)
-	{
-		if(bmp_size%2 != 0)
-		{
-			bmp_size = bmp_size/2 + 1;
-		}
-		else
-		{
-			bmp_size = bmp_size/2;
-		}
-	}
-	else if(font->bpp == 2)
-	{
-		if(bmp_size%4 != 0)
-		{
-			bmp_size = bmp_size/4 + 1;
-		}
-		else
-		{
-			bmp_size = bmp_size/4;
-		}
-	}
-	else if(font->bpp == 1)
-	{
-		if(bmp_size%8 != 0)
-		{
-			bmp_size = bmp_size/8 + 1;
-		}
-		else
-		{
-			bmp_size = bmp_size/4;
-		}
-	}	
+	uint32_t stride = (metric_item->bbw * font->bpp +7)/8;
+	bmp_size = stride*metric_item->bbh;
 
     int slots = bmp_size/cache->unit_size;
     if(bmp_size%cache->unit_size != 0 || bmp_size == 0)
@@ -1946,15 +2030,15 @@ glyph_metrics_t* _font_get_glyph_dsc(bitmap_font_t* font, bitmap_cache_t* cache,
 	if(hcache != NULL)
 	{
 		metric_item = &(hcache->metrics[cache_index]);
-		data = hcache->data+hcache->unit_size*cache_index;
+		cache_data = hcache->data+hcache->unit_size*cache_index;
 	}
 	else
 	{
 		metric_item = &(cache->metrics[cache_index]);
-		data = _get_glyph_cache(cache, glyf_id);
+		cache_data = _get_glyph_cache(cache, glyf_id);
 	}
 
-	if(data == NULL || metric_item == NULL)
+	if(cache_data == NULL || metric_item == NULL)
 	{
 		SYS_LOG_ERR("get glyph cache faild for glyph id %d\n", glyf_id);
 		return NULL;
@@ -1963,7 +2047,9 @@ glyph_metrics_t* _font_get_glyph_dsc(bitmap_font_t* font, bitmap_cache_t* cache,
     *pcache_index = cache_index;
     memcpy(metric_item, &metric_data, sizeof(glyph_metrics_t));
 
-	if(font->compress_alg == 1)
+
+	data = cache_data;
+	/*it's necessary to read bitmap to a seperate buffer, for striding or decompress*/
 	{
 		//realloc decompress buffer if glyf too big and keep the buffer
 		if(bmp_size > decomp_buf_size)
@@ -1987,6 +2073,7 @@ glyph_metrics_t* _font_get_glyph_dsc(bitmap_font_t* font, bitmap_cache_t* cache,
 		}
 	}
 
+	off = 0;
 	if(bits_off != 0)
 	{
 		fs_read(&font->font_fp, data+4, bmp_size);
@@ -2003,11 +2090,13 @@ glyph_metrics_t* _font_get_glyph_dsc(bitmap_font_t* font, bitmap_cache_t* cache,
 		fs_read(&font->font_fp, data, bmp_size);
 	}
 
-	if(font->compress_alg == 1 && out_dest != NULL)
-	{
+	memset(out_dest, 0, bmp_size);
+	if(font->compress_alg == 1 && out_dest != NULL) {
 		//compressed data, decompress it
 	    decompress_glyf_bitmap(data, out_dest, metric_item->bbw, metric_item->bbh, (uint8_t)font->bpp, true, decomp_tmp1, decomp_tmp2);		
-		//bitmap_font_cache_free(data);
+	} else {
+		//stride every line
+		stride_glyf_bitmap(data, out_dest, metric_item->bbw, metric_item->bbh, (uint8_t)font->bpp);
 	}
 
 //	SYS_LOG_INF("adw %d x %d y %d w %d h %d\n", metric_item->advance, metric_item->bbx, metric_item->bby, metric_item->bbw, metric_item->bbh);
@@ -2084,7 +2173,7 @@ glyph_metrics_t* bitmap_font_get_glyph_dsc(bitmap_font_t* font, bitmap_cache_t *
 			return NULL;
 		}
 
-//		SYS_LOG_INF("metrics %d %d %d %d\n", metric_item->bbx, metric_item->bby, metric_item->bbw, metric_item->bbh);
+		SYS_LOG_INF("unicode 0x%x, metrics %d %d %d %d\n", unicode, metric_item->bbx, metric_item->bby, metric_item->bbw, metric_item->bbh);
 		//FIXME: no way to adjust vertical position of some letters automatically
 		if(unicode == 0x4e00  || unicode == 0x2014 || unicode == 0xbbd2)
 		{
@@ -2104,14 +2193,14 @@ void bitmap_font_dump_info(void)
     int i;
 	int cached_size;
 	int per_size;
-
+    SYS_LOG_INF("bitmap font info dump:\n");
     for(i=0;i<max_fonts;i++)
     {
         if(opend_font[i].font_fp.filep != NULL)
         {
         	per_size = opend_font[i].cache->unit_size+sizeof(glyph_metrics_t)+sizeof(uint32_t);
         	cached_size = (opend_font[i].cache->cached_total+2)*per_size;
-            os_printk("font %d, path %s, metric buf %p, data buf %p, cached total %d, cached max %d, cache size now %d, cache size max %d\n", 
+            SYS_LOG_INF("font %d, path %s, metric buf %p, data buf %p, cached total %d, cached max %d, cache size now %d, cache size max %d\n", 
 						i, opend_font[i].font_path, opend_font[i].cache->metrics, opend_font[i].cache->data, 
 						opend_font[i].cache->cached_total+2, opend_font[i].cache->cached_max, cached_size, opend_font[i].cache->cache_max_size);
         }

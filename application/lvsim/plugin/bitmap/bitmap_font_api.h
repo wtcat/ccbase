@@ -10,6 +10,7 @@ extern "C" {
  *********************/
 
 #include <stdint.h>
+#include "font_port.h"
 
 /*********************
  *      DEFINES
