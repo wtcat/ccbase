@@ -18,21 +18,27 @@
 
 #include "application/helper/helper.h"
 
+// Forward declare
+namespace leveldb {
+class DB;
+}
+
 namespace app {
 
 // Class ResourceParser
 class ResourceParser {
 public:
     struct ResourceOptions: public base::RefCounted<ResourceOptions> {
-        ResourceOptions() : id_base(0) {}
+        ResourceOptions() : db(nullptr), id_base(0) {}
         ~ResourceOptions()  {}
-        std::string resource_fnname;
-        std::string resource_namespace;
-        std::string default_font;
-        std::string ui_ids_filename;
-        std::string ui_res_filename;
-        FilePath    outpath;
-        int         id_base;
+        leveldb::DB*  db;
+        std::string   resource_fnname;
+        std::string   resource_namespace;
+        std::string   default_font;
+        std::string   ui_ids_filename;
+        std::string   ui_res_filename;
+        FilePath      outpath;
+        int           id_base;
     };
 
     struct ResourceType {
@@ -128,6 +134,9 @@ public:
     }
     const std::string& res_filename() const {
         return options_->ui_res_filename;
+    }
+    leveldb::DB* database() {
+        return options_->db;
     }
 
 private:
@@ -271,7 +280,7 @@ class ViewCodeBuilder : public CodeBuilder {
 public:
     ViewCodeBuilder(const ResourceParser::ViewData& view, const FilePath& file, 
         const std::string &view_name)
-        : CodeBuilder(file), view_(view), view_name_(view_name) {}
+        : CodeBuilder(file), view_(view), view_name_(view_name), styles_(0) {}
 
 private:
     void AddEnumList(std::string& code);
@@ -285,6 +294,9 @@ private:
     void AddPictureCode(std::string& code, char* buf, size_t size);
     void AddStringCode(std::string& code, char* buf, size_t size);
     void AddGroupCode(std::string& code, char* buf, size_t size);
+    void AddStyleClearCode(std::string& code);
+    void AddDestroyCode(std::string& code);
+    bool GetKV(const char* key, std::string* value);
 
     bool CodeWriteHeader(std::string& code) override;
     bool CodeWriteBody(std::string& code) override;
@@ -293,6 +305,7 @@ private:
 private:
     const ResourceParser::ViewData& view_;
     std::string view_name_;
+    int styles_;
 };
 
 //Class ViewPresenterBuilder

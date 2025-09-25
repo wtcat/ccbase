@@ -9,6 +9,8 @@
 #include "base/command_line.h"
 #include "base/memory/scoped_ptr.h"
 
+#include "thirdparty/leveldb/include/leveldb/db.h"
+
 #include "application/codegen/codegen.h"
 
 
@@ -27,6 +29,7 @@ int main(int argc, char* argv[]) {
                 "[--resource_fnname = name] "
                 "[--input_file = filename] "
                 "[--output_dir = output path] "
+                "[--database_dir = database path] "
                 "[--defaut_fontfile = fontfile] "
                 "[--resource_namespace = namespace] "
                 "[--resource_ids_cfile = filename] "
@@ -37,6 +40,7 @@ int main(int argc, char* argv[]) {
                 "  --resource_fnname         The function name that get resource by view ID. (default: _sdk_view_get_resource)\n"
                 "  --input_file              The resource information file. (default: re_output.json)\n"
                 "  --output_dir              The output directory\n"
+                "  --database_dir            The input directory of lvgl database\n"
                 "  --defaut_fontfile         The default font file\n"
                 "  --resource_namespace      Current resource namespace\n"
                 "  --resource_ids_cfile      Resource IDs c header file name\n"
@@ -91,6 +95,16 @@ int main(int argc, char* argv[]) {
 
         overwrite = cmdline->HasSwitch("overwrite");
 
+        if (cmdline->HasSwitch("database_dir")) {
+            FilePath tdir = cmdline->GetSwitchValuePath("database_dir");
+
+            FilePath db_path = tdir.Append(L"DB");
+            leveldb::Options options;
+            if (file_util::PathExists(db_path))
+                leveldb::DB::Open(options, db_path.AsUTF8Unsafe(), &option->db);
+        }
+
+        scoped_ptr<leveldb::DB> ptr(option->db);
         if (!file_util::PathExists(option->outpath)) {
             if (!file_util::CreateDirectory(option->outpath)) {
                 DLOG(ERROR) << "Failed to create directory: " << option->outpath.value();

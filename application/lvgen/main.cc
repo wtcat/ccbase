@@ -43,8 +43,7 @@ int main(int argc, char* argv[]) {
             file_util::CreateDirectory(outdir);
 
         leveldb::DB* db = nullptr;
-        //if (cmdline->HasSwitch("outdb")) 
-        {
+        if (cmdline->HasSwitch("outdb")) {
             FilePath db_path = outdir.Append(L"DB");
             leveldb::Options options;
 

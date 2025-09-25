@@ -13,6 +13,8 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/threading/simple_thread.h"
 
+#include "thirdparty/leveldb/include/leveldb/db.h"
+
 #include "application/codegen/codegen.h"
 
 namespace app {
@@ -246,6 +248,12 @@ void ViewCodeBuilder::AddHeaderFile(std::string& code) {
         "#include \"ui_template.h\"\n"
         "#include \"app_ui_view.h\"\n"
     );
+
+    // Insert code segment
+    std::string value;
+    if (GetKV("include", &value))
+        code.append(value).append("\n");
+
     code.append(buffer).append("\n");
 }
 
@@ -265,6 +273,17 @@ void ViewCodeBuilder::AddPrivateData(std::string& code) {
         (uint32_t)view_.picgroups.size());
     code.append(buffer.get());
 
+    // Insert code segment
+    std::string value;
+    if (GetKV("style", &value)) {
+        styles_ = atoi(value.c_str());
+        snprintf(buffer.get(), BUFFER_SIZE,
+            "#define STYLE_NUMBERS   %d\n",
+            styles_
+        );
+        code.append(buffer.get()).append("\n");
+    }
+
     AddEnumList(code);
 
     //Generate font member code
@@ -279,7 +298,7 @@ void ViewCodeBuilder::AddPrivateData(std::string& code) {
     snprintf(buffer.get(), BUFFER_SIZE,
         "typedef struct {\n"
         "\tlv_obj_t* obj;\n"
-        "\t\n"
+        "\t%s"
         "\t// Resource objects \n"
         "\t%s\n"
         "\t%s\n"
@@ -287,6 +306,7 @@ void ViewCodeBuilder::AddPrivateData(std::string& code) {
         "%s"
         "} %s_t;\n"
         "\n\n",
+        styles_ > 0? "\n\tlv_style_t styles[STYLE_NUMBERS];\n\n": "\n\n",
         view_.pictures.size()?  "lv_img_dsc_t res_img[PIC_NUMBERS];": "",
         view_.strings.size()?   "ui_string_t res_txt[STR_NUMBERS];" : "",
         view_.picgroups.size()? "ui_picture_set_t res_anim[GRP_NUMBERS];" : "",
@@ -341,10 +361,16 @@ bool ViewCodeBuilder::CodeWriteFoot(std::string& code) {
 
 bool ViewCodeBuilder::CodeWriteBody(std::string& code) {
     std::string tcode;
+    tcode.reserve(4096);
 
     //AddExampleCode(code);
+    AddStyleClearCode(code);
 
-    tcode.reserve(1024);
+    //Insert lvgl functions
+    if (GetKV("function", &tcode))
+        code.append(tcode).append("\n");
+
+    tcode.clear();
     AddResourceCode(tcode);
     AddMethod(code, "create", 
         "ui_context_t* ctx", 
@@ -363,10 +389,11 @@ bool ViewCodeBuilder::CodeWriteBody(std::string& code) {
         "\treturn 0;\n"
     );
 
+    tcode.clear();
+    AddDestroyCode(tcode);
     AddMethod(code, "destroy", 
         "ui_context_t* ctx", 
-        "\t//TODO: implement\n"
-        "\treturn 0;\n"
+        tcode.c_str()
     );
 
     AddMethod(code, "key",
@@ -417,21 +444,41 @@ void ViewCodeBuilder::AddResourceCode(std::string& code) {
     // Font resource get code
     AddFontCode(code, buffer.get(), BUFFER_SIZE);
 
-    // Lvgl widget create code
-    snprintf(buffer.get(), BUFFER_SIZE,
-        "\t/*\n"
-        "\t * Create lvgl widgets\n"
-        "\t */\n"
-        "\tlv_obj_t *scr = lv_disp_get_scr_act(ui_context_get_display(ctx));\n"
-        "\tconst %s_presenter_t *presenter = ui_context_get_presenter(ctx);\n"
-        "\n"
-        "\tpriv->obj = lv_obj_create(scr);\n"
-        "\tlv_obj_set_pos(priv->obj, 0, 0);\n"
-        "\tlv_obj_set_size(priv->obj, DEF_UI_VIEW_WIDTH, DEF_UI_VIEW_HEIGHT);\n\n"
-        "\t//TODO: implement\n"
-        "\n"
-        "\treturn 0;\n",
-        view_name_.c_str());
+    // Insert code segment
+    std::string value;
+    if (GetKV("entry", &value)) {
+        snprintf(buffer.get(), BUFFER_SIZE,
+            "\t/*\n"
+            "\t * Create lvgl widgets\n"
+            "\t */\n"
+            "\tlv_obj_t *scr = lv_disp_get_scr_act(ui_context_get_display(ctx));\n"
+            "\t//const %s_presenter_t *presenter = ui_context_get_presenter(ctx);\n"
+            "\n"
+            "\tpriv->obj = %s(scr, priv);%s"
+            "\n"
+            "\treturn 0;\n",
+            view_name_.c_str(),
+            value.c_str(),
+            styles_ > 0 ? 
+                "\n\tlv_obj_add_event_cb(priv->obj, style_clear_eventcb, LV_EVENT_DELETE, priv);\n": "\n"
+        );
+    } else {
+        // Lvgl widget create code
+        snprintf(buffer.get(), BUFFER_SIZE,
+            "\t/*\n"
+            "\t * Create lvgl widgets\n"
+            "\t */\n"
+            "\tlv_obj_t *scr = lv_disp_get_scr_act(ui_context_get_display(ctx));\n"
+            "\tconst %s_presenter_t *presenter = ui_context_get_presenter(ctx);\n"
+            "\n"
+            "\tpriv->obj = lv_obj_create(scr);\n"
+            "\tlv_obj_set_pos(priv->obj, 0, 0);\n"
+            "\tlv_obj_set_size(priv->obj, DEF_UI_VIEW_WIDTH, DEF_UI_VIEW_HEIGHT);\n\n"
+            "\t//TODO: implement\n"
+            "\n"
+            "\treturn 0;\n",
+            view_name_.c_str());
+    }
     code.append(buffer.get());
 }
 
@@ -551,6 +598,46 @@ void ViewCodeBuilder::AddExampleCode(std::string& code) {
     code.append(buffer.get());
 }
 
+void ViewCodeBuilder::AddStyleClearCode(std::string& code) {
+    if (styles_ > 0) {
+        scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
+        snprintf(buffer.get(), BUFFER_SIZE,
+            "static void style_clear_eventcb(lv_event_t *e) {\n"
+            "\t%s_t *priv = lv_event_get_user_data(e);\n"
+            "\tfor (int i = 0; i < STYLE_NUMBERS; i++)\n"
+            "\t\tlv_style_reset(&priv->styles[i]);\n"
+            "}\n\n",
+            view_name_.c_str()
+        );
+        code.append(buffer.get());
+    }
+}
+
+void ViewCodeBuilder::AddDestroyCode(std::string& code) {
+    scoped_ptr<char> buffer(new char[BUFFER_SIZE]);
+
+    snprintf(buffer.get(), BUFFER_SIZE,
+        "\t%s_t *priv = ui_context_get_user(ctx);\n"
+        "\tif (priv->obj != NULL) {\n"
+        "\t\tlv_obj_del(priv->obj);\n"
+        "\t\tpriv->obj = NULL;\n"
+        "\t}\n",
+        view_name_.c_str()
+    );
+    code.append(buffer.get());
+}
+
+bool ViewCodeBuilder::GetKV(const char* key, std::string* value) {
+    leveldb::DB* db = app::ResourceParser::GetInstance()->database();
+    if (db != nullptr) {
+        const char* name = view_name_.c_str() + 7; // Drop prefix "scene__" 
+        char buf[256];
+
+        snprintf(buf, sizeof(buf), "%s/%s", name, key);
+        return db->Get(leveldb::ReadOptions(), buf, value).ok();
+    }
+    return false;
+}
 
 //Class ViewIDCodeBuilder
 ViewIDCodeBuilder::ViewIDCodeBuilder(const FilePath& file) : 
