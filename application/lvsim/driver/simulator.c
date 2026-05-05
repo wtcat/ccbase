@@ -49,7 +49,7 @@ static void sched_message(void) {
 
 	if (!TAILQ_EMPTY(&ctx->pending)) {
 		SDL_LockMutex(sim_context.mutex);
-		if (!TAILQ_EMPTY(&ctx->pending)) {
+		while (!TAILQ_EMPTY(&ctx->pending)) {
 			simulator_message_t* p = TAILQ_FIRST(&ctx->pending);
 
 			TAILQ_REMOVE(&ctx->pending, p, node);
