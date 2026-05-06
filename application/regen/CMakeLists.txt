@@ -3,12 +3,14 @@ set(TARGET_NAME regen)
 
 add_executable(${TARGET_NAME}
     main.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/../helper/utils.cc
 )
 
 if (CMAKE_HOST_WIN32)
 target_compile_options(${TARGET_NAME}
     PRIVATE
     /wd4996
+    /wd4200
 )
 endif()
 

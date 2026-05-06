@@ -5,7 +5,7 @@ enable_language(C CXX)
 
 set(ROOT_DIR           ${CMAKE_CURRENT_SOURCE_DIR})
 set(LVGL_ROOT_DIR      ${ROOT_DIR}/lvgl)
-set(LV_BUILD_CONF_DIR  ${ROOT_DIR})
+set(LV_BUILD_CONF_DIR  ${ROOT_DIR} CACHE PATH " ")
 
 include_directories(
 	${ROOT_DIR}

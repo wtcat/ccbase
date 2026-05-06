@@ -2,15 +2,15 @@
 
 ############################## OPTIONS ######################################
 
-set(LV_BUILD_CONF_PATH "" CACHE PATH
-    "Use this to specify the location of and/or filename of lv_conf.h")
+#set(LV_BUILD_CONF_PATH "" CACHE PATH
+#    "Use this to specify the location of and/or filename of lv_conf.h")
 
-set(LV_BUILD_CONF_DIR "" CACHE PATH
-    "Can be used to specify the include dir containing lv_conf.h, to be used in conjuction with LV_CONF_INCLUDE_SIMPLE")
+#set(LV_BUILD_CONF_DIR "" CACHE PATH
+#    "Can be used to specify the include dir containing lv_conf.h, to be used in conjuction with LV_CONF_INCLUDE_SIMPLE")
 
 option(LV_BUILD_USE_KCONFIG "Use Kconfig" OFF)
-set(LV_BUILD_DEFCONFIG_PATH "" CACHE PATH
-    "Supply the default Kconfig configuration - used with Kconfig")
+#set(LV_BUILD_DEFCONFIG_PATH "" CACHE PATH
+#    "Supply the default Kconfig configuration - used with Kconfig")
 
 option(LV_BUILD_SET_CONFIG_OPTS
     "Create variables from the definitions in lv_conf_internal.h"  OFF)

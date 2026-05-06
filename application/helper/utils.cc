@@ -2,38 +2,25 @@
  * Copyright 2026 wtcat 
  */
 
-
-#include <regex>
-
-#include "base/file_path.h"
-#include "base/file_util.h"
-
 #include "application/helper/utils.h"
 
-
 namespace helper {
+uint32_t crc32_ieee_update(uint32_t crc, const uint8_t* data, size_t len) {
+	/* crc table generated from polynomial 0xedb88320 */
+	static const uint32_t table[16] = {
+		0x00000000U, 0x1db71064U, 0x3b6e20c8U, 0x26d930acU, 0x76dc4190U, 0x6b6b51f4U,
+		0x4db26158U, 0x5005713cU, 0xedb88320U, 0xf00f9344U, 0xd6d6a3e8U, 0xcb61b38cU,
+		0x9b64c2b0U, 0x86d3d2d4U, 0xa00ae278U, 0xbdbdf21cU,
+	};
 
-bool FileCollect(const FilePath& dir, const char* regex, std::vector<FilePath>& out) {
-    if (!file_util::PathExists(dir)) {
-        printf("Invalid path: %s\n", dir.AsUTF8Unsafe().c_str());
-        return false;
-    }
-
-    file_util::FileEnumerator iterator(dir, false, file_util::FileEnumerator::FILES);
-    if (regex == nullptr) {
-        for (FilePath path = iterator.Next(); path.value().size() > 0;
-            path = iterator.Next())
-            out.push_back(path);
-    }
-    else {
-        std::regex pattern(regex);
-        for (FilePath path = iterator.Next(); path.value().size() > 0;
-            path = iterator.Next()) {
-            if (std::regex_match(path.AsUTF8Unsafe(), pattern))
-                out.push_back(path);
-        }
-    }
-    return true;
+	crc = ~crc;
+	for (size_t i = 0; i < len; i++) {
+		uint8_t byte = data[i];
+		crc = (crc >> 4) ^ table[(crc ^ byte) & 0x0f];
+		crc = (crc >> 4) ^ table[(crc ^ ((uint32_t)byte >> 4)) & 0x0f];
+	}
+	return ~crc;
 }
 
-} //helper
+} //namespace helper
+
