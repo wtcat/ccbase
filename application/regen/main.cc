@@ -141,13 +141,14 @@ public:
         int16_t format = -1;
         PixelNode* payload = nullptr;
     };
-    FileResource(RGBConvertor* rgb) : rgb_impl_(rgb) {
+    FileResource(RGBConvertor* rgb, int fmt, int comp)
+        : rgb_impl_(rgb), format_(fmt), compress_(comp) {
         images_.reserve(256);
     }
     ~FileResource() {
         for (auto& iter : images_) {
             if (iter.payload != nullptr) {
-                delete iter.payload;
+                delete [] iter.payload;
                 iter.payload = nullptr;
             }
         }
@@ -158,7 +159,7 @@ public:
     int GenerateResFile(const FilePath& path);
 
 private:
-    bool FormatEnqueue(ImageNode& img, int format, int comp);
+    bool Format(ImageNode& img, int format, int comp);
     uint32_t NameHash(const uint8_t* key, uint32_t len);
 
 private:
@@ -178,7 +179,7 @@ public:
 
     void Run() OVERRIDE {
         for (size_t i = id_; i < nr_; i++)
-            fres_->FormatEnqueue(fres_->images_[i], fres_->format_, fres_->compress_);
+            fres_->Format(fres_->images_[i], fres_->format_, fres_->compress_);
         delete this;
     }
 
@@ -199,13 +200,13 @@ uint32_t FileResource::NameHash(const uint8_t* key, uint32_t len) {
 }
 
 size_t FileResource::CollectFiles(const FilePath& dir) {
-    helper::FileCollect(dir, true, "\.(jpg|jpeg|png|bmp)$", [&](const FilePath& path) {
+    helper::FileCollect(dir, true, ".*\\.(jpg|jpeg|png|bmp)$", [&](const FilePath& path) {
         images_.push_back(ImageNode(path));
         });
     return images_.size();
 }
 
-bool FileResource::FormatEnqueue(ImageNode& img, int format, int comp) {
+bool FileResource::Format(ImageNode& img, int format, int comp) {
     // Get the size of RGB format
     size_t alloc_size = rgb_impl_->GetFormatSize(format);
     if (alloc_size == 0)
@@ -224,6 +225,8 @@ bool FileResource::FormatEnqueue(ImageNode& img, int format, int comp) {
         return false;
     }
 
+    alloc_size = alloc_size * width * height;
+
     // TODO: Should to aligned allocate
     int index = comp != REFILE_COMPRESS_NONE ? 1 : 0;
     PixelNode* ptr = (PixelNode*)(new uint8_t[sizeof(PixelNode) + alloc_size * (index + 1)]);
@@ -238,11 +241,13 @@ bool FileResource::FormatEnqueue(ImageNode& img, int format, int comp) {
     }
 
     if (comp != REFILE_COMPRESS_NONE) {
-        if (!rgb_impl_->Compress(optr, alloc_size, cptr, &alloc_size, comp)) {
+        size_t dst_size = alloc_size * 2;
+        if (!rgb_impl_->Compress(optr, alloc_size, cptr, &dst_size, comp)) {
             printf("Failed to compress file(%s)\n", img.path.AsUTF8Unsafe().c_str());
             stbi_image_free(px);
             return false;
         }
+        alloc_size = dst_size;
     }
 
     ptr->width = (uint32_t)width;
@@ -291,11 +296,11 @@ FileResource& FileResource::SubmitWork(size_t nr_threads) {
 int FileResource::GenerateResFile(const FilePath& path) {
     //Sort images
     std::sort(images_.begin(), images_.end(), [](const ImageNode& a, const ImageNode& b) {
-        return a.key > b.key;
+        return a.key < b.key;
         });
 
     //Check key conflict
-    size_t bin_size = images_[0].payload->size + sizeof(PixelNode);
+    size_t bin_size = images_[0].size;
     for (size_t i = 1, j = 0; i < images_.size(); i++, j++) {
         if (images_[i].key == images_[j].key) {
             printf("Error: File(%s : %s) hash conflict\n",
@@ -303,11 +308,11 @@ int FileResource::GenerateResFile(const FilePath& path) {
                 images_[j].path.AsUTF8Unsafe().c_str());
             return false;
         }
-        bin_size += images_[i].payload->size + sizeof(PixelNode);
+        bin_size += images_[i].size;
     }
 
-    bin_size += sizeof(struct refile_header);
     bin_size += sizeof(struct refile_index) * images_.size();
+    bin_size += sizeof(struct refile_header);
 
     auto ptr = std::make_unique<uint8_t[]>(bin_size);
 
@@ -321,7 +326,7 @@ int FileResource::GenerateResFile(const FilePath& path) {
     uint32_t offset = sizeof(struct refile_header) + pheader->count * sizeof(struct refile_index);
     for (uint32_t i = 0; i < pheader->count; i++) {
         // Copy binary data
-        size_t dsize = images_[i].payload->size + sizeof(PixelNode);
+        size_t dsize = images_[i].size;
         memcpy(ptr.get() + offset, images_[i].payload, dsize);
 
         // Set binary offset and key
@@ -347,23 +352,29 @@ int main(int argc, char* argv[]) {
         CommandLine* cmdline = CommandLine::ForCurrentProcess();
         if (cmdline->HasSwitch("help")) {
             printf(
-                "lvsim "
+                "regen "
                 "[--dir=path]"
-                "[--hres=value]"
-                "[--vres=value]\n"
+                "[--out=file]\n"
+                "[--job=number]\n"
+                "[--format=value]"
+                "[--compress=value]\n"
 
                 "Options:\n"
                 "  --dir      The root directory of input files\n"
-                "  --hres     The horizontal resolution of window\n"
-                "  --vres     The vertical resolution of window\n"
+                "  --job      The number of threads\n"
+                "  --out      The output files\n"
+                "  --format   The target format((a)rgb565,(a)rgb888)\n"
+                "  --compress Compress algorithm(none, lz4)\n"
             );
 
             return 0;
         }
 
-        FilePath dir(L"source");
-        int hres = 480;
-        int vres = 480;
+        FilePath dir(L"IMG");
+        FilePath out(L"res.bin");
+        int format = PIXEL_FORMAT_RGB565;
+        int compress = REFILE_COMPRESS_LZ4;
+        int jobs = 1;
 
         if (cmdline->HasSwitch("dir"))
             dir = cmdline->GetSwitchValuePath("dir");
@@ -373,12 +384,30 @@ int main(int argc, char* argv[]) {
             return -1;
         }
 
-        if (cmdline->HasSwitch("hres"))
-            hres = std::stoi(cmdline->GetSwitchValueASCII("hres"));
+        if (cmdline->HasSwitch("out"))
+            out = cmdline->GetSwitchValuePath("out");
 
-        if (cmdline->HasSwitch("vres"))
-            vres = std::stoi(cmdline->GetSwitchValueASCII("vres"));
+        if (cmdline->HasSwitch("job")) {
+            jobs = std::stoi(cmdline->GetSwitchValueASCII("job"));
+            if (jobs == 0)
+                jobs = 1;
+        }
 
+        if (cmdline->HasSwitch("format"))
+            format = std::stoi(cmdline->GetSwitchValueASCII("format"));
+
+        if (cmdline->HasSwitch("compress"))
+            compress = std::stoi(cmdline->GetSwitchValueASCII("compress"));
+
+        RGBConvertor conv("default");
+        FileResource fres(&conv, format, compress);
+
+        if (fres.CollectFiles(dir) == 0) {
+            printf("Not found any pictures\n");
+            return -EINVAL;
+        }
+
+        return fres.SubmitWork(jobs).GenerateResFile(out);
     }
 
     return 0;
