@@ -29,14 +29,9 @@ public:
     const std::string& name() const {
         return name_;
     }
-    virtual bool Convert(const uint8_t* src, int w, int h, int channels, int* format, uint8_t* outpx) {
-    _repeat:
-        switch (*format) {
+    virtual bool Convert(const uint8_t* src, int w, int h, int channels, int format, uint8_t* outpx) {
+        switch (format) {
         case PIXEL_FORMAT_RGB888:
-            if (channels == 4) {
-                *format = PIXEL_FORMAT_ARGB888;
-                goto _repeat;
-            }
             for (int i = 0; i < w * h; i++) {
                 outpx[i * 3 + 0] = src[i * channels + 0]; // R
                 outpx[i * 3 + 1] = src[i * channels + 1]; // G
@@ -44,10 +39,6 @@ public:
             }
             break;
         case PIXEL_FORMAT_ARGB888:
-            if (channels == 3) {
-                *format = PIXEL_FORMAT_RGB888;
-                goto _repeat;
-            }
             for (int i = 0; i < w * h; i++) {
                 outpx[i * 4 + 0] = src[i * channels + 0]; // R
                 outpx[i * 4 + 1] = src[i * channels + 1]; // G
@@ -56,10 +47,6 @@ public:
             }
             break;
         case PIXEL_FORMAT_RGB565:
-            if (channels == 4) {
-                *format = PIXEL_FORMAT_ARGB565;
-                goto _repeat;
-            }
             for (int i = 0; i < w * h; i++) {
                 uint8_t r = src[i * channels + 0];
                 uint8_t g = src[i * channels + 1];
@@ -71,10 +58,6 @@ public:
             }
             break;
         case PIXEL_FORMAT_ARGB565:
-            if (channels == 3) {
-                *format = PIXEL_FORMAT_RGB565;
-                goto _repeat;
-            }
             for (int i = 0; i < w * h; i++) {
                 uint8_t r = src[i * channels + 0];
                 uint8_t g = src[i * channels + 1];
@@ -106,13 +89,40 @@ public:
         }
         return false;
     }
-    virtual size_t GetFormatSize(int format) {
-        switch (format) {
-        case PIXEL_FORMAT_RGB888: return 3;
-        case PIXEL_FORMAT_ARGB888: return 4;
-        case PIXEL_FORMAT_RGB565: return 2;
-        case PIXEL_FORMAT_ARGB565: return 3;
-        default: return 0;
+    virtual size_t GetFormatSize(int *format, int channel) {
+        bool alpha = channel == 4;
+    _repeat:
+        switch (*format) {
+        case PIXEL_FORMAT_RGB888:
+            if (alpha) {
+                *format = PIXEL_FORMAT_ARGB888;
+                goto _repeat;
+            }
+            return 3;
+
+        case PIXEL_FORMAT_ARGB888:
+            if (!alpha) {
+                *format = PIXEL_FORMAT_RGB888;
+                goto _repeat;
+            }
+            return 4;
+
+        case PIXEL_FORMAT_RGB565:
+            if (alpha) {
+                *format = PIXEL_FORMAT_ARGB565;
+                goto _repeat;
+            }
+            return 2;
+
+        case PIXEL_FORMAT_ARGB565: 
+            if (!alpha) {
+                *format = PIXEL_FORMAT_RGB565;
+                goto _repeat;
+            }
+            return 3;
+
+        default: 
+            return 0;
         }
     }
 
@@ -128,12 +138,13 @@ private:
 class FileResource {
 public:
     typedef struct refile_data PixelNode;
+    enum { kMaxFileName = 64 };
     struct FileNode {
         FileNode(const FilePath& p) : path(p) {}
         FilePath path;
         size_t   size = 0;
         uint32_t key = 0;
-
+        char     keyname[kMaxFileName] = {};
     };
     struct ImageNode : public FileNode {
         ImageNode(const FilePath& p) : FileNode(p) {}
@@ -207,11 +218,6 @@ size_t FileResource::CollectFiles(const FilePath& dir) {
 }
 
 bool FileResource::Format(ImageNode& img, int format, int comp) {
-    // Get the size of RGB format
-    size_t alloc_size = rgb_impl_->GetFormatSize(format);
-    if (alloc_size == 0)
-        return false;
-
     if (img.format >= 0)
         format = img.format;
     if (img.compress >= 0)
@@ -225,6 +231,11 @@ bool FileResource::Format(ImageNode& img, int format, int comp) {
         return false;
     }
 
+    // Get the size of RGB format
+    size_t alloc_size = rgb_impl_->GetFormatSize(&format, channels);
+    if (alloc_size == 0)
+        return false;
+
     alloc_size = alloc_size * width * height;
 
     // TODO: Should to aligned allocate
@@ -234,7 +245,7 @@ bool FileResource::Format(ImageNode& img, int format, int comp) {
     uint8_t* optr = cptr + alloc_size * index;
 
     // Convert pixel format
-    if (!rgb_impl_->Convert(px, width, height, channels, &format, optr)) {
+    if (!rgb_impl_->Convert(px, width, height, channels, format, optr)) {
         printf("Failed to convert file(%s)\n", img.path.AsUTF8Unsafe().c_str());
         stbi_image_free(px);
         return false;
@@ -256,8 +267,13 @@ bool FileResource::Format(ImageNode& img, int format, int comp) {
     ptr->format = (uint16_t)format;
     ptr->compress = (uint16_t)comp;
 
-    std::string name = img.path.BaseName().AsUTF8Unsafe();
+    // Extract base name and convert to Upper
+    std::string name = img.path.BaseName().RemoveExtension().AsUTF8Unsafe();
+    std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) 
+        { return std::toupper(c); });
+
     img.key = NameHash((uint8_t*)name.c_str(), (uint32_t)name.size());
+    std::strncpy(img.keyname, name.c_str(), kMaxFileName - 1);
     img.size = sizeof(PixelNode) + alloc_size;
     img.payload = ptr;
 
@@ -332,15 +348,24 @@ int FileResource::GenerateResFile(const FilePath& path) {
         // Set binary offset and key
         pheader->indexs[i].namekey = images_[i].key;
         pheader->indexs[i].offset = offset;
+        pheader->indexs[i].size = (uint32_t)dsize;
 
         // Update data offset
         offset += (uint32_t)dsize;
     }
 
-    pheader->chksum = helper::crc32_ieee_update(0,
+    pheader->chksum = helper::crc32_ieee_update(
+        0,
         ptr.get() + sizeof(struct refile_header),
         offset - sizeof(struct refile_header));
-    return file_util::WriteFile(path, (const char*)ptr.get(), offset);
+
+    /* Flush to binary file */
+    int err = file_util::WriteFile(path, (const char*)ptr.get(), offset);
+    if (err < 0)
+        return err;
+
+    /* Generate symbol file */
+    return err;
 }
 
 } //namespace
@@ -374,7 +399,7 @@ int main(int argc, char* argv[]) {
         FilePath out(L"res.bin");
         int format = PIXEL_FORMAT_RGB565;
         int compress = REFILE_COMPRESS_LZ4;
-        int jobs = 1;
+        int jobs = 2;
 
         if (cmdline->HasSwitch("dir"))
             dir = cmdline->GetSwitchValuePath("dir");
@@ -388,9 +413,9 @@ int main(int argc, char* argv[]) {
             out = cmdline->GetSwitchValuePath("out");
 
         if (cmdline->HasSwitch("job")) {
-            jobs = std::stoi(cmdline->GetSwitchValueASCII("job"));
-            if (jobs == 0)
-                jobs = 1;
+            int nr_jobs = std::stoi(cmdline->GetSwitchValueASCII("job"));
+            if (nr_jobs != 0)
+                jobs = nr_jobs;
         }
 
         if (cmdline->HasSwitch("format"))

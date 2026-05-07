@@ -29,6 +29,7 @@ enum refile_comp {
 struct refile_index {
 	uint32_t namekey;
 	uint32_t offset;
+	uint32_t size;
 };
 
 struct refile_header {
