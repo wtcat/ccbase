@@ -172,6 +172,7 @@ public:
 private:
     bool Format(ImageNode& img, int format, int comp);
     uint32_t NameHash(const uint8_t* key, uint32_t len);
+    int GenerateImageSymbol(const FilePath& path);
 
 private:
     friend class Worker;
@@ -208,6 +209,33 @@ uint32_t FileResource::NameHash(const uint8_t* key, uint32_t len) {
         hash ^= (uint32_t)(*key);
     }
     return hash;
+}
+
+int FileResource::GenerateImageSymbol(const FilePath& path) {
+    FilePath filename = path.RemoveExtension().AddExtension(L".h");
+   
+    std::sort(images_.begin(), images_.end(), [](const ImageNode& a, const ImageNode& b) {
+        return std::strcmp(a.keyname, b.keyname) < 0;
+        });
+
+    std::string buf;
+    buf.reserve(4096);
+    std::string header = filename.BaseName().RemoveExtension().AsUTF8Unsafe();
+    std::transform(header.begin(), header.end(), header.begin(), [](unsigned char c)
+        { return std::toupper(c); });
+
+    char temp[256];
+    snprintf(temp, sizeof(temp), "#ifndef %s_H_\n#define %s_H_\n\n", 
+        header.c_str(), header.c_str());
+    buf.append(temp);
+
+    for (const auto& iter : images_) {
+        snprintf(temp, sizeof(buf), "#define %s 0x%x\n", iter.keyname, iter.key);
+        buf.append(temp);
+    }
+    buf.append("\n#endif");
+
+    return file_util::WriteFile(filename, buf.data(), (int)buf.size());
 }
 
 size_t FileResource::CollectFiles(const FilePath& dir) {
@@ -365,7 +393,7 @@ int FileResource::GenerateResFile(const FilePath& path) {
         return err;
 
     /* Generate symbol file */
-    return err;
+    return GenerateImageSymbol(path);
 }
 
 } //namespace
