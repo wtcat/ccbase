@@ -3,6 +3,7 @@ set(TARGET_NAME regen)
 
 add_executable(${TARGET_NAME}
     main.cc
+    resource_loader.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../helper/utils.cc
 )
 
