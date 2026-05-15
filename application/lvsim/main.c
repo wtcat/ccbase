@@ -2,15 +2,23 @@
  * Copyright 2025 wtcat 
  */
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "driver/simulator.h"
 #include "driver/file_watcher.h"
 #include "lvgl/lvgl.h"
+#include "lvgl/src/misc/lv_event.h"
 
 #include "lvgl/src/core/lv_obj_private.h"
 #undef main
+
+#include "resource_file.h"
+
+static uint8_t static_buffer[10 * 1024 * 1024];
+static struct refile_header* res_area = (void *)static_buffer;
 
 #if 0
 static void reload_view(void) {
@@ -180,6 +188,29 @@ static void ui_lvgen__view_red_border_style_init(lv_style_t* style) {
 
 static lv_obj_t* ui_lvgen__view_create(lv_obj_t* parent, lv_view__private_t* priv) {
 
+    struct refile_data* pimg = (struct refile_data*)((char*)res_area + res_area->indexs[20].offset);
+    static lv_image_dsc_t dsc;
+
+    for (uint32_t i = 0; i < res_area->count; i++) {
+        if (res_area->indexs[i].namekey == 0x4765c6e2) {
+            pimg = (struct refile_data*)((char*)res_area + res_area->indexs[i].offset);
+            break;
+        }
+    }
+
+    dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
+    dsc.header.cf = LV_COLOR_FORMAT_RGB565;
+    dsc.header.w = pimg->width;
+    dsc.header.h = pimg->height;
+    dsc.data_size = pimg->size;
+    dsc.data = (uint8_t *)(pimg + 1);
+
+    lv_obj_t* img = lv_image_create(parent);
+    lv_obj_set_pos(img, 0, 0);
+    lv_image_set_src(img, &dsc);
+
+    return parent;
+
     lv_obj_t* obj_0 = lv_obj_create(parent);
     lv_obj_set_width(obj_0, 380);
     lv_obj_set_height(obj_0, LV_SIZE_CONTENT);
@@ -251,6 +282,8 @@ static lv_obj_t* ui_lvgen__view_create(lv_obj_t* parent, lv_view__private_t* pri
     lv_label_set_text(label_4, "Hello");
     lv_label_set_long_mode(label_4, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 
+
+
     return obj_0;
 }
 
@@ -261,7 +294,19 @@ static void view_init(void) {
 }
 
 int main(int argc, char* argv[]) {
-	lvgl_runloop(400, 400, view_init, NULL);
+    FILE *fp = fopen("res.bin", "rb");
+    if (fp == NULL)
+        return -1;
+
+    fseek(fp, 0, SEEK_END);
+    size_t file_size = ftell(fp);
+    rewind(fp);
+
+    assert(file_size < sizeof(static_buffer));
+    fread(res_area, 1, file_size, fp);
+    fclose(fp);
+
+	lvgl_runloop(400, 400, view_init, NULL, NULL);
 	return 0;
 }
 #endif

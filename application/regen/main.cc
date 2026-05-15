@@ -426,7 +426,7 @@ int main(int argc, char* argv[]) {
         FilePath dir(L"IMG");
         FilePath out(L"res.bin");
         int format = PIXEL_FORMAT_RGB565;
-        int compress = REFILE_COMPRESS_LZ4;
+        int compress = REFILE_COMPRESS_NONE;
         int jobs = 2;
 
         if (cmdline->HasSwitch("dir"))

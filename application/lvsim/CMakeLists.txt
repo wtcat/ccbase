@@ -39,8 +39,8 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 
 add_executable(${PROJECT_NAME}
-#	main.c
-	main.cc
+	main.c
+#	main.cc
 )
 
 include(cmake/lvgl.cmake)
