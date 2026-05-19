@@ -30,6 +30,7 @@ struct refile_index {
 	uint32_t namekey;
 	uint32_t offset;
 	uint32_t size;
+#define REFILE_GROUP_F 0x80000000
 };
 
 struct refile_header {
@@ -44,11 +45,20 @@ struct refile_header {
 struct refile_data {
 	uint32_t width;
 	uint32_t height;
-	uint32_t size;   /* Compressed size */
-	uint16_t format;
-	uint16_t compress;
+	uint32_t size;
+
+#ifndef _CPU_BIG_ENDIAN
+	uint32_t format : 6;
+	uint32_t compress : 2;
+	uint32_t count : 24;
+#else
+	uint32_t count : 24;
+	uint32_t compress : 2;
+	uint32_t format : 6;
+#endif
 	char     data[];
 };
+
 #pragma pack(pop)
 
 #ifdef __cplusplus

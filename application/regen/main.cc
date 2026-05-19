@@ -2,11 +2,10 @@
  * Copyright 2026 wtcat
  */
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <thirdparty/stb/stb_image.h>
-
 #include "application/regen/resource_file.h"
 #include "application/helper/utils.h"
+
+#include "sys/queue.h"
 
 #include "base/bind.h"
 #include "base/at_exit.h"
@@ -20,6 +19,9 @@
 #include "base/threading/simple_thread.h"
 
 #include "thirdparty/lz4/lib/lz4.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "thirdparty/stb/stb_image.h"
 
 namespace {
 
@@ -139,31 +141,52 @@ class FileResource {
 public:
     typedef struct refile_data PixelNode;
     enum { kMaxFileName = 64 };
+    enum { kImageFileNode = 1, kImageGroupFileNode = 2 };
+
     struct FileNode {
-        FileNode(const FilePath& p) : path(p) {}
+        FileNode(const FilePath& p, int ftype) : path(p), type(ftype) {}
+        TAILQ_ENTRY(FileNode) link = {};
         FilePath path;
-        size_t   size = 0;
         uint32_t key = 0;
+        int      type = 0;
         char     keyname[kMaxFileName] = {};
+        void*    payload = nullptr;
+        size_t   size = 0;
     };
-    struct ImageNode : public FileNode {
-        ImageNode(const FilePath& p) : FileNode(p) {}
+
+    struct ImageNode : public FileNode, public base::RefCountedThreadSafe<ImageNode> {
+        ImageNode(const FilePath& p) : FileNode(p, kImageFileNode) {}
         int16_t compress = -1;
         int16_t format = -1;
-        PixelNode* payload = nullptr;
     };
+
+    struct ImageGroup : public FileNode, public base::RefCountedThreadSafe<ImageGroup> {
+        ImageGroup(const FilePath& path) : FileNode(path, kImageGroupFileNode) {
+            images.reserve(32);
+        }
+        const std::vector<const ImageNode*>& sort_by_name() {
+            std::sort(images.begin(), images.end(),
+                [](const ImageNode* a, const ImageNode* b) {
+                    return std::strcmp(a->keyname, b->keyname) < 0;
+                });
+            return images;
+        }
+        const std::vector<const ImageNode*>& sort_by_key() {
+            std::sort(images.begin(), images.end(),
+                [](const ImageNode* a, const ImageNode* b) {
+                    return a->key < b->key;
+                });
+            return images;
+        }
+
+        std::vector<const ImageNode*> images;
+    };
+
     FileResource(RGBConvertor* rgb, int fmt, int comp)
         : rgb_impl_(rgb), format_(fmt), compress_(comp) {
         images_.reserve(256);
     }
-    ~FileResource() {
-        for (auto& iter : images_) {
-            if (iter.payload != nullptr) {
-                delete [] iter.payload;
-                iter.payload = nullptr;
-            }
-        }
-    }
+    ~FileResource() = default;
 
     size_t CollectFiles(const FilePath& dir);
     FileResource& SubmitWork(size_t nr_threads);
@@ -174,11 +197,19 @@ private:
     uint32_t NameHash(const uint8_t* key, uint32_t len);
     int GenerateImageSymbol(const FilePath& path);
 
+    scoped_refptr<ImageGroup> CreateImageGroup(const FilePath& group_path) {
+        scoped_refptr<ImageGroup> group(new ImageGroup(group_path));
+        groups_.push_back(group);
+        return group;
+    }
+
 private:
     friend class Worker;
     DISALLOW_COPY_AND_ASSIGN(FileResource);
-    std::vector<ImageNode> images_;
+    std::vector<scoped_refptr<ImageNode>> images_;
+    std::vector<scoped_refptr<ImageGroup>> groups_;
     RGBConvertor* rgb_impl_;
+    TAILQ_HEAD(, FileNode) top_list_ = TAILQ_HEAD_INITIALIZER(top_list_);
     int format_ = 0;
     int compress_ = 0;
 };
@@ -191,7 +222,7 @@ public:
 
     void Run() OVERRIDE {
         for (size_t i = id_; i < nr_; i++)
-            fres_->Format(fres_->images_[i], fres_->format_, fres_->compress_);
+            fres_->Format(*fres_->images_[i].get(), fres_->format_, fres_->compress_);
         delete this;
     }
 
@@ -214,8 +245,9 @@ uint32_t FileResource::NameHash(const uint8_t* key, uint32_t len) {
 int FileResource::GenerateImageSymbol(const FilePath& path) {
     FilePath filename = path.RemoveExtension().AddExtension(L".h");
    
-    std::sort(images_.begin(), images_.end(), [](const ImageNode& a, const ImageNode& b) {
-        return std::strcmp(a.keyname, b.keyname) < 0;
+    std::sort(images_.begin(), images_.end(), 
+        [](const scoped_refptr<ImageNode>& a, const scoped_refptr<ImageNode>& b) {
+            return std::strcmp(a.get()->keyname, b.get()->keyname) < 0;
         });
 
     std::string buf;
@@ -230,7 +262,7 @@ int FileResource::GenerateImageSymbol(const FilePath& path) {
     buf.append(temp);
 
     for (const auto& iter : images_) {
-        snprintf(temp, sizeof(buf), "#define %s 0x%x\n", iter.keyname, iter.key);
+        snprintf(temp, sizeof(buf), "#define %s 0x%x\n", iter.get()->keyname, iter.get()->key);
         buf.append(temp);
     }
     buf.append("\n#endif");
@@ -240,7 +272,9 @@ int FileResource::GenerateImageSymbol(const FilePath& path) {
 
 size_t FileResource::CollectFiles(const FilePath& dir) {
     helper::FileCollect(dir, true, ".*\\.(jpg|jpeg|png|bmp)$", [&](const FilePath& path) {
-        images_.push_back(ImageNode(path));
+        scoped_refptr<ImageNode> ptr(new ImageNode(path));
+        images_.push_back(ptr);
+        TAILQ_INSERT_TAIL(&top_list_, ptr.get(), link);
         });
     return images_.size();
 }
@@ -303,7 +337,7 @@ bool FileResource::Format(ImageNode& img, int format, int comp) {
     img.key = NameHash((uint8_t*)name.c_str(), (uint32_t)name.size());
     std::strncpy(img.keyname, name.c_str(), kMaxFileName - 1);
     img.size = sizeof(PixelNode) + alloc_size;
-    img.payload = ptr;
+    img.payload = (void *)ptr;
 
     return true;
 }
@@ -339,20 +373,21 @@ FileResource& FileResource::SubmitWork(size_t nr_threads) {
 
 int FileResource::GenerateResFile(const FilePath& path) {
     //Sort images
-    std::sort(images_.begin(), images_.end(), [](const ImageNode& a, const ImageNode& b) {
-        return a.key < b.key;
+    std::sort(images_.begin(), images_.end(), 
+        [](const scoped_refptr<ImageNode> &a, const scoped_refptr<ImageNode> &b) {
+            return a.get()->key < b.get()->key;
         });
 
     //Check key conflict
-    size_t bin_size = images_[0].size;
+    size_t bin_size = images_[0].get()->size;
     for (size_t i = 1, j = 0; i < images_.size(); i++, j++) {
-        if (images_[i].key == images_[j].key) {
+        if (images_[i].get()->key == images_[j].get()->key) {
             printf("Error: File(%s : %s) hash conflict\n",
-                images_[i].path.AsUTF8Unsafe().c_str(),
-                images_[j].path.AsUTF8Unsafe().c_str());
+                images_[i].get()->path.AsUTF8Unsafe().c_str(),
+                images_[j].get()->path.AsUTF8Unsafe().c_str());
             return false;
         }
-        bin_size += images_[i].size;
+        bin_size += images_[i].get()->size;
     }
 
     bin_size += sizeof(struct refile_index) * images_.size();
@@ -370,11 +405,11 @@ int FileResource::GenerateResFile(const FilePath& path) {
     uint32_t offset = sizeof(struct refile_header) + pheader->count * sizeof(struct refile_index);
     for (uint32_t i = 0; i < pheader->count; i++) {
         // Copy binary data
-        size_t dsize = images_[i].size;
-        memcpy(ptr.get() + offset, images_[i].payload, dsize);
+        size_t dsize = images_[i].get()->size;
+        memcpy(ptr.get() + offset, images_[i].get()->payload, dsize);
 
         // Set binary offset and key
-        pheader->indexs[i].namekey = images_[i].key;
+        pheader->indexs[i].namekey = images_[i].get()->key;
         pheader->indexs[i].offset = offset;
         pheader->indexs[i].size = (uint32_t)dsize;
 
@@ -411,6 +446,7 @@ int main(int argc, char* argv[]) {
                 "[--job=number]\n"
                 "[--format=value]"
                 "[--compress=value]\n"
+                "[--group=dir1,dir2,...]\n"
 
                 "Options:\n"
                 "  --dir      The root directory of input files\n"
@@ -418,6 +454,7 @@ int main(int argc, char* argv[]) {
                 "  --out      The output files\n"
                 "  --format   The target format((a)rgb565,(a)rgb888)\n"
                 "  --compress Compress algorithm(none, lz4)\n"
+                "  --group    The group of resource file\n"
             );
 
             return 0;
