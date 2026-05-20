@@ -26,11 +26,15 @@ enum refile_comp {
 
 #pragma pack(push)
 #pragma pack(1)
+
+#define REFILE_INDEX_SIZE_GROUP_F 0x80000000
+#define REFILE_INDEX_BASE \
+	uint32_t offset; \
+	uint32_t size;
+
 struct refile_index {
 	uint32_t namekey;
-	uint32_t offset;
-	uint32_t size;
-#define REFILE_GROUP_F 0x80000000
+	REFILE_INDEX_BASE
 };
 
 struct refile_header {
@@ -57,6 +61,17 @@ struct refile_data {
 	uint32_t format : 6;
 #endif
 	char     data[];
+};
+
+struct refile_bindex {
+	REFILE_INDEX_BASE
+};
+
+struct refile_group {
+#define REFILE_GROUP_MAGIC 0xFCFCFCFC
+	uint32_t magic;
+	uint32_t count;
+	struct refile_bindex indexs[];
 };
 
 #pragma pack(pop)
