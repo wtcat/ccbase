@@ -1,6 +1,7 @@
 ﻿/*
  * Copyright 2026 wtcat
  */
+#include <assert.h>
 
 #include "application/regen/resource_file.h"
 #include "application/helper/utils.h"
@@ -22,6 +23,8 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "thirdparty/stb/stb_image.h"
+
+#define ROUND_UP_ADD(x, y, a) (((x) + (y) + (a) - 1) & ~((a) - 1))
 
 namespace {
 
@@ -168,7 +171,7 @@ public:
             images.reserve(32);
             
             keyname = path.BaseName().AsUTF8Unsafe();
-            key = FileResource::NameHash((const uint8_t *)keyname.c_str(), keyname.size());
+            key = FileResource::NameHash((const uint8_t *)keyname.c_str(), (uint32_t)keyname.size());
         }
         const std::vector<const ImageNode*>& sort_by_name() {
             std::sort(images.begin(), images.end(),
@@ -486,15 +489,38 @@ int FileResource::GenerateResFile(const FilePath& path) {
         size_t dsize;
         if (item->type == kImageFileNode) {
             dsize = item->size;
+
             // Fill binary data
             memcpy(ptr.get() + offset, item->payload, dsize);
-            offset += (uint32_t)dsize; 
         } else {
             ImageGroup* group = (ImageGroup*)item;
-            dsize = group->header_size();
+            size_t group_header_size = group->header_size();
+            auto group_mem = std::make_unique<uint8_t[]>(group_header_size);
+            struct refile_group* group_header = (struct refile_group*)group_mem.get();
+            uint32_t i_offset = (uint32_t)group_header_size;
+            
+            /* Fill group header */
+            group_header->magic = REFILE_GROUP_MAGIC;
+            group_header->count = (uint32_t)group->images.size();
 
+            for (uint32_t i = 0; i < group_header->count; i++) {
+                size_t item_size = group->images[i]->size;
+                group_header->indexs[i].offset = i_offset;
+                group_header->indexs[i].size = (uint32_t)item_size;
 
+                /* Copy payload to buffer */
+                memcpy(ptr.get() + offset + i_offset, group->images[i]->payload, item_size);
+                i_offset += (uint32_t)item_size;
+            }
+
+            /* Copy header to buffer */
+            memcpy(ptr.get() + offset, group_header, group_header_size);
+            dsize = group->binary_size();
+            assert(i_offset == (uint32_t)dsize);
         }
+
+        // Update offset
+        offset += (uint32_t)dsize;
 
         // Set binary offset and key
         pheader->indexs[item_offset].namekey = item->key;
@@ -504,20 +530,7 @@ int FileResource::GenerateResFile(const FilePath& path) {
         item_offset++;
     }
 
-    for (uint32_t i = 0; i < pheader->count; i++) {
-        // Copy binary data
-        size_t dsize = images_[i].get()->size;
-        memcpy(ptr.get() + offset, images_[i].get()->payload, dsize);
-
-        // Set binary offset and key
-        pheader->indexs[i].namekey = images_[i].get()->key;
-        pheader->indexs[i].offset = offset;
-        pheader->indexs[i].size = (uint32_t)dsize;
-
-        // Update data offset
-        offset += (uint32_t)dsize;
-    }
-
+    assert(offset == bin_size);
     pheader->chksum = helper::crc32_ieee_update(
         0,
         ptr.get() + sizeof(struct refile_header),
