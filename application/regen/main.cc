@@ -35,7 +35,7 @@ int main(int argc, char* argv[]) {
                 "  --out      The output files\n"
                 "  --format   The target format((a)rgb565,(a)rgb888)\n"
                 "  --compress Compress algorithm(none, lz4)\n"
-                "  --group    The group of resource file\n"
+                "  --groups   The group of resource file\n"
                 "  --verbose  Output log detials\n"
             );
 
@@ -82,7 +82,6 @@ int main(int argc, char* argv[]) {
                 fres.CreateImageGroup(dir.AppendASCII(iter));
         }
 
-        //fres.CreateImageGroup(dir.AppendASCII("health")); //TODO: REMOVE
         fres.SetVerbose(cmdline->HasSwitch("verbose"));
         if (fres.CollectFiles(dir) == 0) {
             printf("Not found any pictures\n");
