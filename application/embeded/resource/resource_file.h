@@ -15,6 +15,7 @@ enum refile_pixelformat {
 	PIXEL_FORMAT_ARGB888, /* Argb888 */
 	PIXEL_FORMAT_RGB565,  /* rgb565  */
 	PIXEL_FORMAT_ARGB565, /* argb565 */
+	PIXEL_FORMAT_INDEXED8, /* indexed8 */
 };
 
 enum refile_comp {
@@ -26,10 +27,16 @@ enum refile_comp {
 
 #pragma pack(push)
 #pragma pack(1)
+
+#define REFILE_INDEX_SIZE_GROUP_F (0x80000000)
+#define REFILE_INDEX_SIZE_MASK    (0x7FFFFFFF)
+#define REFILE_INDEX_BASE \
+	uint32_t offset; \
+	uint32_t size;
+
 struct refile_index {
 	uint32_t namekey;
-	uint32_t offset;
-	uint32_t size;
+	REFILE_INDEX_BASE
 };
 
 struct refile_header {
@@ -44,11 +51,32 @@ struct refile_header {
 struct refile_data {
 	uint32_t width;
 	uint32_t height;
-	uint32_t size;   /* Compressed size */
-	uint16_t format;
-	uint16_t compress;
+	uint32_t size;
+
+#ifndef _CPU_BIG_ENDIAN
+	uint32_t format : 6;
+	uint32_t compress : 2;
+	uint32_t count : 24;
+#else
+	uint32_t count : 24;
+	uint32_t compress : 2;
+	uint32_t format : 6;
+#endif
 	char     data[];
 };
+
+struct refile_bindex {
+	REFILE_INDEX_BASE
+};
+
+struct refile_group {
+#define REFILE_GROUP_MAGIC 0xFCFCFCFC
+	uint32_t magic;
+	uint32_t count;
+	uint32_t offset;
+	struct refile_bindex indexs[];
+};
+
 #pragma pack(pop)
 
 #ifdef __cplusplus

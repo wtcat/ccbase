@@ -22,5 +22,16 @@ uint32_t crc32_ieee_update(uint32_t crc, const uint8_t* data, size_t len) {
 	return ~crc;
 }
 
+std::vector<std::string> StringSplit(const std::string& s, char delim) {
+	std::vector<std::string> result;
+	size_t start = 0, pos;
+	while ((pos = s.find(delim, start)) != std::string::npos) {
+		result.emplace_back(s, start, pos - start);
+		start = pos + 1;
+	}
+	result.emplace_back(s, start);  // last token
+	return result;
+}
+
 } //namespace helper
 

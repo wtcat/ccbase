@@ -1,5 +1,7 @@
 # Application
+include_directories(.)
 
+add_subdirectory(embeded)
 add_subdirectory(lvgen)
 add_subdirectory(lvsim)
 add_subdirectory(codegen)

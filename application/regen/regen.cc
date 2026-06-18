@@ -1,0 +1,343 @@
+// Copyright 2026 wtcat
+
+#include "embeded/resource/resource_file.h"
+#include "application/helper/utils.h"
+
+#include <algorithm>
+#include "base/file_util.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include "thirdparty/stb/stb_image.h"
+
+#include "regen.h"
+#include "reconv.h"
+
+bool FileResource::NaturalLess(const std::string& a, const std::string& b) {
+    size_t i = 0, j = 0;
+    while (i < a.size() && j < b.size()) {
+        unsigned char ca = a[i], cb = b[j];
+        if (std::isdigit(ca) && std::isdigit(cb)) {
+            size_t za = i, zb = j;
+            while (i < a.size() && a[i] == '0') ++i;
+            while (j < b.size() && b[j] == '0') ++j;
+
+            size_t sa = i, sb = j;
+            while (i < a.size() && std::isdigit((unsigned char)a[i])) ++i;
+            while (j < b.size() && std::isdigit((unsigned char)b[j])) ++j;
+            size_t la = i - sa, lb = j - sb;
+            if (la != lb) return la < lb;
+            if (int c = a.compare(sa, la, b, sb, lb)) return c < 0;
+            if ((i - za) != (j - zb)) return (i - za) < (j - zb);
+        }
+        else {
+            if (ca != cb) return ca < cb;
+            ++i; ++j;
+        }
+    }
+    return (a.size() - i) < (b.size() - j);
+}
+
+uint32_t FileResource::NameHash(const uint8_t* key, uint32_t len) {
+    uint32_t hash = 0;
+    for (const uint8_t* end = key + len;
+        key < end; key++) {
+        hash *= 16777619;
+        hash ^= (uint32_t)(*key);
+    }
+    return hash;
+}
+
+void FileResource::FillImageGroup() {
+    for (const auto iter : images_) {
+        if (iter->id >= 0)
+            groups_[iter->id].get()->images.push_back((ImageNode*)iter);
+    }
+    for (auto iter : groups_)
+        iter->sort_by_name();
+}
+
+bool FileResource::CheckConflict() {
+    std::vector<FileNode*>& sort_vector = sort_vector_;
+    std::sort(sort_vector.begin(), sort_vector.end(),
+        [](const FileNode* a, const FileNode* b) {
+            return a->key < b->key;
+        });
+
+    const FileNode* old_node = sort_vector[0];
+    for (size_t i = 1; i < sort_vector.size(); i++) {
+        if (sort_vector[i]->key == old_node->key) {
+            printf("Error: File(%s : %s) hash conflict\n",
+                old_node->path.AsUTF8Unsafe().c_str(),
+                sort_vector[i]->path.AsUTF8Unsafe().c_str());
+            return false;
+        }
+        old_node = sort_vector[i];
+    }
+    return true;
+}
+
+void FileResource::CollectNodes(FileNodeList* list) {
+    std::vector<FileNode*>& sort_vector = sort_vector_;
+    for (auto iter : sort_vector) {
+        if (iter->type == kImageFileNode) {
+            if (iter->id < 0)
+                TAILQ_INSERT_TAIL(list, iter, link);
+        }
+        else {
+            TAILQ_INSERT_TAIL(list, iter, link);
+        }
+    }
+}
+
+int FileResource::GenerateImageSymbol(const FilePath& path) {
+    FilePath filename = path.RemoveExtension().AddExtension(L".h");
+    std::string header = filename.BaseName().RemoveExtension().AsUTF8Unsafe();
+    std::transform(header.begin(), header.end(), header.begin(), [](unsigned char c)
+        { return std::toupper(c); });
+
+    char temp[256];
+    snprintf(temp, sizeof(temp), "#ifndef %s_H_\n#define %s_H_\n\n",
+        header.c_str(), header.c_str());
+
+    std::string buf;
+    buf.reserve(4096);
+    buf.append(temp);
+
+    FileNodeList list = TAILQ_HEAD_INITIALIZER(list);
+    std::sort(sort_vector_.begin(), sort_vector_.end(),
+        [](const FileNode* a, const FileNode* b) {
+            return FileResource::NaturalLess(a->keyname, b->keyname);
+        });
+    CollectNodes(&list);
+
+    FileNode* iter;
+    TAILQ_FOREACH(iter, &list, link) {
+        snprintf(temp, sizeof(buf), "#define %s 0x%x\n", iter->keyname.c_str(), iter->key);
+        buf.append(temp);
+    }
+    buf.append("\n#endif");
+
+    return file_util::WriteFile(filename, buf.data(), (int)buf.size());
+}
+
+size_t FileResource::CollectFiles(const FilePath& dir) {
+    helper::FileCollect(dir, true, ".*\\.(jpg|jpeg|png|bmp)$", [&](const FilePath& path) {
+        scoped_refptr<ImageNode> ptr(new ImageNode(path));
+        images_.push_back(ptr);
+        });
+    return images_.size();
+}
+
+bool FileResource::Format(ImageNode& img, int format, int comp) {
+    if (img.format >= 0)
+        format = img.format;
+    if (img.compress >= 0)
+        comp = img.compress;
+
+    // Load picture RGB channels 
+    int width, height, channels, req_channels = (format == PIXEL_FORMAT_INDEXED8) ? 4 : 0;
+    uint8_t* px = stbi_load(img.path.AsUTF8Unsafe().c_str(), &width, &height, &channels, req_channels);
+    if (!px) {
+        printf("stb error: %s", stbi_failure_reason());
+        return false;
+    }
+
+    // Get the size of RGB format
+    size_t alloc_size = rgb_impl_->GetFormatSize(&format, channels);
+    if (alloc_size == 0)
+        return false;
+
+    alloc_size = alloc_size * width * height;
+
+    // TODO: Should to aligned allocate
+    int index = comp != REFILE_COMPRESS_NONE ? 1 : 0;
+    PixelNode* ptr = (PixelNode*)(new uint8_t[sizeof(PixelNode) + alloc_size * (index + 1)]);
+    uint8_t* cptr = (uint8_t*)(ptr + 1);
+    uint8_t* optr = cptr + alloc_size * index;
+
+    // Convert pixel format
+    bool okay = rgb_impl_->Convert(px, width, height, channels, format, optr);
+    stbi_image_free(px);
+    if (!okay) {
+        printf("Failed to convert file(%s)\n", img.path.AsUTF8Unsafe().c_str());
+        return false;
+    }
+
+    if (comp != REFILE_COMPRESS_NONE) {
+        size_t dst_size = alloc_size * 2;
+        if (!rgb_impl_->Compress(optr, alloc_size, cptr, &dst_size, comp)) {
+            printf("Failed to compress file(%s)\n", img.path.AsUTF8Unsafe().c_str());
+            return false;
+        }
+        alloc_size = dst_size;
+    }
+
+    ptr->width = (uint32_t)width;
+    ptr->height = (uint32_t)height;
+    ptr->size = (uint32_t)alloc_size;
+    ptr->format = (uint16_t)format;
+    ptr->compress = (uint16_t)comp;
+
+    // Extract base name and convert to Upper
+    img.keyname = img.path.BaseName().RemoveExtension().AsUTF8Unsafe();
+    std::transform(img.keyname.begin(), img.keyname.end(), img.keyname.begin(),
+        [](unsigned char c) {
+            return std::toupper(c);
+        });
+
+    img.key = NameHash((uint8_t*)img.keyname.c_str(), (uint32_t)img.keyname.size());
+    img.size = sizeof(PixelNode) + alloc_size;
+    img.payload = (void*)ptr;
+
+    return true;
+}
+
+FileResource& FileResource::SubmitWork(size_t nr_threads) {
+    if (nr_threads > 8)
+        nr_threads = 8;
+
+    size_t nr_images = images_.size();
+    size_t avg = nr_images / nr_threads;
+    if (nr_images % nr_threads)
+        avg++;
+
+    //Dispatch works
+    base::DelegateSimpleThreadPool thread_pool("refile", (int)nr_threads);
+    for (size_t i = 0, next = 0; i < nr_threads; i++) {
+        size_t end = next + avg;
+        if (end > nr_images)
+            end = nr_images;
+        thread_pool.AddWork(new Worker(this, next, end));
+        if (end == nr_images)
+            break;
+
+        next = end;
+    }
+    thread_pool.Start();
+
+    //Waiting for worker complete
+    thread_pool.JoinAll();
+
+    return *this;
+}
+
+int FileResource::GenerateResFile(const FilePath& path) {
+    //Fill sort vector
+    sort_vector_.reserve(images_.size() + groups_.size());
+    for (const auto iter : images_)
+        sort_vector_.push_back(iter.get());
+    for (auto iter : groups_)
+        sort_vector_.push_back(iter.get());
+
+    if (!CheckConflict())
+        return -EINVAL;
+
+    // File group
+    FillImageGroup();
+
+    // Sort images
+    FileNodeList list = TAILQ_HEAD_INITIALIZER(list);
+    CollectNodes(&list);
+
+    // Update group size
+    for (auto iter : groups_)
+        iter->size = iter->binary_size();
+
+    // Calculate binary size
+    size_t bin_size = 0;
+    size_t nitems = 0;
+    FileNode* item;
+    TAILQ_FOREACH(item, &list, link) {
+        bin_size += item->size;
+        nitems++;
+    }
+    bin_size += sizeof(struct refile_index) * nitems;
+    bin_size += sizeof(struct refile_header);
+
+    // Allocate memory for binary file
+    auto ptr = std::make_unique<uint8_t[]>(bin_size);
+
+    // Build header
+    struct refile_header* pheader = (struct refile_header*)ptr.get();
+    strncpy((char*)pheader->magic, REFILE_FILE_MAGIC, sizeof(pheader->magic) - 1);
+    pheader->magic[sizeof(pheader->magic) - 1] = '\0';
+    pheader->version = 0;
+    pheader->count = (uint32_t)nitems;
+
+    uint32_t offset = sizeof(struct refile_header) + pheader->count * sizeof(struct refile_index);
+    uint32_t item_offset = 0;
+    size_t   group_header_size = 0;
+
+    TAILQ_FOREACH(item, &list, link) {
+        size_t dsize;
+        if (item->type == kImageFileNode) {
+            dsize = item->size;
+
+            // Fill binary data
+            memcpy(ptr.get() + offset, item->payload, dsize);
+        }
+        else {
+            ImageGroup* group = (ImageGroup*)item;
+            group_header_size = group->header_size();
+            auto group_mem = std::make_unique<uint8_t[]>(group_header_size);
+            struct refile_group* group_header = (struct refile_group*)group_mem.get();
+            uint32_t i_offset = (uint32_t)group_header_size;
+
+            /* Fill group header */
+            group_header->magic = REFILE_GROUP_MAGIC;
+            group_header->count = (uint32_t)group->images.size();
+            group_header->offset = offset;
+
+            for (uint32_t i = 0; i < group_header->count; i++) {
+                size_t item_size = group->images[i]->size;
+                group_header->indexs[i].offset = i_offset;
+                group_header->indexs[i].size = (uint32_t)item_size;
+
+                if (verbose_) {
+                    printf("@Group(%s) index(%d) file(%s) offset(0x%x) size(0x%zx) CRC(0x%x)\n",
+                        group->path.AsUTF8Unsafe().c_str(),
+                        i,
+                        group->images[i]->path.AsUTF8Unsafe().c_str(),
+                        i_offset + offset,
+                        group->images[i]->size,
+                        helper::crc32_ieee_update(0, (uint8_t*)group->images[i]->payload, item_size)
+                    );
+                }
+
+                /* Copy payload to buffer */
+                memcpy(ptr.get() + offset + i_offset, group->images[i]->payload, item_size);
+                i_offset += (uint32_t)item_size;
+            }
+
+            /* Copy header to buffer */
+            memcpy(ptr.get() + offset, group_header, group_header_size);
+            dsize = group->binary_size();
+            assert(i_offset == (uint32_t)dsize);
+        }
+
+        // Set binary offset and key
+        pheader->indexs[item_offset].namekey = item->key;
+        pheader->indexs[item_offset].offset = offset;
+        if (item->type == kImageFileNode)
+            pheader->indexs[item_offset].size = (uint32_t)dsize;
+        else
+            pheader->indexs[item_offset].size = (uint32_t)group_header_size | REFILE_INDEX_SIZE_GROUP_F;
+        item_offset++;
+
+        // Update offset
+        offset += (uint32_t)dsize;
+    }
+
+    assert(offset == bin_size);
+    pheader->chksum = helper::crc32_ieee_update(
+        0,
+        ptr.get() + sizeof(struct refile_header),
+        offset - sizeof(struct refile_header));
+
+    /* Flush to binary file */
+    int err = file_util::WriteFile(path, (const char*)ptr.get(), offset);
+    if (err < 0)
+        return err;
+
+    /* Generate symbol file */
+    return GenerateImageSymbol(path);
+}

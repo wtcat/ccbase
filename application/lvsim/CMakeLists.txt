@@ -50,6 +50,7 @@ add_subdirectory(plugin)
 target_link_libraries(${PROJECT_NAME}
 	lvgl
 	base
+	resource
 	${CMAKE_CURRENT_SOURCE_DIR}/SDL2/lib/x64/SDL2.lib
 )
 

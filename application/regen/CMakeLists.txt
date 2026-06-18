@@ -1,10 +1,21 @@
 
 set(TARGET_NAME regen)
 
+if(NOT EXISTS "${CMAKE_BINARY_DIR}/IMG")
+    file(COPY "${CMAKE_SOURCE_DIR}/IMG" DESTINATION "${CMAKE_BINARY_DIR}")
+endif()
+
 add_executable(${TARGET_NAME}
     main.cc
-    resource_loader.c
+    regen.cc
+    reconv.cc
+	quantizer.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/../helper/utils.cc
+)
+
+target_include_directories(${TARGET_NAME}
+	PRIVATE
+	${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 if (CMAKE_HOST_WIN32)

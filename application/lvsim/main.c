@@ -11,14 +11,19 @@
 #include "driver/file_watcher.h"
 #include "lvgl/lvgl.h"
 #include "lvgl/src/misc/lv_event.h"
+#include "lvgl/src/display/lv_display.h"
+
 
 #include "lvgl/src/core/lv_obj_private.h"
 #undef main
 
-#include "resource_file.h"
+#include "embeded/resource/resource_file.h"
+#include "embeded/resource/resource_loader.h"
 
 static uint8_t static_buffer[10 * 1024 * 1024];
 static struct refile_header* res_area = (void *)static_buffer;
+static re_file_t re_file;
+static re_group_t re_group;
 
 #if 0
 static void reload_view(void) {
@@ -186,20 +191,50 @@ static void ui_lvgen__view_red_border_style_init(lv_style_t* style) {
     lv_style_set_border_color(style, lv_color_hex(0x00ff0000));
 }
 
-static lv_obj_t* ui_lvgen__view_create(lv_obj_t* parent, lv_view__private_t* priv) {
+static uint8_t image_buffer_2[11][400 * 1024];
+static lv_image_dsc_t image_dsc[11];
+static lv_obj_t* img_object;
 
-    struct refile_data* pimg = (struct refile_data*)((char*)res_area + res_area->indexs[20].offset);
-    static lv_image_dsc_t dsc;
+static void anim_size_cb(void* var, int32_t v) {
+    static int index = 0;
+    while (index < 11) {
+        struct refile_data* const pimg = image_buffer_2[index];
+        re_desc_t desc;
 
-    for (uint32_t i = 0; i < res_area->count; i++) {
-        if (res_area->indexs[i].namekey == 0x4765c6e2) {
-            pimg = (struct refile_data*)((char*)res_area + res_area->indexs[i].offset);
-            break;
-        }
+        
+        //re_load_group_image(&re_group, index, &pimg);
+        re_read_group_image_dsc(&re_group, index, &desc);
+        re_read_desc(&desc, pimg, sizeof(image_buffer_2[0]));
+
+        image_dsc[index].header.magic = LV_IMAGE_HEADER_MAGIC;
+        image_dsc[index].header.cf = LV_COLOR_FORMAT_I8;
+        image_dsc[index].header.w = pimg->width;
+        image_dsc[index].header.h = pimg->height;
+        image_dsc[index].data_size = pimg->size;
+        image_dsc[index].data = (uint8_t*)pimg->data;
+        index++;
     }
 
+    if (img_object == NULL)
+        img_object = lv_image_create(var);
+
+    lv_obj_set_pos(img_object, 0, 210);
+    lv_image_set_src(img_object, &image_dsc[v]);
+    lv_display_refr_timer(NULL);
+}
+
+static uint8_t image_buffer_1[400 * 1024];
+static lv_obj_t* ui_lvgen__view_create(lv_obj_t* parent, lv_view__private_t* priv) {
+    re_desc_t desc;
+    static struct refile_data* pimg = image_buffer_1;
+    //re_load_image(&re_file, 0xe6fce000, &pimg);
+    re_read_group_image_dsc(&re_group, 0, &desc);
+    re_read_desc(&desc, pimg, sizeof(image_buffer_1));
+    //re_load_group_image(&re_group, 0, &pimg);
+
+    static lv_image_dsc_t dsc;
     dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
-    dsc.header.cf = LV_COLOR_FORMAT_RGB565;
+    dsc.header.cf = LV_COLOR_FORMAT_I8;
     dsc.header.w = pimg->width;
     dsc.header.h = pimg->height;
     dsc.data_size = pimg->size;
@@ -208,6 +243,21 @@ static lv_obj_t* ui_lvgen__view_create(lv_obj_t* parent, lv_view__private_t* pri
     lv_obj_t* img = lv_image_create(parent);
     lv_obj_set_pos(img, 0, 0);
     lv_image_set_src(img, &dsc);
+
+    
+    /* Shared animation template */
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, parent);
+    lv_anim_set_duration(&a, 1000);                    /* forward duration (ms) */
+    lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+
+    /* Animation 1: size 30 -> 70 px, then play back to 30 */
+    lv_anim_set_exec_cb(&a, anim_size_cb);
+    lv_anim_set_values(&a, 0, 10);
+    lv_anim_set_playback_duration(&a, 1000);           /* reverse duration (ms) */
+    lv_anim_start(&a);
+
 
     return parent;
 
@@ -294,17 +344,20 @@ static void view_init(void) {
 }
 
 int main(int argc, char* argv[]) {
-    FILE *fp = fopen("res.bin", "rb");
-    if (fp == NULL)
-        return -1;
+    //FILE *fp = fopen("res.bin", "rb");
+    //if (fp == NULL)
+    //    return -1;
 
-    fseek(fp, 0, SEEK_END);
-    size_t file_size = ftell(fp);
-    rewind(fp);
+    //fseek(fp, 0, SEEK_END);
+    //size_t file_size = ftell(fp);
+    //rewind(fp);
 
-    assert(file_size < sizeof(static_buffer));
-    fread(res_area, 1, file_size, fp);
-    fclose(fp);
+    //assert(file_size < sizeof(static_buffer));
+    //fread(res_area, 1, file_size, fp);
+    //fclose(fp);
+
+    re_file_open("res.bin", &re_file);
+    re_load_group(&re_file, 0x10204a22, &re_group);
 
 	lvgl_runloop(400, 400, view_init, NULL, NULL);
 	return 0;
