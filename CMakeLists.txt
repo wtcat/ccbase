@@ -31,9 +31,10 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR})
 
 #Options
-option(USE_LEVELDB "Enable levelDB" ON)
-option(USE_SPDLOG  "Enable spdlog"  OFF)
-option(USE_XML     "Enable tinyXML library" ON)
+option(USE_LEVELDB   "Enable levelDB" ON)
+option(USE_SPDLOG    "Enable spdlog"  OFF)
+option(USE_XML       "Enable tinyXML library" ON)
+option(USE_IMGQUANT  "Enable image quant" ON)
 
 if (USE_XML)
 set(tinyxml2_SHARED_LIBS tinyxml2)
