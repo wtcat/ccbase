@@ -11,6 +11,9 @@
 #include "base/memory/ref_counted.h"
 #include "base/threading/simple_thread.h"
 
+#define RE_KEY_PREFIX   "reIMG__"
+#define RE_GROUP_PREFIX "reIMG__GRP_"
+
 class Worker;
 class RGBConvertor;
 
@@ -45,6 +48,11 @@ public:
             images.reserve(32);
 
             keyname = path.BaseName().AsUTF8Unsafe();
+            std::transform(keyname.begin(), keyname.end(), keyname.begin(),
+                [](unsigned char c) {
+                    return std::toupper(c);
+                });
+            keyname = RE_GROUP_PREFIX + keyname;
             key = FileResource::NameHash((const uint8_t*)keyname.c_str(), (uint32_t)keyname.size());
         }
         const std::vector<const ImageNode*>& sort_by_name() {

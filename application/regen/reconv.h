@@ -10,9 +10,9 @@ public:
     const std::string& name() const {
         return name_;
     }
-    virtual bool Convert(const uint8_t* src, int w, int h, int channels, int format, uint8_t* outpx);
-    virtual bool Compress(const uint8_t* src, size_t size, uint8_t* dst, size_t* dst_size, int comp);
-    virtual size_t GetFormatSize(int* format, int channel);
+    bool Convert(const uint8_t* src, int w, int h, int channels, int format, uint8_t* outpx);
+    bool Compress(const uint8_t* src, size_t size, uint8_t* dst, size_t* dst_size, int comp);
+    size_t GetFormatSize(int* format, int channel);
  
 protected:
     inline uint16_t ToRGB565(uint8_t r, uint8_t g, uint8_t b) {
