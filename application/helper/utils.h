@@ -16,6 +16,8 @@ namespace helper {
 
 uint32_t crc32_ieee_update(uint32_t crc, const uint8_t* data, size_t len);
 std::vector<std::string> StringSplit(const std::string& s, char delim);
+int StrSplit(char* string, int stringlen, char** tokens, int maxtokens,
+    char delim);
 
 template<typename Function>
 bool FileCollect(const FilePath& dir, bool recursive, const char* regex, Function&& fn) {

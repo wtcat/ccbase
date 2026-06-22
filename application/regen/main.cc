@@ -5,7 +5,8 @@
 #include <errno.h>
 #include "regen.h"
 #include "reconv.h"
-#include "application/helper/utils.h"
+#include "helper/utils.h"
+#include "helper/fnmatch.h"
 
 #include <assert.h>
 #include "base/at_exit.h"
@@ -34,20 +35,20 @@ static constexpr struct kv_format px_comptbl[] = {
     TERMINAL_ITEM
 };
 
-static int get_key_value(const std::string& fmt, const struct kv_format *table) {
+static int get_key_value(const char *fmt, const struct kv_format *table) {
     for (size_t i = 0; table[i].fmt != nullptr; i++) {
-        if (!strcmp(fmt.c_str(), table[i].fmt))
+        if (!strcmp(fmt, table[i].fmt))
             return table[i].value;
     }
     return -EINVAL;
 }
 
 static int get_pixel_format(const std::string& fmt) {
-    return get_key_value(fmt, px_fmttbl);
+    return get_key_value(fmt.c_str(), px_fmttbl);
 }
 
 static int get_compress_algo(const std::string& comp) {
-    return get_key_value(comp, px_comptbl);
+    return get_key_value(comp.c_str(), px_comptbl);
 }
 
 int main(int argc, char* argv[]) {
@@ -64,6 +65,7 @@ int main(int argc, char* argv[]) {
                 "[--format=value]"
                 "[--compress=value]\n"
                 "[--groups=dir1,dir2,...]\n"
+                "[--filter=filter_expr1,filter_expr2...]\n"
                 "[--verbose]\n"
 
                 "Options:\n"
@@ -73,6 +75,7 @@ int main(int argc, char* argv[]) {
                 "  --format   The target format(i8, (a)rgb565,(a)rgb888)\n"
                 "  --compress Compress algorithm(none, lz4)\n"
                 "  --groups   The group of resource file\n"
+                "  --filter   The filter expresses(PATH:FMT:COMP)\n"
                 "  --verbose  Output log detials\n"
             );
 
@@ -81,7 +84,7 @@ int main(int argc, char* argv[]) {
 
         FilePath dir(L"IMG");
         FilePath out(L"res.bin");
-        int format = PIXEL_FORMAT_INDEXED8;
+        int format = PIXEL_FORMAT_RGB565;
         int compress = REFILE_COMPRESS_NONE;
         int jobs = 2;
 
@@ -125,6 +128,30 @@ int main(int argc, char* argv[]) {
 
         // Set log switch
         fres.SetVerbose(verbose);
+
+        // Add filter
+        if (cmdline->HasSwitch("filter")) {
+            std::vector<std::string> filter_group = helper::StringSplit(cmdline->GetSwitchValueASCII("filter"), ',');
+            for (auto& iter : filter_group) {
+                char* tokens[3] = {};
+                int ret = helper::StrSplit(iter.data(), (int)iter.size(), tokens, sizeof(tokens) / sizeof(tokens[0]), ':');
+                if (ret == 3) {
+                    int format = get_key_value(tokens[1], px_fmttbl);
+                    if (format < 0)
+                        continue;
+
+                    int compress = get_key_value(tokens[2], px_comptbl);
+                    if (compress < 0)
+                        continue;
+
+                    fres.AddFilter(tokens[0], format, compress);
+                    if (verbose) {
+                        printf("Add filter item: name(%s) fmt(%s:%d) comp(%s:%d)\n",
+                            tokens[0], tokens[1], format, tokens[2], compress);
+                    }
+                }
+            }
+        }
 
         // Create image group
         if (cmdline->HasSwitch("groups")) {

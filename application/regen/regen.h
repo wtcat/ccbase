@@ -24,6 +24,14 @@ public:
     enum { kMaxFileName = 128 };
     enum { kImageFileNode = 1, kImageGroupFileNode = 2 };
 
+    struct FileFilter : public base::RefCounted<FileFilter> {
+        FileFilter(const char* str, int fmt, int comp) 
+            : name(str), format(fmt), compress(comp) {}
+        std::string name;
+        int format;
+        int compress;
+    };
+
     struct FileNode {
         FileNode(const FilePath& p, int ftype) : path(p), type(ftype) {}
         ~FileNode() = default;
@@ -99,8 +107,14 @@ public:
         scoped_refptr<ImageGroup> group(new ImageGroup(group_path, global_id_++));
         groups_.push_back(group);
     }
+    void AddFilter(const char* match, int format, int comp) {
+        filters_.push_back(new FileFilter(match, format, comp));
+    }
     void SetVerbose(bool en) {
         verbose_ = en;
+    }
+    bool verbose() const {
+        return verbose_;
     }
 
 private:
@@ -119,6 +133,7 @@ private:
     std::vector<scoped_refptr<ImageNode>> images_;
     std::vector<scoped_refptr<ImageGroup>> groups_;
     std::vector<FileNode*> sort_vector_;
+    std::vector<scoped_refptr<FileFilter>> filters_;
     RGBConvertor* rgb_impl_;
     int format_ = 0;
     int compress_ = 0;
@@ -131,21 +146,7 @@ public:
     Worker(FileResource* fres, size_t id, size_t nr) :
         fres_(fres), id_(id), nr_(nr) {
     }
-
-    void Run() OVERRIDE {
-        for (size_t i = id_; i < nr_; i++) {
-            FileResource::ImageNode* node = fres_->images_[i].get();
-            if (fres_->Format(*node, fres_->format_, fres_->compress_)) {
-                for (const auto iter : fres_->groups_) {
-                    // Allocate group id for image node 
-                    if (iter.get()->path.IsParent(node->path))
-                        node->id = iter.get()->gid;
-                }
-            }
-        }
-        delete this;
-    }
-
+    void Run() OVERRIDE;
 private:
     FileResource* fres_;
     size_t id_;

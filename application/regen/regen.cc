@@ -1,7 +1,8 @@
 // Copyright 2026 wtcat
 
 #include "embeded/resource/resource_file.h"
-#include "application/helper/utils.h"
+#include "helper/utils.h"
+#include "helper/fnmatch.h"
 
 #include <algorithm>
 #include "base/file_util.h"
@@ -12,6 +13,39 @@
 #include "reconv.h"
 
 static constexpr size_t TEMP_BUFSIZE = 1024;
+
+void Worker::Run() {
+    for (size_t i = id_; i < nr_; i++) {
+        FileResource::ImageNode* node = fres_->images_[i].get();
+        std::string keyname = node->path.BaseName().AsUTF8Unsafe();
+
+        // Inject image parameters
+        for (const auto iter : fres_->filters_) {
+            if (!fnmatch(iter->name.c_str(), keyname.c_str(), 0)) {
+                if (fres_->verbose()) {
+                    printf("Picture(%s) format(%d) compress(%d)\n",
+                        node->path.AsUTF8Unsafe().c_str(),
+                        iter->compress,
+                        iter->format
+                    );
+                }
+                node->compress = iter->compress;
+                node->format = iter->format;
+            }
+        }
+
+        // Format image
+        if (fres_->Format(*node, fres_->format_, fres_->compress_)) {
+            for (const auto iter : fres_->groups_) {
+
+                // Allocate group id for image node 
+                if (iter.get()->path.IsParent(node->path))
+                    node->id = iter.get()->gid;
+            }
+        }
+    }
+    delete this;
+}
 
 bool FileResource::NaturalLess(const std::string& a, const std::string& b) {
     size_t i = 0, j = 0;

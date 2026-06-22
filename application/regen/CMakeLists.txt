@@ -11,6 +11,7 @@ add_executable(${TARGET_NAME}
     reconv.cc
 	quantizer.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/../helper/utils.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/../helper/fnmatch.cc
 )
 
 target_include_directories(${TARGET_NAME}
