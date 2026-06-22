@@ -47,9 +47,18 @@ static int get_pixel_format(const std::string& fmt) {
     return get_key_value(fmt.c_str(), px_fmttbl);
 }
 
+static int get_pixel_format_cstr(const char *fmt) {
+    return get_key_value(fmt, px_fmttbl);
+}
+
 static int get_compress_algo(const std::string& comp) {
     return get_key_value(comp.c_str(), px_comptbl);
 }
+
+static int get_compress_algo_cstr(const char* comp) {
+    return get_key_value(comp, px_comptbl);
+}
+
 
 int main(int argc, char* argv[]) {
     base::AtExitManager atexit;
@@ -136,11 +145,11 @@ int main(int argc, char* argv[]) {
                 char* tokens[3] = {};
                 int ret = helper::StrSplit(iter.data(), (int)iter.size(), tokens, sizeof(tokens) / sizeof(tokens[0]), ':');
                 if (ret == 3) {
-                    int format = get_key_value(tokens[1], px_fmttbl);
+                    int format = get_pixel_format_cstr(tokens[1]);
                     if (format < 0)
                         continue;
 
-                    int compress = get_key_value(tokens[2], px_comptbl);
+                    int compress = get_compress_algo_cstr(tokens[2]);
                     if (compress < 0)
                         continue;
 
