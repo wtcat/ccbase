@@ -11,11 +11,12 @@ extern "C" {
 #endif
 
 enum refile_pixelformat {
-	PIXEL_FORMAT_RGB888,  /* rgb888  */
-	PIXEL_FORMAT_ARGB888, /* Argb888 */
+	PIXEL_FORMAT_INVALID,
+	PIXEL_FORMAT_INDEXED8, /* indexed8 */
 	PIXEL_FORMAT_RGB565,  /* rgb565  */
 	PIXEL_FORMAT_ARGB565, /* argb565 */
-	PIXEL_FORMAT_INDEXED8, /* indexed8 */
+	PIXEL_FORMAT_RGB888,  /* rgb888  */
+	PIXEL_FORMAT_ARGB888, /* Argb888 */
 };
 
 enum refile_comp {

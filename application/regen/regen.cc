@@ -157,25 +157,28 @@ bool FileResource::Format(ImageNode& img, int format, int comp) {
 
     // TODO: Should to aligned allocate
     int index = comp != REFILE_COMPRESS_NONE ? 1 : 0;
-    PixelNode* ptr = (PixelNode*)(new uint8_t[sizeof(PixelNode) + alloc_size * (index + 1)]);
-    uint8_t* cptr = (uint8_t*)(ptr + 1);
-    uint8_t* optr = cptr + alloc_size * index;
+    auto px_ptr = std::make_unique<uint8_t[]>(sizeof(PixelNode) + alloc_size * (index + 1));
+    PixelNode* ptr = (PixelNode*)px_ptr.get();
+    uint8_t*   cptr = (uint8_t*)(ptr + 1);
+    uint8_t*   optr = cptr + alloc_size * index;
 
     // Convert pixel format
-    bool okay = rgb_impl_->Convert(px, width, height, channels, format, optr);
+    size_t orgin_size = rgb_impl_->Convert(px, width, height, channels, format, optr);
     stbi_image_free(px);
-    if (!okay) {
+    if (orgin_size == 0) {
         printf("Failed to convert file(%s)\n", img.path.AsUTF8Unsafe().c_str());
         return false;
     }
 
     if (comp != REFILE_COMPRESS_NONE) {
         size_t dst_size = alloc_size * 2;
-        if (!rgb_impl_->Compress(optr, alloc_size, cptr, &dst_size, comp)) {
+        if (!rgb_impl_->Compress(optr, orgin_size, cptr, &dst_size, comp)) {
             printf("Failed to compress file(%s)\n", img.path.AsUTF8Unsafe().c_str());
             return false;
         }
         alloc_size = dst_size;
+    } else {
+        alloc_size = orgin_size;
     }
 
     ptr->width = (uint32_t)width;
@@ -194,7 +197,8 @@ bool FileResource::Format(ImageNode& img, int format, int comp) {
     img.keyname = RE_KEY_PREFIX + img.keyname;
     img.key = NameHash((uint8_t*)img.keyname.c_str(), (uint32_t)img.keyname.size());
     img.size = sizeof(PixelNode) + alloc_size;
-    img.payload = (void*)ptr;
+    img.orgsize = sizeof(PixelNode) + orgin_size;
+    img.payload = std::move(px_ptr);
 
     return true;
 }
@@ -281,7 +285,7 @@ int FileResource::GenerateResFile(const FilePath& path) {
             dsize = item->size;
 
             // Fill binary data
-            memcpy(ptr.get() + offset, item->payload, dsize);
+            memcpy(ptr.get() + offset, item->payload.get(), dsize);
         }
         else {
             ImageGroup* group = (ImageGroup*)item;
@@ -307,12 +311,12 @@ int FileResource::GenerateResFile(const FilePath& path) {
                         group->images[i]->path.AsUTF8Unsafe().c_str(),
                         i_offset + offset,
                         group->images[i]->size,
-                        helper::crc32_ieee_update(0, (uint8_t*)group->images[i]->payload, item_size)
+                        helper::crc32_ieee_update(0, (uint8_t*)group->images[i]->payload.get(), item_size)
                     );
                 }
 
                 /* Copy payload to buffer */
-                memcpy(ptr.get() + offset + i_offset, group->images[i]->payload, item_size);
+                memcpy(ptr.get() + offset + i_offset, group->images[i]->payload.get(), item_size);
                 i_offset += (uint32_t)item_size;
             }
 

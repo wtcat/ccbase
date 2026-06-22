@@ -8,8 +8,10 @@
 
 #define ALIGN_UP(x, a) (((x) + (a) - 1) / (a) * (a))
 
-bool RGBConvertor::Convert(const uint8_t* src, int w, int h, int channels, 
+size_t RGBConvertor::Convert(const uint8_t* src, int w, int h, int channels, 
     int format, uint8_t* outpx) {
+    size_t dst_size;
+
     switch (format) {
     case PIXEL_FORMAT_RGB888:
         for (int i = 0; i < w * h; i++) {
@@ -17,6 +19,7 @@ bool RGBConvertor::Convert(const uint8_t* src, int w, int h, int channels,
             outpx[i * 3 + 1] = src[i * channels + 1]; // G
             outpx[i * 3 + 2] = src[i * channels + 2]; // B
         }
+        dst_size = (size_t)w * h * 3;
         break;
 
     case PIXEL_FORMAT_ARGB888:
@@ -26,6 +29,7 @@ bool RGBConvertor::Convert(const uint8_t* src, int w, int h, int channels,
             outpx[i * 4 + 2] = src[i * channels + 2]; // B
             outpx[i * 4 + 3] = src[i * channels + 3]; // A
         }
+        dst_size = (size_t)w * h * 4;
         break;
 
     case PIXEL_FORMAT_RGB565:
@@ -38,6 +42,7 @@ bool RGBConvertor::Convert(const uint8_t* src, int w, int h, int channels,
             outpx[i * 2 + 0] = rgb565 & 0xFF;
             outpx[i * 2 + 1] = rgb565 >> 8;
         }
+        dst_size = (size_t)w * h * 2;
         break;
 
     case PIXEL_FORMAT_ARGB565:
@@ -51,6 +56,7 @@ bool RGBConvertor::Convert(const uint8_t* src, int w, int h, int channels,
             outpx[i * 3 + 1] = rgb565 >> 8;
             outpx[i * 3 + 2] = src[i * channels + 3];
         }
+        dst_size = (size_t)w * h * 3;
         break;
 
     case PIXEL_FORMAT_INDEXED8: {
@@ -81,13 +87,16 @@ bool RGBConvertor::Convert(const uint8_t* src, int w, int h, int channels,
             for (int pad = w; pad < stride; ++pad)
                 *opx++ = 0;
         }
+
+        dst_size = i8::kPaletteEntries * 4 + (size_t)stride * h * 1;
     }
          break;
 
     default:
-        return false;
+        dst_size = 0;
+        break;
     }
-    return true;
+    return dst_size;
 }
 bool RGBConvertor::Compress(const uint8_t* src, size_t size, uint8_t* dst, size_t* dst_size, int comp) {
     if (comp == REFILE_COMPRESS_LZ4) {

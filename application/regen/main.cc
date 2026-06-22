@@ -82,7 +82,7 @@ int main(int argc, char* argv[]) {
         FilePath dir(L"IMG");
         FilePath out(L"res.bin");
         int format = PIXEL_FORMAT_INDEXED8;
-        int compress = REFILE_COMPRESS_LZ4; // REFILE_COMPRESS_NONE;
+        int compress = REFILE_COMPRESS_NONE;
         int jobs = 2;
 
         if (cmdline->HasSwitch("dir"))

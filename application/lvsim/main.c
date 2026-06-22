@@ -357,7 +357,7 @@ int main(int argc, char* argv[]) {
     //fclose(fp);
 
     re_file_open("res.bin", &re_file);
-    re_load_group(&re_file, 0x10204a22, &re_group);
+    re_load_group(&re_file, 0x4a43fec8, &re_group);
 
 	lvgl_runloop(400, 400, view_init, NULL, NULL);
 	return 0;

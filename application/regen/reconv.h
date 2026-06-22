@@ -10,7 +10,7 @@ public:
     const std::string& name() const {
         return name_;
     }
-    bool Convert(const uint8_t* src, int w, int h, int channels, int format, uint8_t* outpx);
+    size_t Convert(const uint8_t* src, int w, int h, int channels, int format, uint8_t* outpx);
     bool Compress(const uint8_t* src, size_t size, uint8_t* dst, size_t* dst_size, int comp);
     size_t GetFormatSize(int* format, int channel);
  

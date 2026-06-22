@@ -3,6 +3,7 @@
 #pragma once
 
 #include <algorithm>
+#include <memory>
 #include <vector>
 
 #include "sys/queue.h"
@@ -25,14 +26,16 @@ public:
 
     struct FileNode {
         FileNode(const FilePath& p, int ftype) : path(p), type(ftype) {}
+        ~FileNode() = default;
         TAILQ_ENTRY(FileNode) link = {};
         FilePath    path;
         std::string keyname;
         uint32_t    key = 0;
         int         type = 0;
         int         id = -1;
-        void* payload = nullptr;
         size_t      size = 0;
+        size_t      orgsize = 0;
+        std::unique_ptr<uint8_t[]> payload;
     };
     TAILQ_HEAD(FileNodeList, FileNode);
 

@@ -16,7 +16,7 @@ constexpr int kPaletteBytes = kPaletteEntries * 4;
 struct QuantizeOptions {
     int max_colors = 256;  // hard cap for INDEX8
     float dither = 1.0f;   // libimagequant dithering level, 0 = none, 1 = full
-    int speed = 4;         // libimagequant speed 1 (best quality) .. 10 (fastest)
+    int speed = 1;         // libimagequant speed 1 (best quality) .. 10 (fastest)
 };
 
 struct QuantizeResult {
