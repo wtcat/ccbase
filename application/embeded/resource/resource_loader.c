@@ -11,6 +11,10 @@
 
 //#define RE_LOADER_DISABLE_CHECKER 
 
+#ifndef MIN
+#define MIN(a, b) ((a) < (b)? (a): (b))
+#endif
+
 static uint32_t re_crc32_update(uint32_t crc, const uint8_t* data, size_t len) {
     /* crc table generated from polynomial 0xedb88320 */
     static const uint32_t table[16] = {
@@ -35,50 +39,70 @@ static int key_compare(const void* a, const void* b) {
     return (ua > ub) - (ua < ub);
 }
 
-int re_file_open(const char* file, re_file_t* refile) {
+int re_file_open(const char* file, unsigned int flags, re_file_t* refile) {
     if (file == NULL || refile == NULL)
         return -EINVAL;
 
     struct refile_header* re;
     int err;
-
-    // Open resource file
+    
+    /* Open resource file */
     RE_FILE_OPEN(refile->fd, file, err);
     if (err)
         return err;
 
-    // Get file size
-    size_t fsize = 0;
-    RE_FILE_SIZE(refile->fd, fsize);
-    if (fsize == 0) {
-        err = -EINVAL;
+    struct refile_header header;
+    RE_FILE_READ_OFFSET(refile->fd, &header, sizeof(header), 0, err);
+
+    /* Check file magic number */
+    if (memcmp(header.magic, REFILE_FILE_MAGIC, sizeof(REFILE_FILE_MAGIC)) != 0) {
+        err = -ENODATA;
         goto _close;
     }
 
-    // Allocate memory for resource file
-    re = RE_MALLOC(fsize);
+    /* Verify file content */
+    if (flags & RE_F_FILE_CHECK) {
+        /* Get file size */
+        size_t fsize = 0;
+        RE_FILE_SIZE(refile->fd, fsize);
+        if (fsize == 0) {
+            err = -EINVAL;
+            goto _close;
+        }
+
+        size_t rd_offset = sizeof(struct refile_header);
+        uint8_t buf[512];
+        uint32_t crc = 0;
+        while (rd_offset < fsize) {
+            size_t bytes = MIN(fsize - rd_offset, sizeof(buf));
+            RE_FILE_READ_OFFSET(refile->fd, buf, bytes, rd_offset, err);
+            if (err)
+                goto _close;
+
+            rd_offset += bytes;
+            crc = re_crc32_update(crc, buf, bytes);
+        }
+        if (crc != header.chksum) {
+            err = -EBADF;
+            goto _close;
+        }
+    }
+
+    /* Allocate memory for resource file */
+    size_t header_size = sizeof(struct refile_header) + header.count * sizeof(struct refile_index);
+    re = RE_MALLOC(header_size);
     if (re == NULL) {
         err = -ENOMEM;
         goto _close;
     }
 
-    // Read file content to buffer
-    RE_FILE_READ_OFFSET(refile->fd, re, fsize, 0, err);
+    /* Read file content to buffer */
+    RE_FILE_READ_OFFSET(refile->fd, re, header_size, 0, err);
     if (err)
         goto _free;
 
-    // Check file magic number
-    if (memcmp(re->magic, REFILE_FILE_MAGIC, sizeof(REFILE_FILE_MAGIC)) != 0) {
-        err = -ENODATA;
-        goto _free;
-    }
-
-    // Check file CRC
-    if (re->chksum != re_crc32_update(0, (uint8_t*)(re + 1), fsize - sizeof(*re))) {
-        err = -EINVAL;
-        goto _free;
-    }
-
+    memset(refile->name, 0, RE_MAX_FILENAME);
+    strncpy(refile->name, file, RE_MAX_FILENAME - 1);
     refile->p = re;
     return 0;
 

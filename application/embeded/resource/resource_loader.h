@@ -34,7 +34,7 @@ do { \
     
 #define RE_FILE_READ_OFFSET(_fd, _buffer, _size, _offset, _err) \
 do { \
-    fseek(_fd, _offset, SEEK_SET); \
+    fseek(_fd, (long)_offset, SEEK_SET); \
     fread(_buffer, 1, _size, _fd); \
     (_err) = 0; \
 } while (0)
@@ -50,10 +50,13 @@ do { \
 /*
  * Resource loader data structure 
  */
+#define RE_MAX_FILENAME 48
+
 struct refile_data;
 typedef struct {
     RE_FILE_FD(fd)
     void* p;
+    char name[RE_MAX_FILENAME];
 } re_file_t;
 
 typedef struct {
@@ -67,6 +70,8 @@ typedef struct {
     uint32_t size;
 } re_desc_t;
 
+/* File open flags */
+#define RE_F_FILE_CHECK (0x0001)
 
 /*
  * Public API
@@ -86,7 +91,8 @@ uint32_t re_name_hash(const uint8_t* key, uint32_t len) {
     return hash;
 }
 
-int re_file_open(const char* file, re_file_t* refile);
+
+int re_file_open(const char* file, unsigned int flags, re_file_t* refile);
 int re_file_close(re_file_t* refile);
 
 int re_read_desc(const re_desc_t* desc, void* buf, size_t bsize);
