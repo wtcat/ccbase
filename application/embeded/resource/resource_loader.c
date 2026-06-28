@@ -132,7 +132,7 @@ int re_read_image_dsc(const re_file_t* refile, uint32_t id, re_desc_t* desc) {
 
     if (desc == NULL)
         return -EINVAL;
-#endif /* RE_LOADER_DISABLE_CHECKER */
+#endif
 
     struct refile_header* re = refile->p;
     struct refile_index* ind;
@@ -182,7 +182,7 @@ int re_load_group(const re_file_t* refile, uint32_t gid, re_group_t* regroup) {
 
     if (regroup == NULL)
         return -EINVAL;
-#endif /* RE_LOADER_DISABLE_CHECKER */
+#endif
 
     struct refile_header* re = refile->p;
     struct refile_index* ind;
@@ -218,7 +218,7 @@ int re_unload_group(re_group_t* regroup) {
 #ifndef RE_LOADER_DISABLE_CHECKER
     if (regroup == NULL || regroup->p == NULL)
         return -EINVAL;
-#endif /* RE_LOADER_DISABLE_CHECKER */
+#endif
 
     RE_FREE(regroup->p);
     regroup->p = NULL;
@@ -230,7 +230,7 @@ size_t re_group_size(const re_group_t* regroup) {
 #ifndef RE_LOADER_DISABLE_CHECKER
     if (regroup == NULL || regroup->p == NULL)
         return -EINVAL;
-#endif /* RE_LOADER_DISABLE_CHECKER */
+#endif
 
     struct refile_group* g = regroup->p;
     return g->count;
@@ -243,7 +243,7 @@ int re_read_group_image_dsc(const re_group_t* regroup, uint32_t idx, re_desc_t *
 
     if (desc == NULL)
         return -EINVAL;
-#endif /* RE_LOADER_DISABLE_CHECKER */
+#endif
 
     struct refile_group* g = regroup->p;
     if (idx < g->count) {
@@ -263,7 +263,7 @@ int re_load_group_image(const re_group_t* regroup, uint32_t idx, struct refile_d
 
     if (img == NULL)
         return -EINVAL;
-#endif /* RE_LOADER_DISABLE_CHECKER */
+#endif
 
     struct refile_group* g = regroup->p;
     if (idx < g->count) {
@@ -293,7 +293,7 @@ int re_read_desc(const re_desc_t* desc, void* buf, size_t bsize) {
 
     if (buf == NULL)
         return -EINVAL;
-#endif /* RE_LOADER_DISABLE_CHECKER */
+#endif
     if (desc->size > bsize)
         return -EINVAL;
 

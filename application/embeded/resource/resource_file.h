@@ -22,8 +22,6 @@ enum refile_pixelformat {
 enum refile_comp {
 	REFILE_COMPRESS_NONE,
 	REFILE_COMPRESS_LZ4,
-	REFILE_COMPRESS_USER1,
-	REFILE_COMPRESS_USER2,
 };
 
 #pragma pack(push)
