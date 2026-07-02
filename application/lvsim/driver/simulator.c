@@ -11,8 +11,8 @@
 
 #include "simulator.h"
 #include "driver/queue.h"
-#include "lvgl/lvgl.h"
-#include "lvgl/src/drivers/lv_drivers.h"
+#include "thirdparty/lvgl/lvgl.h"
+#include "thirdparty/lvgl/src/drivers/lv_drivers.h"
 
 
 typedef struct simulator_message {

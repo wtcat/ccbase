@@ -12,7 +12,7 @@
 #endif
 //XC end
 
-#include "lvgl/lvgl.h"
+#include "thirdparty/lvgl/lvgl.h"
 #include "lz4.h"
 
 #ifdef CONFIG_JPEG_HAL

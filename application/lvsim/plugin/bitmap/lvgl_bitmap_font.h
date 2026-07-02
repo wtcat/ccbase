@@ -8,7 +8,7 @@ extern "C" {
 /*********************
  *      INCLUDES
  *********************/
-#include "lvgl/lvgl.h"
+#include "thirdparty/lvgl/lvgl.h"
 #include "bitmap_font_api.h"
 
 /*********************

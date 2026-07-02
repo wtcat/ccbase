@@ -2,10 +2,10 @@
  * Plugin manager
  */
 
-#include "lvgl/src/others/xml/lv_xml_component_private.h"
-#include "lvgl/src/others/xml/lv_xml_private.h"
-#include "lvgl/src/font/lv_binfont_loader.h"
-#include "lvgl/xml_parser_notify.h"
+#include "thirdparty/lvgl/src/others/xml/lv_xml_component_private.h"
+#include "thirdparty/lvgl/src/others/xml/lv_xml_private.h"
+#include "thirdparty/lvgl/src/font/lv_binfont_loader.h"
+#include "thirdparty/lvgl/xml_parser_notify.h"
 
 #include <filesystem>
 

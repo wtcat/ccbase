@@ -2,6 +2,7 @@
 include_directories(.)
 
 add_subdirectory(embeded)
+add_subdirectory(wfc)
 add_subdirectory(lvgen)
 add_subdirectory(lvsim)
 add_subdirectory(codegen)

@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "lvgl/lvgl.h"
+#include "thirdparty/lvgl/lvgl.h"
 
 #include "res_port.h"
 #include "res_manager_api.h"

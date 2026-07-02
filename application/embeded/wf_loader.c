@@ -1,0 +1,456 @@
+/*
+ * wf_loader — WFB runtime loader implementation.
+ */
+#include <stdlib.h>
+#include <string.h>
+
+#include "embeded/wf_loader.h"
+#include "embeded/resource/resource_file.h"
+
+typedef struct {
+	wf_event_cb_t cb;
+	uint32_t param;
+} wf_evbind_t;
+
+struct wf_instance {
+	lv_obj_t *screen;
+
+	/* growable list of malloc'd blocks to free on unload (image blobs, dsc
+	 * arrays, frame pointer arrays) — compact vector, not a linked list. */
+	void **allocs;
+	int n_alloc, cap_alloc;
+
+	/* both point into the trailing bytes of this same block — never free()d
+	 * separately (see wf_load's single-block calloc) */
+	lv_font_t **font_cache; /* [font_count], lazily resolved             */
+	wf_evbind_t *binds;		/* [event_count], resolved at load time      */
+
+	/* read-only views into the wfb buffer */
+	const wf_widget_t *widgets;
+	const wf_image_t *images;
+	const wf_font_t *fonts;
+	const wf_anim_t *anims;
+	const wf_event_t *events;
+	const wf_style_t *styles;
+	const char *strings;
+	const wf_header_t *hdr;
+};
+
+#define WF_MAX_REG 32
+static struct {
+	uint32_t hash;
+	wf_event_cb_t cb;
+} s_reg[WF_MAX_REG];
+static int s_reg_n;
+
+static uint32_t crc32_calc(const uint8_t *data, uint32_t len) {
+    /* CRC-32 (poly 0xEDB88320)  */
+	static const uint32_t table[16] = {
+		0x00000000U, 0x1db71064U, 0x3b6e20c8U, 0x26d930acU, 0x76dc4190U, 0x6b6b51f4U,
+		0x4db26158U, 0x5005713cU, 0xedb88320U, 0xf00f9344U, 0xd6d6a3e8U, 0xcb61b38cU,
+		0x9b64c2b0U, 0x86d3d2d4U, 0xa00ae278U, 0xbdbdf21cU,
+	};
+	uint32_t crc = ~0u;
+	for (uint32_t i = 0; i < len; i++) {
+		uint8_t b = data[i];
+		crc = (crc >> 4) ^ table[(crc ^ b) & 0x0f];
+		crc = (crc >> 4) ^ table[(crc ^ ((uint32_t)b >> 4)) & 0x0f];
+	}
+	return ~crc;
+}
+
+void wf_register_event(const char *name, wf_event_cb_t cb) {
+	uint32_t h = re_name_hash((const uint8_t *)name, (uint32_t)strlen(name));
+	for (int i = 0; i < s_reg_n; i++)
+		if (s_reg[i].hash == h) {
+			s_reg[i].cb = cb;
+			return;
+		}
+	if (s_reg_n < WF_MAX_REG) {
+		s_reg[s_reg_n].hash = h;
+		s_reg[s_reg_n].cb = cb;
+		s_reg_n++;
+	}
+}
+
+wf_event_cb_t wf_lookup_event(uint32_t cb_hash) {
+	for (int i = 0; i < s_reg_n; i++)
+		if (s_reg[i].hash == cb_hash)
+			return s_reg[i].cb;
+	return NULL;
+}
+
+static int track(wf_instance_t *in, void *p) {
+	if (!p)
+		return -1;
+	if (in->n_alloc == in->cap_alloc) {
+		int nc = in->cap_alloc ? in->cap_alloc * 2 : 16;
+		void **na = realloc(in->allocs, (size_t)nc * sizeof(void *));
+		if (!na)
+			return -1;
+		in->allocs = na;
+		in->cap_alloc = nc;
+	}
+	in->allocs[in->n_alloc++] = p;
+	return 0;
+}
+
+static lv_align_t map_align(uint8_t a) {
+	static const lv_align_t m[] = {
+		LV_ALIGN_CENTER,
+        LV_ALIGN_TOP_LEFT,
+        LV_ALIGN_TOP_MID,
+		LV_ALIGN_TOP_RIGHT,
+        LV_ALIGN_BOTTOM_LEFT,
+        LV_ALIGN_BOTTOM_MID,
+		LV_ALIGN_BOTTOM_RIGHT,
+        LV_ALIGN_LEFT_MID,
+        LV_ALIGN_RIGHT_MID,
+	};
+	return (a < sizeof(m) / sizeof(m[0])) ? m[a] : LV_ALIGN_TOP_LEFT;
+}
+
+static lv_event_code_t map_event(uint8_t c) {
+	static const lv_event_code_t m[] = {
+		LV_EVENT_CLICKED,
+        LV_EVENT_PRESSED,
+        LV_EVENT_RELEASED,
+		LV_EVENT_LONG_PRESSED,
+        LV_EVENT_VALUE_CHANGED,
+	};
+	return (c < sizeof(m) / sizeof(m[0])) ? m[c] : LV_EVENT_CLICKED;
+}
+
+static lv_color_format_t map_cf(uint32_t fmt) {
+	switch (fmt) {
+	case PIXEL_FORMAT_INDEXED8:
+		return LV_COLOR_FORMAT_I8;
+	case PIXEL_FORMAT_RGB565:
+		return LV_COLOR_FORMAT_RGB565;
+	case PIXEL_FORMAT_ARGB565:
+		return LV_COLOR_FORMAT_RGB565A8; /* TODO: approximate */
+	case PIXEL_FORMAT_RGB888:
+		return LV_COLOR_FORMAT_RGB888;
+	case PIXEL_FORMAT_ARGB888:
+		return LV_COLOR_FORMAT_ARGB8888;
+	default:
+		return LV_COLOR_FORMAT_UNKNOWN;
+	}
+}
+
+static void fill_image_dsc(lv_image_dsc_t *dsc, const struct refile_data *d) {
+	memset(dsc, 0, sizeof(*dsc));
+#ifdef LV_IMAGE_HEADER_MAGIC
+	dsc->header.magic = LV_IMAGE_HEADER_MAGIC;
+#endif
+	dsc->header.cf = (uint8_t)map_cf(d->format);
+	dsc->header.w = (uint16_t)d->width;
+	dsc->header.h = (uint16_t)d->height;
+	dsc->data_size = d->size;
+	dsc->data = (const uint8_t *)d->data;
+	/* NOTE: LZ4-compressed entries (d->compress) are not decoded here yet. */
+}
+
+/* Load a single image by namekey into a persistent, tracked lv_image_dsc_t.
+ * Returns the dsc pointer, or NULL on failure. */
+static lv_image_dsc_t *load_image_dsc(wf_instance_t *in, const re_file_t *res,
+									  uint32_t namekey) {
+	struct refile_data *blob = NULL;
+	if (re_load_image(res, namekey, &blob) != 0 || !blob)
+		return NULL;
+	if (track(in, blob) != 0) {
+		free(blob);
+		return NULL;
+	}
+
+	lv_image_dsc_t *dsc = malloc(sizeof(*dsc));
+	if (track(in, dsc) != 0) {
+		free(dsc);
+		return NULL;
+	}
+	fill_image_dsc(dsc, blob);
+	return dsc;
+}
+
+static void apply_style(lv_obj_t *obj, const wf_style_t *s) {
+	lv_obj_set_style_text_color(obj, lv_color_hex(s->text_color), 0);
+	if (s->bg_opa > 0) {
+		lv_obj_set_style_bg_color(obj, lv_color_hex(s->bg_color), 0);
+		lv_obj_set_style_bg_opa(obj, (lv_opa_t)s->bg_opa, 0);
+	}
+	if (s->arc_width > 0) {
+		lv_obj_set_style_arc_width(obj, s->arc_width, 0);
+		lv_obj_set_style_arc_color(obj, lv_color_hex(s->arc_color), 0);
+	}
+}
+
+static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
+							   const wf_env_t *env, const wf_widget_t *w,
+							   lv_obj_t *parent) {
+	lv_obj_t *obj = NULL;
+
+	switch (w->type) {
+	case WF_W_IMAGE: {
+		obj = lv_image_create(parent);
+		if (w->res_ref != WF_REF_NONE) {
+			lv_image_dsc_t *dsc = load_image_dsc(in, res, in->images[w->res_ref].namekey);
+			if (dsc)
+				lv_image_set_src(obj, dsc);
+		}
+		break;
+	}
+
+	case WF_W_LABEL: {
+		obj = lv_label_create(parent);
+		lv_label_set_text_static(obj, in->strings + w->extra);
+		if (w->res_ref != WF_REF_NONE) {
+			lv_font_t *f = in->font_cache[w->res_ref];
+			if (!f && env && env->get_font)
+				f = in->font_cache[w->res_ref] =
+					env->get_font(in->fonts[w->res_ref].namekey);
+			if (f)
+				lv_obj_set_style_text_font(obj, f, 0);
+		}
+		break;
+	}
+
+	case WF_W_FRAME_ANIM: {
+		obj = lv_animimg_create(parent);
+		if (w->res_ref != WF_REF_NONE) {
+			const wf_anim_t *a = &in->anims[w->res_ref];
+			re_group_t grp;
+			if (re_load_group(res, a->namekey, &grp) == 0) {
+				size_t n = re_group_size(&grp);
+				/* One block holds both the pointer array lv_animimg_set_src
+				 * needs and the contiguous dsc storage it points into — a
+				 * single tracked alloc instead of one malloc per frame. */
+				void *block =
+					n ? malloc(n * (sizeof(void *) + sizeof(lv_image_dsc_t))) : NULL;
+				if (block && track(in, block) == 0) {
+					const void **srcs = (const void **)block;
+					lv_image_dsc_t *dscs = (lv_image_dsc_t *)(srcs + n);
+					size_t got = 0;
+					for (size_t i = 0; i < n; i++) {
+						struct refile_data *blob = NULL;
+						if (re_load_group_image(&grp, (uint32_t)i, &blob) != 0 || !blob)
+							break;
+						if (track(in, blob) != 0) {
+							free(blob);
+							break;
+						}
+						fill_image_dsc(&dscs[got], blob);
+						srcs[got] = &dscs[got];
+						got++;
+					}
+					if (got) {
+						lv_animimg_set_src(obj, srcs, got);
+						lv_animimg_set_duration(obj, a->duration_ms);
+						lv_animimg_set_repeat_count(
+							obj, a->repeat ? a->repeat : LV_ANIM_REPEAT_INFINITE);
+						lv_animimg_start(obj);
+					}
+				} else {
+					free(block);
+				}
+				re_unload_group(&grp);
+			}
+		}
+		break;
+	}
+
+	case WF_W_IMGLABEL: {
+		obj = lvgl_imglabel_create(parent);
+		if (w->res_ref != WF_REF_NONE) {
+			/* the referenced (virtual) image is a group: one member per glyph.
+			 * Build one contiguous lv_image_dsc_t array for lvgl_imglabel_set_src. */
+			re_group_t grp;
+			if (re_load_group(res, in->images[w->res_ref].namekey, &grp) == 0) {
+				size_t n = re_group_size(&grp);
+				lv_image_dsc_t *chars = n ? malloc(n * sizeof(lv_image_dsc_t)) : NULL;
+				if (chars && track(in, chars) == 0) {
+					size_t got = 0;
+					for (size_t i = 0; i < n; i++) {
+						struct refile_data *blob = NULL;
+						if (re_load_group_image(&grp, (uint32_t)i, &blob) != 0 || !blob)
+							break;
+						if (track(in, blob) != 0) {
+							free(blob);
+							break;
+						}
+						fill_image_dsc(&chars[got++], blob);
+					}
+					if (got)
+						lvgl_imglabel_set_src(obj, chars, (uint8_t)got);
+				} else {
+					free(chars);
+				}
+				re_unload_group(&grp);
+			}
+		}
+		break;
+	}
+
+	case WF_W_ARC:
+		obj = lv_arc_create(parent);
+		break;
+	case WF_W_BAR:
+		obj = lv_bar_create(parent);
+		break;
+	case WF_W_SCREEN:
+	case WF_W_CONTAINER:
+	default:
+		obj = lv_obj_create(parent);
+		break;
+	}
+
+	if (!obj)
+		return NULL;
+
+	/* geometry */
+	if (w->w != WF_SIZE_RES || w->h != WF_SIZE_RES) {
+		int32_t cw = (w->w == WF_SIZE_CONTENT) ? LV_SIZE_CONTENT
+					 : (w->w == WF_SIZE_RES)   ? lv_obj_get_width(obj)
+											   : w->w;
+		int32_t ch = (w->h == WF_SIZE_CONTENT) ? LV_SIZE_CONTENT
+					 : (w->h == WF_SIZE_RES)   ? lv_obj_get_height(obj)
+											   : w->h;
+		lv_obj_set_size(obj, cw, ch);
+	}
+	lv_obj_align(obj, map_align(w->align), w->x, w->y);
+
+	if (w->style_ref != WF_REF_NONE)
+		apply_style(obj, &in->styles[w->style_ref]);
+	if (w->flags & WF_WF_CLICKABLE)
+		lv_obj_add_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+	if (w->flags & WF_WF_HIDDEN)
+		lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+
+	return obj;
+}
+
+static void wf_trampoline(lv_event_t *e) {
+	wf_evbind_t *b = (wf_evbind_t *)lv_event_get_user_data(e);
+	if (b && b->cb)
+		b->cb(e, b->param);
+}
+
+static int validate(const wf_header_t *h, uint32_t wfb_size) {
+	if (wfb_size < sizeof(*h))
+		return -1;
+
+	if (h->magic[0] != WFB_MAGIC0 || h->magic[1] != WFB_MAGIC1 ||
+		h->magic[2] != WFB_MAGIC2 || h->magic[3] != WFB_MAGIC3)
+		return -1;
+
+	if (h->version != WFB_VERSION)
+		return -1;
+
+	if ((uint64_t)sizeof(*h) + h->layout_size > wfb_size)
+		return -1;
+
+	const uint8_t *layout = (const uint8_t *)h + sizeof(*h);
+	if (crc32_calc(layout, h->layout_size) != h->crc32)
+		return -1;
+
+	/* every table must lie within the layout section */
+	struct {
+		uint32_t off, count, sz;
+	} t[] = {
+		{h->off_widgets, h->widget_count, sizeof(wf_widget_t)},
+		{h->off_images, h->image_count, sizeof(wf_image_t)},
+		{h->off_fonts, h->font_count, sizeof(wf_font_t)},
+		{h->off_anims, h->anim_count, sizeof(wf_anim_t)},
+		{h->off_events, h->event_count, sizeof(wf_event_t)},
+		{h->off_styles, h->style_count, sizeof(wf_style_t)},
+	};
+	for (unsigned i = 0; i < sizeof(t) / sizeof(t[0]); i++) {
+		uint64_t end = (uint64_t)t[i].off + (uint64_t)t[i].count * t[i].sz;
+		if (end > h->layout_size)
+			return -1;
+	}
+	if (h->off_strings > h->layout_size)
+		return -1;
+	return 0;
+}
+
+wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_res,
+					   const wf_env_t *env, lv_obj_t *screen) {
+	if (!wfb || !screen)
+		return NULL;
+	const wf_header_t *h = (const wf_header_t *)wfb;
+	if (validate(h, wfb_size) != 0)
+		return NULL;
+
+	const uint8_t *L = (const uint8_t *)wfb + sizeof(*h);
+
+	/* Single instance block: header + font cache + event binds in one calloc.
+	 * Both trailing arrays are pointer-aligned, so appending them after the
+	 * (pointer-aligned) struct keeps natural alignment. calloc zeroes the tail,
+	 * which the font cache relies on for lazy resolution. The objs[] scratch map
+	 * stays a separate alloc — it is freed before wf_load returns. */
+	size_t fc_bytes = (size_t)h->font_count * sizeof(lv_font_t *);
+	size_t bind_bytes = (size_t)h->event_count * sizeof(wf_evbind_t);
+	wf_instance_t *in = calloc(1, sizeof(*in) + fc_bytes + bind_bytes);
+	if (!in)
+		return NULL;
+	uint8_t *tail = (uint8_t *)in + sizeof(*in);
+	in->font_cache = h->font_count ? (lv_font_t **)tail : NULL;
+	in->binds = h->event_count ? (wf_evbind_t *)(tail + fc_bytes) : NULL;
+	in->screen = screen;
+	in->hdr = h;
+	in->widgets = (const wf_widget_t *)(L + h->off_widgets);
+	in->images = (const wf_image_t *)(L + h->off_images);
+	in->fonts = (const wf_font_t *)(L + h->off_fonts);
+	in->anims = (const wf_anim_t *)(L + h->off_anims);
+	in->events = (const wf_event_t *)(L + h->off_events);
+	in->styles = (const wf_style_t *)(L + h->off_styles);
+	in->strings = (const char *)(L + h->off_strings);
+
+	/* scratch index->object map, freed before returning (steady-state RAM save) */
+	lv_obj_t **objs = calloc(h->widget_count ? h->widget_count : 1, sizeof(lv_obj_t *));
+	if (!objs) {
+		wf_unload(in);
+		return NULL;
+	}
+
+	/* single linear pass — parents precede children (topological order) */
+	for (uint16_t i = 0; i < h->widget_count; i++) {
+		const wf_widget_t *w = &in->widgets[i];
+		lv_obj_t *parent = (w->parent == WF_PARENT_ROOT)
+							   ? screen
+							   : (w->parent < i ? objs[w->parent] : screen);
+		lv_obj_t *obj = create_widget(in, img_res, env, w, parent);
+		if (!obj) {
+			free(objs);
+			wf_unload(in);
+			return NULL;
+		}
+		objs[i] = obj;
+
+		for (uint8_t e = 0; e < w->event_count; e++) {
+			uint16_t ei = w->event_start + e;
+			const wf_event_t *ev = &in->events[ei];
+			wf_event_cb_t cb = (env && env->get_event) ? env->get_event(ev->cb_hash)
+													   : wf_lookup_event(ev->cb_hash);
+			if (!cb)
+				continue;
+			in->binds[ei].cb = cb;
+			in->binds[ei].param = ev->param;
+			lv_obj_add_event_cb(obj, wf_trampoline, map_event(ev->code), &in->binds[ei]);
+		}
+	}
+
+	free(objs);
+	return in;
+}
+
+void wf_unload(wf_instance_t *in) {
+	if (!in)
+		return;
+	if (in->screen)
+		lv_obj_clean(in->screen); /* delete created children */
+	for (int i = 0; i < in->n_alloc; i++)
+		free(in->allocs[i]);
+	free(in->allocs);
+	free(in); /* font_cache + binds live inside this same block */
+}

@@ -8,10 +8,10 @@
 #include <stdlib.h>
 
 #include "driver/simulator.h"
-#include "lvgl/lvgl.h"
-#include "lvgl/src/misc/lv_event.h"
-#include "lvgl/src/display/lv_display.h"
-#include "lvgl/src/core/lv_obj_private.h"
+#include "thirdparty/lvgl/lvgl.h"
+#include "thirdparty/lvgl/src/misc/lv_event.h"
+#include "thirdparty/lvgl/src/display/lv_display.h"
+#include "thirdparty/lvgl/src/core/lv_obj_private.h"
 #undef main
 
 #include "embeded/resource/resource_file.h"

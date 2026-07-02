@@ -5,6 +5,8 @@ project(app
     LANGUAGES C CXX
 )
 
+set(PROJECT_BASE ${CMAKE_CURRENT_SOURCE_DIR})
+
 # Import user function 
 include(cmake/extension.cmake)
 include(cmake/extensions.cmake)
@@ -43,6 +45,9 @@ endif()
 set(CMAKE_C_STANDARD   11)
 set(CMAKE_CXX_STANDARD 20)
 
+# For lvgl
+add_compile_definitions(XML_STATIC=1)
+
 if (CMAKE_HOST_WIN32)
     add_compile_options(
         /DUNICODE=1
@@ -50,7 +55,11 @@ if (CMAKE_HOST_WIN32)
     )
 endif()
 
-include_directories(.)
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/SDL2/include
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/SDL2/lib/x64)
 
 add_subdirectory(base)
 add_subdirectory(thirdparty)

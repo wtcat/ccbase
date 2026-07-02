@@ -18,7 +18,7 @@ extern "C" {
 /*********************
  *      INCLUDES
  *********************/
-#include <lvgl/lvgl.h>
+#include "thirdparty/lvgl/lvgl.h"
 #include "res_manager_api.h"
 
 /*********************

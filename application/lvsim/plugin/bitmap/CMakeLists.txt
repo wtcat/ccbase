@@ -17,7 +17,8 @@ target_sources(bitmap
 )
 
 target_link_libraries(bitmap 
+	lvsim_interface
 	base
 	lvgl
-	${CMAKE_CURRENT_SOURCE_DIR}/../../SDL2/lib/x64/SDL2.lib
+	SDL2.lib
 )
