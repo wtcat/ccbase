@@ -91,6 +91,12 @@ uint32_t re_name_hash(const uint8_t* key, uint32_t len) {
     return hash;
 }
 
+static inline
+int re_read_buf(const re_desc_t* desc, void* buf, size_t bsize, unsigned long offset) {
+    int err;
+    RE_FILE_READ_OFFSET(desc->refile->fd, buf, bsize, desc->offset + offset, err);
+    return err;
+}
 
 int re_file_open(const char* file, unsigned int flags, re_file_t* refile);
 int re_file_close(re_file_t* refile);

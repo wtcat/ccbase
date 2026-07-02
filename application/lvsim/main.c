@@ -16,6 +16,7 @@
 
 #include "embeded/resource/resource_file.h"
 #include "embeded/resource/resource_loader.h"
+#include "embeded/wf_loader.h"
 
 static uint8_t static_buffer[10 * 1024 * 1024];
 static struct refile_header* res_area = (void *)static_buffer;
@@ -93,12 +94,39 @@ static lv_obj_t* ui_lvgen__view_create(lv_obj_t* parent) {
     return parent;
 }
 
+static void* read_file(const char* name, size_t *size) {
+    FILE* fp = fopen(name, "rb");
+    if (fp == NULL)
+        return NULL;
+
+    fseek(fp, 0, SEEK_END);
+    size_t fsize = ftell(fp);
+    void* blob = malloc(fsize);
+    if (blob == NULL) {
+        fclose(fp);
+        return NULL;
+    }
+
+    rewind(fp);
+    fread(blob, 1, fsize, fp);
+    fclose(fp);
+    if (size)
+        *size = fsize;
+    return blob;
+}
+
 static void view_init(void) {
-	ui_lvgen__view_create(lv_screen_active());
+    size_t size;
+    void* wfb = read_file("IMG/wface.wfb", &size);
+
+    wf_env_t env = {NULL};
+    wf_load(wfb, (uint32_t)size, &re_file, &env, lv_screen_active());
 }
 
 int main(int argc, char* argv[]) {
-    re_file_open("res.bin", RE_F_FILE_CHECK, &re_file);
+    if (re_file_open("IMG/res.bin", RE_F_FILE_CHECK, &re_file))
+        return -1;
+
     re_load_group(&re_file, 0x4a43fec8, &re_group);
 
 	lvgl_runloop(400, 400, view_init, NULL, NULL);

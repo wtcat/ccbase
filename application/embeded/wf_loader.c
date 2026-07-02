@@ -4,13 +4,22 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "embeded/widget/lvgl_animation.h"
+#include "embeded/widget/lvgl_imglabel.h"
 #include "embeded/wf_loader.h"
 #include "embeded/resource/resource_file.h"
+
+#define WF_MAX_REG (16)
 
 typedef struct {
 	wf_event_cb_t cb;
 	uint32_t param;
 } wf_evbind_t;
+
+typedef struct {
+	uint32_t hash;
+	wf_event_cb_t cb;
+} wf_evnode_t;
 
 struct wf_instance {
 	lv_obj_t *screen;
@@ -36,12 +45,9 @@ struct wf_instance {
 	const wf_header_t *hdr;
 };
 
-#define WF_MAX_REG 32
-static struct {
-	uint32_t hash;
-	wf_event_cb_t cb;
-} s_reg[WF_MAX_REG];
-static int s_reg_n;
+
+static wf_evnode_t evnode_array[WF_MAX_REG];
+static int evnode_count;
 
 static uint32_t crc32_calc(const uint8_t *data, uint32_t len) {
     /* CRC-32 (poly 0xEDB88320)  */
@@ -61,22 +67,22 @@ static uint32_t crc32_calc(const uint8_t *data, uint32_t len) {
 
 void wf_register_event(const char *name, wf_event_cb_t cb) {
 	uint32_t h = re_name_hash((const uint8_t *)name, (uint32_t)strlen(name));
-	for (int i = 0; i < s_reg_n; i++)
-		if (s_reg[i].hash == h) {
-			s_reg[i].cb = cb;
+	for (int i = 0; i < evnode_count; i++)
+		if (evnode_array[i].hash == h) {
+			evnode_array[i].cb = cb;
 			return;
 		}
-	if (s_reg_n < WF_MAX_REG) {
-		s_reg[s_reg_n].hash = h;
-		s_reg[s_reg_n].cb = cb;
-		s_reg_n++;
+	if (evnode_count < WF_MAX_REG) {
+		evnode_array[evnode_count].hash = h;
+		evnode_array[evnode_count].cb = cb;
+		evnode_count++;
 	}
 }
 
 wf_event_cb_t wf_lookup_event(uint32_t cb_hash) {
-	for (int i = 0; i < s_reg_n; i++)
-		if (s_reg[i].hash == cb_hash)
-			return s_reg[i].cb;
+	for (int i = 0; i < evnode_count; i++)
+		if (evnode_array[i].hash == cb_hash)
+			return evnode_array[i].cb;
 	return NULL;
 }
 
@@ -121,29 +127,10 @@ static lv_event_code_t map_event(uint8_t c) {
 	return (c < sizeof(m) / sizeof(m[0])) ? m[c] : LV_EVENT_CLICKED;
 }
 
-static lv_color_format_t map_cf(uint32_t fmt) {
-	switch (fmt) {
-	case PIXEL_FORMAT_INDEXED8:
-		return LV_COLOR_FORMAT_I8;
-	case PIXEL_FORMAT_RGB565:
-		return LV_COLOR_FORMAT_RGB565;
-	case PIXEL_FORMAT_ARGB565:
-		return LV_COLOR_FORMAT_RGB565A8; /* TODO: approximate */
-	case PIXEL_FORMAT_RGB888:
-		return LV_COLOR_FORMAT_RGB888;
-	case PIXEL_FORMAT_ARGB888:
-		return LV_COLOR_FORMAT_ARGB8888;
-	default:
-		return LV_COLOR_FORMAT_UNKNOWN;
-	}
-}
-
 static void fill_image_dsc(lv_image_dsc_t *dsc, const struct refile_data *d) {
 	memset(dsc, 0, sizeof(*dsc));
-#ifdef LV_IMAGE_HEADER_MAGIC
 	dsc->header.magic = LV_IMAGE_HEADER_MAGIC;
-#endif
-	dsc->header.cf = (uint8_t)map_cf(d->format);
+	dsc->header.cf = (uint8_t)wf_map_colorfmt(d->format);
 	dsc->header.w = (uint16_t)d->width;
 	dsc->header.h = (uint16_t)d->height;
 	dsc->data_size = d->size;
@@ -373,6 +360,23 @@ static int validate(const wf_header_t *h, uint32_t wfb_size) {
 	return 0;
 }
 
+static lv_color_format_t wf_map_colorfmt(uint32_t fmt) {
+	switch (fmt) {
+	case PIXEL_FORMAT_INDEXED8:
+		return LV_COLOR_FORMAT_I8;
+	case PIXEL_FORMAT_RGB565:
+		return LV_COLOR_FORMAT_RGB565;
+	case PIXEL_FORMAT_ARGB565:
+		return LV_COLOR_FORMAT_RGB565A8; /* TODO: approximate */
+	case PIXEL_FORMAT_RGB888:
+		return LV_COLOR_FORMAT_RGB888;
+	case PIXEL_FORMAT_ARGB888:
+		return LV_COLOR_FORMAT_ARGB8888;
+	default:
+		return LV_COLOR_FORMAT_UNKNOWN;
+	}
+}
+
 wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_res,
 					   const wf_env_t *env, lv_obj_t *screen) {
 	if (!wfb || !screen)
@@ -425,7 +429,6 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 			wf_unload(in);
 			return NULL;
 		}
-		objs[i] = obj;
 
 		for (uint8_t e = 0; e < w->event_count; e++) {
 			uint16_t ei = w->event_start + e;

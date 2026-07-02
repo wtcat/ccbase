@@ -217,7 +217,7 @@ bool FileResource::Format(ImageNode& img, int format, int comp) {
 
     ptr->width = (uint32_t)width;
     ptr->height = (uint32_t)height;
-    ptr->size = (uint32_t)alloc_size;
+    ptr->size = (uint32_t)orgin_size;
     ptr->format = (uint16_t)format;
     ptr->compress = (uint16_t)comp;
 

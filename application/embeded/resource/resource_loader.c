@@ -294,10 +294,5 @@ int re_read_desc(const re_desc_t* desc, void* buf, size_t bsize) {
     if (buf == NULL)
         return -EINVAL;
 #endif
-    if (desc->size > bsize)
-        return -EINVAL;
-
-    int err;
-    RE_FILE_READ_OFFSET(desc->refile->fd, buf, desc->size, desc->offset, err);
-    return err;
+    return re_read_buf(desc, buf, desc->size, 0);
 }

@@ -57,6 +57,7 @@ endif()
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/SDL2/include
+	${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/lvgl
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/SDL2/lib/x64)

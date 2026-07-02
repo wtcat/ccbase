@@ -41,6 +41,7 @@ target_link_libraries(${PROJECT_NAME}
 	lvsim_interface
 	lvgl
 	base
+	embeded
 	resource
 	SDL2.lib
 )
