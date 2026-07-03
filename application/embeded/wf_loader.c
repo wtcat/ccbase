@@ -11,6 +11,11 @@
 
 #define WF_MAX_REG (16)
 
+#ifndef ROUND_UP
+#define ROUND_UP(x, a) (((x) + (a) - 1) & ~((a) - 1))
+#endif
+#define ROUND_UP_PTR(x) ROUND_UP(x, sizeof(void *))
+
 typedef struct {
 	wf_event_cb_t cb;
 	uint32_t param;
@@ -33,6 +38,7 @@ struct wf_instance {
 	 * separately (see wf_load's single-block calloc) */
 	lv_font_t **font_cache; /* [font_count], lazily resolved             */
 	wf_evbind_t *binds;		/* [event_count], resolved at load time      */
+	lv_image_dsc_t* image_array;
 
 	/* read-only views into the wfb buffer */
 	const wf_widget_t *widgets;
@@ -138,25 +144,18 @@ static void fill_image_dsc(lv_image_dsc_t *dsc, const struct refile_data *d) {
 	/* NOTE: LZ4-compressed entries (d->compress) are not decoded here yet. */
 }
 
-/* Load a single image by namekey into a persistent, tracked lv_image_dsc_t.
- * Returns the dsc pointer, or NULL on failure. */
-static lv_image_dsc_t *load_image_dsc(wf_instance_t *in, const re_file_t *res,
-									  uint32_t namekey) {
+static int load_image_dsc(wf_instance_t *in, const re_file_t *res,
+						uint32_t namekey, lv_image_dsc_t* odsc) {
 	struct refile_data *blob = NULL;
 	if (re_load_image(res, namekey, &blob) != 0 || !blob)
-		return NULL;
+		return -ENODATA;
 	if (track(in, blob) != 0) {
 		free(blob);
-		return NULL;
+		return -ENOMEM;
 	}
 
-	lv_image_dsc_t *dsc = malloc(sizeof(*dsc));
-	if (track(in, dsc) != 0) {
-		free(dsc);
-		return NULL;
-	}
-	fill_image_dsc(dsc, blob);
-	return dsc;
+	fill_image_dsc(odsc, blob);
+	return 0;
 }
 
 static void apply_style(lv_obj_t *obj, const wf_style_t *s) {
@@ -180,9 +179,8 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 	case WF_W_IMAGE: {
 		obj = lv_image_create(parent);
 		if (w->res_ref != WF_REF_NONE) {
-			lv_image_dsc_t *dsc = load_image_dsc(in, res, in->images[w->res_ref].namekey);
-			if (dsc)
-				lv_image_set_src(obj, dsc);
+			if (!load_image_dsc(in, res, in->images[w->res_ref].namekey, &in->image_array[w->res_ref]))
+				lv_image_set_src(obj, &in->image_array[w->res_ref]);
 		}
 		break;
 	}
@@ -394,12 +392,18 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 	 * stays a separate alloc — it is freed before wf_load returns. */
 	size_t fc_bytes = (size_t)h->font_count * sizeof(lv_font_t *);
 	size_t bind_bytes = (size_t)h->event_count * sizeof(wf_evbind_t);
-	wf_instance_t *in = calloc(1, sizeof(*in) + fc_bytes + bind_bytes);
+	size_t img_bytes = (size_t)h->image_count * sizeof(lv_image_dsc_t);
+	fc_bytes = ROUND_UP_PTR(fc_bytes);
+	bind_bytes = ROUND_UP_PTR(bind_bytes);
+
+	wf_instance_t *in = calloc(1, sizeof(*in) + fc_bytes + bind_bytes + img_bytes);
 	if (!in)
 		return NULL;
 	uint8_t *tail = (uint8_t *)in + sizeof(*in);
 	in->font_cache = h->font_count ? (lv_font_t **)tail : NULL;
 	in->binds = h->event_count ? (wf_evbind_t *)(tail + fc_bytes) : NULL;
+	in->image_array = h->image_count ? (lv_image_dsc_t*)(tail + fc_bytes + bind_bytes) : NULL;
+
 	in->screen = screen;
 	in->hdr = h;
 	in->widgets = (const wf_widget_t *)(L + h->off_widgets);
@@ -413,7 +417,7 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 	/* scratch index->object map, freed before returning (steady-state RAM save) */
 	lv_obj_t **objs = calloc(h->widget_count ? h->widget_count : 1, sizeof(lv_obj_t *));
 	if (!objs) {
-		wf_unload(in);
+		wf_unload(in, false);
 		return NULL;
 	}
 
@@ -426,15 +430,15 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 		lv_obj_t *obj = create_widget(in, img_res, env, w, parent);
 		if (!obj) {
 			free(objs);
-			wf_unload(in);
+			wf_unload(in, false);
 			return NULL;
 		}
 
+		objs[i] = obj;
 		for (uint8_t e = 0; e < w->event_count; e++) {
 			uint16_t ei = w->event_start + e;
 			const wf_event_t *ev = &in->events[ei];
-			wf_event_cb_t cb = (env && env->get_event) ? env->get_event(ev->cb_hash)
-													   : wf_lookup_event(ev->cb_hash);
+			wf_event_cb_t cb = wf_lookup_event(ev->cb_hash);
 			if (!cb)
 				continue;
 			in->binds[ei].cb = cb;
@@ -447,13 +451,13 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 	return in;
 }
 
-void wf_unload(wf_instance_t *in) {
+void wf_unload(wf_instance_t *in, bool del_screen) {
 	if (!in)
 		return;
-	if (in->screen)
+	if (in->screen && del_screen)
 		lv_obj_clean(in->screen); /* delete created children */
 	for (int i = 0; i < in->n_alloc; i++)
 		free(in->allocs[i]);
 	free(in->allocs);
-	free(in); /* font_cache + binds live inside this same block */
+	free(in);
 }

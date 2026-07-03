@@ -22,7 +22,6 @@ extern "C" {
  */
 typedef struct {
 	lv_font_t *(*get_font)(uint32_t namekey);
-	wf_event_cb_t (*get_event)(uint32_t cb_hash);
 } wf_env_t;
 
 typedef struct wf_instance wf_instance_t;
@@ -36,7 +35,7 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 					   const wf_env_t *env, lv_obj_t *screen);
 
 /* Delete the created objects and free all resources held by the instance. */
-void wf_unload(wf_instance_t *inst);
+void wf_unload(wf_instance_t* inst, bool del_screen);
 
 /* Built-in event registry (used when wf_env_t.get_event is NULL). */
 void wf_register_event(const char *name, wf_event_cb_t cb);
