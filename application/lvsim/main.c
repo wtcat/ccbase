@@ -2,6 +2,7 @@
  * Copyright 2025 wtcat 
  */
 
+#include <errno.h>
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -11,13 +12,21 @@
 #include "thirdparty/lvgl/lvgl.h"
 #include "thirdparty/lvgl/src/misc/lv_event.h"
 #include "thirdparty/lvgl/src/display/lv_display.h"
-#include "thirdparty/lvgl/src/core/lv_obj_private.h"
+#include "thirdparty/lz4/lib/lz4.h"
 #undef main
 
 #include "embeded/resource/resource_file.h"
 #include "embeded/resource/resource_loader.h"
+#include "embeded/decoder/lz4_lazydecoder.h"
 #include "embeded/wf_loader.h"
 
+
+#define SCREEN_W (466)
+#define SCREEN_H (466)
+#define SCREEN_BUFSIZE (SCREEN_W * SCREEN_H * (LV_COLOR_DEPTH / 8))
+
+
+static char decoder_buffer[SCREEN_BUFSIZE * 3];
 static wf_instance_t* wf_current;
 static void* wf_binary;
 static re_file_t re_file;
@@ -44,13 +53,14 @@ static void* read_file(const char* name, size_t *size) {
 }
 
 static void view_init(void) {
+    lz4_lazydecoder_init();
+    lazy_cache_init(decoder_buffer, sizeof(decoder_buffer), NULL);
+
     size_t size;
     void* wfb = read_file("IMG/wface.wfb", &size);
-
     wf_env_t env = {NULL};
     wf_binary = wfb;
     wf_current = wf_load(wfb, (uint32_t)size, &re_file, &env, lv_screen_active());
-    
 }
 
 static void on_exit(void) {

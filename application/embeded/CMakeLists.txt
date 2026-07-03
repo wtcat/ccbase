@@ -6,5 +6,6 @@ target_sources(embeded
 #	${CMAKE_CURRENT_SOURCE_DIR}/wf_anim_loader.c
 )
 
+add_subdirectory(decoder)
 add_subdirectory(widget)
 add_subdirectory(resource)

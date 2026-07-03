@@ -4,10 +4,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define WF_USE_LAZYDECOMP 0
+
+#include "embeded/wf_loader.h"
+
 #include "embeded/widget/lvgl_animation.h"
 #include "embeded/widget/lvgl_imglabel.h"
-#include "embeded/wf_loader.h"
 #include "embeded/resource/resource_file.h"
+#if WF_USE_LAZYDECOMP
+#include "embeded/decoder/lvgl_lazydecomp.h"
+#endif
+
 
 #define WF_MAX_REG (16)
 
@@ -15,6 +22,12 @@
 #define ROUND_UP(x, a) (((x) + (a) - 1) & ~((a) - 1))
 #endif
 #define ROUND_UP_PTR(x) ROUND_UP(x, sizeof(void *))
+
+#if WF_USE_LAZYDECOMP
+# define WF_IMAGE_ESIZE (sizeof(lv_image_dsc_t) + sizeof(struct image_decomp))
+#else
+# define WF_IMAGE_ESIZE (sizeof(lv_image_dsc_t))
+#endif
 
 typedef struct {
 	wf_event_cb_t cb;
@@ -38,7 +51,7 @@ struct wf_instance {
 	 * separately (see wf_load's single-block calloc) */
 	lv_font_t **font_cache; /* [font_count], lazily resolved             */
 	wf_evbind_t *binds;		/* [event_count], resolved at load time      */
-	lv_image_dsc_t* image_array;
+	void*  image_array;
 
 	/* read-only views into the wfb buffer */
 	const wf_widget_t *widgets;
@@ -51,9 +64,25 @@ struct wf_instance {
 	const wf_header_t *hdr;
 };
 
+#if WF_USE_LAZYDECOMP
+struct image_decomp {
+	struct lazy_decomp base;
+	const lv_image_dsc_t* dsc;
+	uint32_t cflag : 2;
+	uint32_t csize : 30;
+	re_desc_t re;
+};
+#endif
+
 
 static wf_evnode_t evnode_array[WF_MAX_REG];
 static int evnode_count;
+
+extern int LZ4_decompress_safe(const char* src, char* dst, int compressedSize, int dstCapacity);
+
+static inline void* image_array_at(wf_instance_t* in, size_t idx) {
+	return (void *)((char*)in->image_array + WF_IMAGE_ESIZE * idx);
+}
 
 static uint32_t crc32_calc(const uint8_t *data, uint32_t len) {
     /* CRC-32 (poly 0xEDB88320)  */
@@ -133,6 +162,73 @@ static lv_event_code_t map_event(uint8_t c) {
 	return (c < sizeof(m) / sizeof(m[0])) ? m[c] : LV_EVENT_CLICKED;
 }
 
+#if WF_USE_LAZYDECOMP
+static int image_decompress(const struct lazy_decomp* ld, void* dst, size_t dstsize) {
+	struct image_decomp* rd = (struct image_decomp*)ld;
+	int ret;
+
+	if (rd->cflag != REFILE_COMPRESS_NONE) {
+		void* debuf = RE_MALLOC(rd->csize);
+		if (debuf == NULL)
+			return -ENOMEM;
+
+		ret = re_read_buf(&rd->re, debuf, rd->csize - sizeof(struct refile_data),
+			sizeof(struct refile_data));
+		if (ret)
+			goto _free;
+
+		switch (rd->cflag) {
+		case REFILE_COMPRESS_LZ4:
+			ret = LZ4_decompress_safe(debuf, dst, (int)rd->csize, (int)dstsize);
+			break;
+		default:
+			ret = -ENOTSUP;
+			break;
+		}
+
+	_free:
+		RE_FREE(debuf);
+		return ret < 0 ? ret : 0;
+	}
+
+	return re_read_buf(&rd->re, dst, rd->csize - sizeof(struct refile_data), 
+		sizeof(struct refile_data));
+}
+
+static int image_prefetch(const re_file_t* refile, uint32_t name,
+	lv_image_dsc_t* dsc, struct image_decomp* rd) {
+	struct refile_data data;
+	int err;
+
+	err = re_read_image_dsc(refile, name, &rd->re);
+	if (err)
+		return err;
+
+	err = re_read_buf(&rd->re, &data, sizeof(data), 0);
+	if (err)
+		return err;
+
+	rd->base.decompress = image_decompress;
+	rd->base.offset = rd->re.offset;
+	rd->cflag = data.compress;
+	rd->csize = rd->re.size;
+	rd->dsc = dsc;
+
+	dsc->header.magic = LV_IMAGE_HEADER_MAGIC;
+	dsc->header.cf = (uint8_t)wf_map_colorfmt(data.format);
+	dsc->header.w = data.width;
+	dsc->header.h = data.height;
+	dsc->header.flags = 0;
+	dsc->header.stride = 0;
+	dsc->header.reserved_2 = LV_IMG_LAZYDECOMP_MARKER;
+	dsc->data_size = data.size;
+	dsc->data = (void *)rd;
+	dsc->reserved = NULL;
+	dsc->reserved_2 = NULL;
+	return 0;
+}
+#endif /* WF_USE_LAZYDECOMP == 1 */
+
 static void fill_image_dsc(lv_image_dsc_t *dsc, const struct refile_data *d) {
 	memset(dsc, 0, sizeof(*dsc));
 	dsc->header.magic = LV_IMAGE_HEADER_MAGIC;
@@ -179,8 +275,14 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 	case WF_W_IMAGE: {
 		obj = lv_image_create(parent);
 		if (w->res_ref != WF_REF_NONE) {
-			if (!load_image_dsc(in, res, in->images[w->res_ref].namekey, &in->image_array[w->res_ref]))
-				lv_image_set_src(obj, &in->image_array[w->res_ref]);
+			lv_image_dsc_t* dsc = image_array_at(in, w->res_ref);
+#if WF_USE_LAZYDECOMP
+			if (!image_prefetch(res, in->images[w->res_ref].namekey, dsc, (struct image_decomp *)(dsc + 1)))
+				lv_image_set_src(obj, dsc);
+#else
+			if (!load_image_dsc(in, res, in->images[w->res_ref].namekey, dsc))
+				lv_image_set_src(obj, dsc);
+#endif
 		}
 		break;
 	}
@@ -358,7 +460,7 @@ static int validate(const wf_header_t *h, uint32_t wfb_size) {
 	return 0;
 }
 
-static lv_color_format_t wf_map_colorfmt(uint32_t fmt) {
+lv_color_format_t wf_map_colorfmt(uint32_t fmt) {
 	switch (fmt) {
 	case PIXEL_FORMAT_INDEXED8:
 		return LV_COLOR_FORMAT_I8;
@@ -379,6 +481,7 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 					   const wf_env_t *env, lv_obj_t *screen) {
 	if (!wfb || !screen)
 		return NULL;
+
 	const wf_header_t *h = (const wf_header_t *)wfb;
 	if (validate(h, wfb_size) != 0)
 		return NULL;
@@ -392,7 +495,7 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 	 * stays a separate alloc — it is freed before wf_load returns. */
 	size_t fc_bytes = (size_t)h->font_count * sizeof(lv_font_t *);
 	size_t bind_bytes = (size_t)h->event_count * sizeof(wf_evbind_t);
-	size_t img_bytes = (size_t)h->image_count * sizeof(lv_image_dsc_t);
+	size_t img_bytes = (size_t)h->image_count * WF_IMAGE_ESIZE;
 	fc_bytes = ROUND_UP_PTR(fc_bytes);
 	bind_bytes = ROUND_UP_PTR(bind_bytes);
 
@@ -402,7 +505,7 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 	uint8_t *tail = (uint8_t *)in + sizeof(*in);
 	in->font_cache = h->font_count ? (lv_font_t **)tail : NULL;
 	in->binds = h->event_count ? (wf_evbind_t *)(tail + fc_bytes) : NULL;
-	in->image_array = h->image_count ? (lv_image_dsc_t*)(tail + fc_bytes + bind_bytes) : NULL;
+	in->image_array = h->image_count ? (void *)(tail + fc_bytes + bind_bytes) : NULL;
 
 	in->screen = screen;
 	in->hdr = h;

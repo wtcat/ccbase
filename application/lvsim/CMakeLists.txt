@@ -40,6 +40,7 @@ add_subdirectory(plugin)
 target_link_libraries(${PROJECT_NAME}
 	lvsim_interface
 	lvgl
+	lz4
 	base
 	embeded
 	resource

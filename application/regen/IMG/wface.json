@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "screen": { "w": 466, "h": 466, "bg": "#000000" },
+
+  "resources": {
+    "images": [
+      { "name": "background",        "file": "reIMG__HEARTRATE_00008" }
+    ],
+    "anims": [
+      { "name": "health", "duration": 800, "repeat": 0, "file": "reIMG__GRP_HEALTH" }
+    ]
+  },
+
+  "widgets": [
+    {
+      "id": "bg",
+      "type": "image",
+      "image": "background",
+      "align": "top_left"
+    },
+    {
+      "id": "loader",
+      "type": "frame_anim",
+      "anim": "health",
+      "align": "bottom_right",
+      "y": 60
+    }
+  ]
+}
