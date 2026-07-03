@@ -10,53 +10,57 @@
 
 size_t RGBConvertor::Convert(const uint8_t* src, int w, int h, int channels, 
     int format, uint8_t* outpx) {
-    size_t dst_size;
+    const int n = w * h;
+    size_t dst_size = 0;
+    uint8_t* alpha;
 
     switch (format) {
     case PIXEL_FORMAT_RGB888:
-        for (int i = 0; i < w * h; i++) {
-            outpx[i * 3 + 0] = src[i * channels + 0]; // R
+        // LVGL LV_COLOR_FORMAT_RGB888 stores bytes as B, G, R
+        for (int i = 0; i < n; i++) {
+            outpx[i * 3 + 0] = src[i * channels + 2]; // B
             outpx[i * 3 + 1] = src[i * channels + 1]; // G
-            outpx[i * 3 + 2] = src[i * channels + 2]; // B
+            outpx[i * 3 + 2] = src[i * channels + 0]; // R
         }
-        dst_size = (size_t)w * h * 3;
+        dst_size = (size_t)n * 3;
         break;
 
     case PIXEL_FORMAT_ARGB888:
-        for (int i = 0; i < w * h; i++) {
-            outpx[i * 4 + 0] = src[i * channels + 0]; // R
+        // LVGL LV_COLOR_FORMAT_ARGB8888 stores bytes as B, G, R, A
+        for (int i = 0; i < n; i++) {
+            outpx[i * 4 + 0] = src[i * channels + 2]; // B
             outpx[i * 4 + 1] = src[i * channels + 1]; // G
-            outpx[i * 4 + 2] = src[i * channels + 2]; // B
+            outpx[i * 4 + 2] = src[i * channels + 0]; // R
             outpx[i * 4 + 3] = src[i * channels + 3]; // A
         }
-        dst_size = (size_t)w * h * 4;
+        dst_size = (size_t)n * 4;
         break;
 
     case PIXEL_FORMAT_RGB565:
-        for (int i = 0; i < w * h; i++) {
-            uint8_t r = src[i * channels + 0];
-            uint8_t g = src[i * channels + 1];
-            uint8_t b = src[i * channels + 2];
-            uint16_t rgb565 = ToRGB565(r, g, b);
-
+        for (int i = 0; i < n; i++) {
+            uint16_t rgb565 = ToRGB565(src[i * channels + 0],
+                src[i * channels + 1],
+                src[i * channels + 2]);
             outpx[i * 2 + 0] = rgb565 & 0xFF;
             outpx[i * 2 + 1] = rgb565 >> 8;
         }
-        dst_size = (size_t)w * h * 2;
+        dst_size = (size_t)n * 2;
         break;
 
     case PIXEL_FORMAT_ARGB565:
-        for (int i = 0; i < w * h; i++) {
-            uint8_t r = src[i * channels + 0];
-            uint8_t g = src[i * channels + 1];
-            uint8_t b = src[i * channels + 2];
-            uint16_t rgb565 = ToRGB565(r, g, b);
-
-            outpx[i * 3 + 0] = rgb565 & 0xFF;
-            outpx[i * 3 + 1] = rgb565 >> 8;
-            outpx[i * 3 + 2] = src[i * channels + 3];
+        // LVGL LV_COLOR_FORMAT_RGB565A8 is planar: an RGB565 color plane
+        // (2 bytes/px) followed by a separate A8 alpha plane (1 byte/px),
+        // NOT interleaved per pixel.
+        alpha = outpx + (size_t)n * 2;
+        for (int i = 0; i < n; i++) {
+            uint16_t rgb565 = ToRGB565(src[i * channels + 0],
+                src[i * channels + 1],
+                src[i * channels + 2]);
+            outpx[i * 2 + 0] = rgb565 & 0xFF;
+            outpx[i * 2 + 1] = rgb565 >> 8;
+            alpha[i] = src[i * channels + 3];
         }
-        dst_size = (size_t)w * h * 3;
+        dst_size = (size_t)n * 3;
         break;
 
     case PIXEL_FORMAT_INDEXED8: {

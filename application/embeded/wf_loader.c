@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define WF_USE_LAZYDECOMP 0
+#define WF_USE_LAZYDECOMP 1
 
 #include "embeded/wf_loader.h"
 
@@ -200,10 +200,12 @@ static int image_prefetch(const re_file_t* refile, uint32_t name,
 	struct refile_data data;
 	int err;
 
+	/* Get image descriptor */
 	err = re_read_image_dsc(refile, name, &rd->re);
 	if (err)
 		return err;
 
+	/* Get image information */
 	err = re_read_buf(&rd->re, &data, sizeof(data), 0);
 	if (err)
 		return err;
@@ -214,6 +216,7 @@ static int image_prefetch(const re_file_t* refile, uint32_t name,
 	rd->csize = rd->re.size;
 	rd->dsc = dsc;
 
+	/* Fill LVGL image descriptor */
 	dsc->header.magic = LV_IMAGE_HEADER_MAGIC;
 	dsc->header.cf = (uint8_t)wf_map_colorfmt(data.format);
 	dsc->header.w = data.width;
@@ -277,7 +280,8 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 		if (w->res_ref != WF_REF_NONE) {
 			lv_image_dsc_t* dsc = image_array_at(in, w->res_ref);
 #if WF_USE_LAZYDECOMP
-			if (!image_prefetch(res, in->images[w->res_ref].namekey, dsc, (struct image_decomp *)(dsc + 1)))
+			struct image_decomp* de = (struct image_decomp*)(dsc + 1);
+			if (!image_prefetch(res, in->images[w->res_ref].namekey, dsc, de))
 				lv_image_set_src(obj, dsc);
 #else
 			if (!load_image_dsc(in, res, in->images[w->res_ref].namekey, dsc))
