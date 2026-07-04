@@ -15,7 +15,7 @@
 #define MIN(a, b) ((a) < (b)? (a): (b))
 #endif
 
-static uint32_t re_crc32_update(uint32_t crc, const uint8_t* data, size_t len) {
+uint32_t re_crc32_update(uint32_t crc, const uint8_t* data, size_t len) {
     /* crc table generated from polynomial 0xedb88320 */
     static const uint32_t table[16] = {
         0x00000000U, 0x1db71064U, 0x3b6e20c8U, 0x26d930acU, 0x76dc4190U, 0x6b6b51f4U,
@@ -125,7 +125,7 @@ int re_file_close(re_file_t* refile) {
     return 0;
 }
 
-int re_read_image_dsc(const re_file_t* refile, uint32_t id, re_desc_t* desc) {
+int re_read_dsc(const re_file_t* refile, uint32_t id, re_desc_t* desc) {
 #ifndef RE_LOADER_DISABLE_CHECKER
     if (refile == NULL || refile->p == NULL)
         return -EINVAL;
@@ -150,7 +150,7 @@ int re_read_image_dsc(const re_file_t* refile, uint32_t id, re_desc_t* desc) {
 int re_load_image(const re_file_t* refile, uint32_t id, struct refile_data **img) {
     re_desc_t desc;
 
-    int err = re_read_image_dsc(refile, id, &desc);
+    int err = re_read_dsc(refile, id, &desc);
     if (err == 0) {
         struct refile_data* d = RE_MALLOC(desc.size);
         if (d == NULL)
@@ -236,7 +236,7 @@ size_t re_group_size(const re_group_t* regroup) {
     return g->count;
 }
 
-int re_read_group_image_dsc(const re_group_t* regroup, uint32_t idx, re_desc_t *desc) {
+int re_read_group_dsc(const re_group_t* regroup, uint32_t idx, re_desc_t *desc) {
 #ifndef RE_LOADER_DISABLE_CHECKER
     if (regroup == NULL || regroup->p == NULL)
         return -EINVAL;
@@ -284,15 +284,4 @@ int re_load_group_image(const re_group_t* regroup, uint32_t idx, struct refile_d
         return 0;
     }
     return -EINVAL;
-}
-
-int re_read_desc(const re_desc_t* desc, void* buf, size_t bsize) {
-#ifndef RE_LOADER_DISABLE_CHECKER
-    if (desc == NULL || desc->refile == NULL)
-        return -EINVAL;
-
-    if (buf == NULL)
-        return -EINVAL;
-#endif
-    return re_read_buf(desc, buf, desc->size, 0);
 }

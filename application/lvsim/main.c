@@ -76,6 +76,36 @@ int main(int argc, char* argv[]) {
     if (re_file_open("IMG/res.bin", RE_F_FILE_CHECK, &re_file))
         return -1;
 
+#if 0 //String test
+    re_file_t temp;
+    if (!re_file_open("en.bin", RE_F_FILE_CHECK, &temp)) {
+        uint32_t array[] = {
+            0x768fc4c1u,
+            0x768fc4c2u,
+            0x768fc4c8u,
+            0x6552bbe6u,
+            0x6552bbe4u,
+            0x6552bbeau,
+            0x6652bd57u,
+            0x6652bd55u,
+            0x6652bd53u,
+            0x6652bd51u,
+            0x6652bd5fu,
+            0x6752bec9u,
+            0x6752becau,
+            0
+        };
+        re_desc_t desc;
+        char buf[128];
+        for (int i = 0; array[i]; i++) {
+            re_read_dsc(&temp, array[i], &desc);
+            re_read_buf(&desc, buf, desc.size, 0);
+            printf(">%s\n", buf);
+        }
+        re_file_close(&temp);
+    }
+#endif
+
     atexit(on_exit);
 	lvgl_runloop(466, 466, view_init, NULL, NULL);
 	return 0;

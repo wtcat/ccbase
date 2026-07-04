@@ -197,7 +197,7 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 #if WF_USE_LAZYDECOMP
 			struct image_decomp* de = (struct image_decomp*)(dsc + 1);
 			if (!re_image_prefetch(res, in->images[w->res_ref].namekey, dsc, de, 
-				(re_read_t)re_read_image_dsc))
+				(re_read_t)re_read_dsc))
 				lv_image_set_src(obj, dsc);
 #else
 			if (!load_image_dsc(in, res, in->images[w->res_ref].namekey, dsc))
@@ -240,7 +240,7 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 #if WF_USE_LAZYDECOMP
 						lv_image_dsc_t* imgdsc = image_array_at(dscs, i);
 						if (re_image_prefetch(&grp, (uint32_t)i, imgdsc, (void*)(imgdsc + 1),
-							(re_read_t)re_read_group_image_dsc))
+							(re_read_t)re_read_group_dsc))
 							break;
 						srcs[got] = imgdsc;
 #else
@@ -290,7 +290,7 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 					for (size_t i = 0; i < n; i++) {
 #if WF_USE_LAZYDECOMP
 						if (re_image_prefetch(&grp, (uint32_t)i, &chars[i], &rds[i],
-							(re_read_t)re_read_group_image_dsc))
+							(re_read_t)re_read_group_dsc))
 							break;
 #else
 						struct refile_data *blob = NULL;

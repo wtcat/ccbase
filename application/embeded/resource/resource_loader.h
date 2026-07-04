@@ -100,19 +100,21 @@ int re_read_buf(const re_desc_t* desc, void* buf, size_t bsize, unsigned long of
     return err;
 }
 
+uint32_t re_crc32_update(uint32_t crc, const uint8_t* data, size_t len);
+
 int re_file_open(const char* file, unsigned int flags, re_file_t* refile);
 int re_file_close(re_file_t* refile);
 
 int re_read_desc(const re_desc_t* desc, void* buf, size_t bsize);
 
-int re_read_image_dsc(const re_file_t* refile, uint32_t id, re_desc_t* desc);
+int re_read_dsc(const re_file_t* refile, uint32_t id, re_desc_t* desc);
 int re_load_image(const re_file_t* refile, uint32_t id, struct refile_data** img);
 int re_unload_image(struct refile_data* img);
 
 int re_load_group(const re_file_t* refile, uint32_t gid, re_group_t* regroup);
 int re_unload_group(re_group_t* regroup);
 size_t re_group_size(const re_group_t* regroup);
-int re_read_group_image_dsc(const re_group_t* regroup, uint32_t idx, re_desc_t* desc);
+int re_read_group_dsc(const re_group_t* regroup, uint32_t idx, re_desc_t* desc);
 int re_load_group_image(const re_group_t* regroup, uint32_t idx, struct refile_data** img);
 
 #ifdef __cplusplus
