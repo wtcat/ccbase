@@ -39,9 +39,11 @@ do { \
     (_err) = 0; \
 } while (0)
 
-#define RE_FILE_CLOSE(_fd) fclose(_fd)
-#define RE_MALLOC(_size)   malloc((_size))
-#define RE_FREE(_ptr)      free((_ptr))
+#define RE_FILE_CLOSE(_fd)      fclose(_fd)
+#define RE_MALLOC(_size)        malloc(_size)
+#define RE_REALLOC(_ptr, _size) realloc(_ptr, _size)
+#define RE_CALLOC(_n, _size)    calloc(_n, _size)
+#define RE_FREE(_ptr)           free(_ptr)
 
 #else
 #error "Unsupported operation system"

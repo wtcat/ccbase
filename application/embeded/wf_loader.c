@@ -4,20 +4,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define WF_USE_LAZYDECOMP 0
+#define WF_USE_LAZYDECOMP 1
 
 #include "embeded/wf_loader.h"
 
 #include "embeded/widget/lvgl_animation.h"
 #include "embeded/widget/lvgl_imglabel.h"
-#include "embeded/resource/resource_file.h"
-#if WF_USE_LAZYDECOMP
-#include "embeded/decoder/lvgl_lazydecomp.h"
-#endif
+#include "embeded/resource/resource_lvgl.h"
 
 
 #define WF_MAX_REG (16)
-
 #ifndef ROUND_UP
 #define ROUND_UP(x, a) (((x) + (a) - 1) & ~((a) - 1))
 #endif
@@ -28,8 +24,6 @@
 #else
 # define WF_IMAGE_ESIZE (sizeof(lv_image_dsc_t))
 #endif
-
-typedef int (*re_read_t)(const void*, uint32_t, re_desc_t*);
 
 typedef struct {
 	wf_event_cb_t cb;
@@ -44,13 +38,13 @@ typedef struct {
 struct wf_instance {
 	lv_obj_t *screen;
 
-	/* growable list of malloc'd blocks to free on unload (image blobs, dsc
+	/* growable list of malloc'd blocks to RE_FREE on unload (image blobs, dsc
 	 * arrays, frame pointer arrays) — compact vector, not a linked list. */
 	void **allocs;
 	int n_alloc, cap_alloc;
 
-	/* both point into the trailing bytes of this same block — never free()d
-	 * separately (see wf_load's single-block calloc) */
+	/* both point into the trailing bytes of this same block — never RE_FREE()d
+	 * separately (see wf_load's single-block RE_CALLOC) */
 	lv_font_t **font_cache; /* [font_count], lazily resolved             */
 	wf_evbind_t *binds;		/* [event_count], resolved at load time      */
 	void*  image_array;
@@ -66,21 +60,10 @@ struct wf_instance {
 	const wf_header_t *hdr;
 };
 
-#if WF_USE_LAZYDECOMP
-struct image_decomp {
-	struct lazy_decomp base;
-	const lv_image_dsc_t* dsc;
-	uint32_t cflag : 2;
-	uint32_t csize : 30;
-	re_desc_t re;
-};
-#endif
-
 
 static wf_evnode_t evnode_array[WF_MAX_REG];
 static int evnode_count;
 
-extern int LZ4_decompress_safe(const char* src, char* dst, int compressedSize, int dstCapacity);
 
 static inline void* image_array_at(void *array, size_t idx) {
 	return (void *)((char*)array + WF_IMAGE_ESIZE * idx);
@@ -128,7 +111,7 @@ static int track(wf_instance_t *in, void *p) {
 		return -1;
 	if (in->n_alloc == in->cap_alloc) {
 		int nc = in->cap_alloc ? in->cap_alloc * 2 : 16;
-		void **na = realloc(in->allocs, (size_t)nc * sizeof(void *));
+		void **na = RE_REALLOC(in->allocs, (size_t)nc * sizeof(void *));
 		if (!na)
 			return -1;
 		in->allocs = na;
@@ -164,80 +147,11 @@ static lv_event_code_t map_event(uint8_t c) {
 	return (c < sizeof(m) / sizeof(m[0])) ? m[c] : LV_EVENT_CLICKED;
 }
 
-#if WF_USE_LAZYDECOMP
-static int image_decompress(const struct lazy_decomp* ld, void* dst, size_t dstsize) {
-	struct image_decomp* rd = (struct image_decomp*)ld;
-	int ret;
-
-	if (rd->cflag != REFILE_COMPRESS_NONE) {
-		size_t cdata_size = rd->csize - sizeof(struct refile_data);
-		void* debuf = RE_MALLOC(cdata_size);
-		if (debuf == NULL)
-			return -ENOMEM;
-
-		ret = re_read_buf(&rd->re, debuf, cdata_size, sizeof(struct refile_data));
-		if (ret)
-			goto _free;
-
-		switch (rd->cflag) {
-		case REFILE_COMPRESS_LZ4:
-			ret = LZ4_decompress_safe(debuf, dst, (int)cdata_size, (int)dstsize);
-			break;
-		default:
-			ret = -ENOTSUP;
-			break;
-		}
-
-	_free:
-		RE_FREE(debuf);
-		return ret < 0 ? ret : 0;
-	}
-
-	return re_read_buf(&rd->re, dst, rd->csize - sizeof(struct refile_data), 
-		sizeof(struct refile_data));
-}
-
-static int image_prefetch(const void* handle, uint32_t name,
-	lv_image_dsc_t* dsc, struct image_decomp* rd, re_read_t read) {
-	struct refile_data data;
-	int err;
-
-	/* Get image descriptor */
-	err = read(handle, name, &rd->re);
-	if (err)
-		return err;
-
-	/* Get image information */
-	err = re_read_buf(&rd->re, &data, sizeof(data), 0);
-	if (err)
-		return err;
-
-	rd->base.decompress = image_decompress;
-	rd->base.offset = rd->re.offset;
-	rd->cflag = data.compress;
-	rd->csize = rd->re.size;
-	rd->dsc = dsc;
-
-	/* Fill LVGL image descriptor */
-	dsc->header.magic = LV_IMAGE_HEADER_MAGIC;
-	dsc->header.cf = (uint8_t)wf_map_colorfmt(data.format);
-	dsc->header.w = data.width;
-	dsc->header.h = data.height;
-	dsc->header.flags = 0;
-	dsc->header.stride = 0;
-	dsc->header.reserved_2 = LV_IMG_LAZYDECOMP_MARKER;
-	dsc->data_size = data.size;
-	dsc->data = (void*)rd;
-	dsc->reserved = NULL;
-	dsc->reserved_2 = NULL;
-	return 0;
-}
-
-#else /* WF_USE_LAZYDECOMP == 0 */
+#if WF_USE_LAZYDECOMP == 0
 static void fill_image_dsc(lv_image_dsc_t *dsc, const struct refile_data *d) {
 	memset(dsc, 0, sizeof(*dsc));
 	dsc->header.magic = LV_IMAGE_HEADER_MAGIC;
-	dsc->header.cf = (uint8_t)wf_map_colorfmt(d->format);
+	dsc->header.cf = (uint8_t)re_map_colorfmt(d->format);
 	dsc->header.w = (uint16_t)d->width;
 	dsc->header.h = (uint16_t)d->height;
 	dsc->data_size = d->size;
@@ -251,7 +165,7 @@ static int load_image_dsc(wf_instance_t *in, const re_file_t *res,
 	if (re_load_image(res, namekey, &blob) != 0 || !blob)
 		return -ENODATA;
 	if (track(in, blob) != 0) {
-		free(blob);
+		RE_FREE(blob);
 		return -ENOMEM;
 	}
 
@@ -284,7 +198,7 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 			lv_image_dsc_t* dsc = image_array_at(in->image_array, w->res_ref);
 #if WF_USE_LAZYDECOMP
 			struct image_decomp* de = (struct image_decomp*)(dsc + 1);
-			if (!image_prefetch(res, in->images[w->res_ref].namekey, dsc, de, 
+			if (!re_image_prefetch(res, in->images[w->res_ref].namekey, dsc, de, 
 				(re_read_t)re_read_image_dsc))
 				lv_image_set_src(obj, dsc);
 #else
@@ -318,8 +232,8 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 				size_t n = re_group_size(&grp);
 				/* One block holds both the pointer array lv_animimg_set_src
 				 * needs and the contiguous dsc storage it points into — a
-				 * single tracked alloc instead of one malloc per frame. */
-				void *block = n? malloc(n * (sizeof(void *) + WF_IMAGE_ESIZE)) : NULL;
+				 * single tracked alloc instead of one RE_MALLOC per frame. */
+				void *block = n? RE_MALLOC(n * (sizeof(void *) + WF_IMAGE_ESIZE)) : NULL;
 				if (block && track(in, block) == 0) {
 					const void **srcs = (const void **)block;
 					lv_image_dsc_t *dscs = (void *)(srcs + n);
@@ -327,7 +241,7 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 					for (size_t i = 0; i < n; i++) {
 #if WF_USE_LAZYDECOMP
 						lv_image_dsc_t* imgdsc = image_array_at(dscs, i);
-						if (image_prefetch(&grp, (uint32_t)i, imgdsc, (void*)(imgdsc + 1),
+						if (re_image_prefetch(&grp, (uint32_t)i, imgdsc, (void*)(imgdsc + 1),
 							(re_read_t)re_read_group_image_dsc))
 							break;
 						srcs[got] = imgdsc;
@@ -337,7 +251,7 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 							break;
 
 						if (track(in, blob) != 0) {
-							free(blob);
+							RE_FREE(blob);
 							break;
 						}
 						fill_image_dsc(&dscs[got], blob);
@@ -353,7 +267,7 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 						lv_animimg_start(obj);
 					}
 				} else {
-					free(block);
+					RE_FREE(block);
 				}
 				re_unload_group(&grp);
 			}
@@ -369,23 +283,34 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 			re_group_t grp;
 			if (re_load_group(res, in->images[w->res_ref].namekey, &grp) == 0) {
 				size_t n = re_group_size(&grp);
-				lv_image_dsc_t *chars = n ? malloc(n * sizeof(lv_image_dsc_t)) : NULL;
+				lv_image_dsc_t *chars = n ? RE_MALLOC(n * WF_IMAGE_ESIZE) : NULL;
 				if (chars && track(in, chars) == 0) {
+#if WF_USE_LAZYDECOMP
+					struct image_decomp* rds = (struct image_decomp*)(chars + n);
+#endif
 					size_t got = 0;
 					for (size_t i = 0; i < n; i++) {
+#if WF_USE_LAZYDECOMP
+						if (re_image_prefetch(&grp, (uint32_t)i, &chars[i], &rds[i],
+							(re_read_t)re_read_group_image_dsc))
+							break;
+#else
 						struct refile_data *blob = NULL;
 						if (re_load_group_image(&grp, (uint32_t)i, &blob) != 0 || !blob)
 							break;
 						if (track(in, blob) != 0) {
-							free(blob);
+							RE_FREE(blob);
 							break;
 						}
-						fill_image_dsc(&chars[got++], blob);
+						fill_image_dsc(&chars[got], blob);
+#endif
+						got++;
 					}
+
 					if (got)
 						lvgl_imglabel_set_src(obj, chars, (uint8_t)got);
 				} else {
-					free(chars);
+					RE_FREE(chars);
 				}
 				re_unload_group(&grp);
 			}
@@ -476,25 +401,8 @@ static int validate(const wf_header_t *h, uint32_t wfb_size) {
 	return 0;
 }
 
-lv_color_format_t wf_map_colorfmt(uint32_t fmt) {
-	switch (fmt) {
-	case PIXEL_FORMAT_INDEXED8:
-		return LV_COLOR_FORMAT_I8;
-	case PIXEL_FORMAT_RGB565:
-		return LV_COLOR_FORMAT_RGB565;
-	case PIXEL_FORMAT_ARGB565:
-		return LV_COLOR_FORMAT_RGB565A8; /* TODO: approximate */
-	case PIXEL_FORMAT_RGB888:
-		return LV_COLOR_FORMAT_RGB888;
-	case PIXEL_FORMAT_ARGB888:
-		return LV_COLOR_FORMAT_ARGB8888;
-	default:
-		return LV_COLOR_FORMAT_UNKNOWN;
-	}
-}
-
 wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_res,
-					   const wf_env_t *env, lv_obj_t *screen) {
+					   const wf_env_t *env, void *screen) {
 	if (!wfb || !screen)
 		return NULL;
 
@@ -504,9 +412,9 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 
 	const uint8_t *L = (const uint8_t *)wfb + sizeof(*h);
 
-	/* Single instance block: header + font cache + event binds in one calloc.
+	/* Single instance block: header + font cache + event binds in one RE_CALLOC.
 	 * Both trailing arrays are pointer-aligned, so appending them after the
-	 * (pointer-aligned) struct keeps natural alignment. calloc zeroes the tail,
+	 * (pointer-aligned) struct keeps natural alignment. RE_CALLOC zeroes the tail,
 	 * which the font cache relies on for lazy resolution. The objs[] scratch map
 	 * stays a separate alloc — it is freed before wf_load returns. */
 	size_t fc_bytes = (size_t)h->font_count * sizeof(lv_font_t *);
@@ -515,7 +423,7 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 	fc_bytes = ROUND_UP_PTR(fc_bytes);
 	bind_bytes = ROUND_UP_PTR(bind_bytes);
 
-	wf_instance_t *in = calloc(1, sizeof(*in) + fc_bytes + bind_bytes + img_bytes);
+	wf_instance_t *in = RE_CALLOC(1, sizeof(*in) + fc_bytes + bind_bytes + img_bytes);
 	if (!in)
 		return NULL;
 	uint8_t *tail = (uint8_t *)in + sizeof(*in);
@@ -534,7 +442,7 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 	in->strings = (const char *)(L + h->off_strings);
 
 	/* scratch index->object map, freed before returning (steady-state RAM save) */
-	lv_obj_t **objs = calloc(h->widget_count ? h->widget_count : 1, sizeof(lv_obj_t *));
+	lv_obj_t **objs = RE_CALLOC(h->widget_count ? h->widget_count : 1, sizeof(lv_obj_t *));
 	if (!objs) {
 		wf_unload(in, false);
 		return NULL;
@@ -547,7 +455,7 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 							(w->parent < i ? objs[w->parent] : screen);
 		lv_obj_t *obj = create_widget(in, img_res, env, w, parent);
 		if (!obj) {
-			free(objs);
+			RE_FREE(objs);
 			wf_unload(in, false);
 			return NULL;
 		}
@@ -565,7 +473,7 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 		}
 	}
 
-	free(objs);
+	RE_FREE(objs);
 	return in;
 }
 
@@ -575,7 +483,7 @@ void wf_unload(wf_instance_t *in, bool del_screen) {
 	if (in->screen && del_screen)
 		lv_obj_clean(in->screen); /* delete created children */
 	for (int i = 0; i < in->n_alloc; i++)
-		free(in->allocs[i]);
-	free(in->allocs);
-	free(in);
+		RE_FREE(in->allocs[i]);
+	RE_FREE(in->allocs);
+	RE_FREE(in);
 }
