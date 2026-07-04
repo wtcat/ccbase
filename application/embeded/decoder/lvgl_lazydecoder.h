@@ -33,28 +33,28 @@ extern "C" {
  */
 
 /*
- * lz4_lazy_decompress - struct lazy_decomp::decompress implementation.
+ * lvgl_lazy_decompress - struct lazy_decomp::decompress implementation.
  *
  * Reads the size-prefixed LZ4 block at (base + ld->offset) and inflates it
  * into dst. Returns 0 on success, -1 otherwise (matches module convention).
  */
-int lz4_lazy_decompress(const struct lazy_decomp *ld, void *dst, size_t dstsize);
+int lvgl_lazy_decompress(const struct lazy_decomp *ld, void *dst, size_t dstsize);
 
 /*
- * lz4_lazydecoder_set_base - Set the base address of the LZ4 resource region.
+ * lvgl_lazydecoder_set_base - Set the base address of the LZ4 resource region.
  *
  * @base pointer that lazy_decomp::offset is relative to (e.g. mapped flash).
  */
-void lz4_lazydecoder_set_base(const void *base);
+void lvgl_lazydecoder_set_base(const void *base);
 
 /*
- * lz4_lazydecoder_init - Create and register the LVGL 9 image decoder.
+ * lvgl_lazydecoder_init - Create and register the LVGL 9 image decoder.
  *
  * Call once after lv_init(). Requires lazy_cache_init() and
- * lz4_lazydecoder_set_base() to have been called before decoding.
+ * lvgl_lazydecoder_set_base() to have been called before decoding.
  * return 0 on success, -1 if the decoder could not be created.
  */
-int lz4_lazydecoder_init(void);
+int lvgl_lazydecoder_init(void);
 
 
 #ifdef __cplusplus

@@ -17,7 +17,7 @@
 #include "embeded/decoder/lvgl_lazydecoder.h"
 
 
-static lv_result_t lz4_lazy_info_cb(lv_image_decoder_t *decoder,
+static lv_result_t lvgl_lazy_info_cb(lv_image_decoder_t *decoder,
                                     lv_image_decoder_dsc_t *dsc,
                                     lv_image_header_t *header) {
     const lv_image_dsc_t *img = dsc->src;
@@ -35,7 +35,7 @@ static lv_result_t lz4_lazy_info_cb(lv_image_decoder_t *decoder,
     return LV_RESULT_OK;
 }
 
-static lv_result_t lz4_lazy_open_cb(lv_image_decoder_t *decoder,
+static lv_result_t lvgl_lazy_open_cb(lv_image_decoder_t *decoder,
                                     lv_image_decoder_dsc_t *dsc) {
     const lv_image_dsc_t *src = dsc->src;
     lv_image_dsc_t decoded;
@@ -84,7 +84,7 @@ static lv_result_t lz4_lazy_open_cb(lv_image_decoder_t *decoder,
     return LV_RESULT_OK;
 }
 
-static void lz4_lazy_close_cb(lv_image_decoder_t *decoder,
+static void lvgl_lazy_close_cb(lv_image_decoder_t *decoder,
                               lv_image_decoder_dsc_t *dsc) {
     LV_UNUSED(decoder);
 
@@ -95,14 +95,14 @@ static void lz4_lazy_close_cb(lv_image_decoder_t *decoder,
     }
 }
 
-int lz4_lazydecoder_init(void) {
+int lvgl_lazydecoder_init(void) {
     lv_image_decoder_t *dec = lv_image_decoder_create();
     if (dec == NULL)
         return -1;
 
-    lv_image_decoder_set_info_cb(dec, lz4_lazy_info_cb);
-    lv_image_decoder_set_open_cb(dec, lz4_lazy_open_cb);
-    lv_image_decoder_set_close_cb(dec, lz4_lazy_close_cb);
+    lv_image_decoder_set_info_cb(dec, lvgl_lazy_info_cb);
+    lv_image_decoder_set_open_cb(dec, lvgl_lazy_open_cb);
+    lv_image_decoder_set_close_cb(dec, lvgl_lazy_close_cb);
 
     return 0;
 }

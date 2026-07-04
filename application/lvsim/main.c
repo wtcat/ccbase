@@ -54,7 +54,7 @@ static void* read_file(const char* name, size_t *size) {
 
 static void view_init(void *user) {
     (void)user;
-    lz4_lazydecoder_init();
+    lvgl_lazydecoder_init();
     lazy_cache_init(decoder_buffer, sizeof(decoder_buffer), NULL);
 
     size_t size;
