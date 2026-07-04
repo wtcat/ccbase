@@ -96,11 +96,11 @@ void lvgl_imglabel_set_src(lv_obj_t *obj, const lv_image_dsc_t * chars, uint8_t 
 }
 
 void lvgl_imglabel_set_src_nocache(lv_obj_t *obj, const lv_image_dsc_t * chars, uint8_t cnt,
-	const imglabel_loader_t *ops)
+	const lvgl_imglabel_loader_t *loader)
 {
 	lvgl_imglabel_t * label = (lvgl_imglabel_t *)obj;
 
-	label->loader = *ops;
+	label->loader = loader;
 	label->src_chars = chars;
 	label->num_chars = cnt;
 	label->refresh = refresh_text_nocache;
@@ -113,7 +113,7 @@ void lvgl_imglabel_set_text(lv_obj_t * obj, const uint8_t * indices, uint8_t cnt
 	uint8_t new_count = LV_MIN(cnt, IMG_LABEL_MAX_COUNT);
 
 	//Unload picture resource
-	if (label->loader.ops) {
+	if (label->loader) {
 		for (int i = 0, j; i < (int)label->count; i++) {
 			for (j = 0; j < new_count; j++) {
 				if (label->indices[i] == indices[j])
@@ -124,7 +124,7 @@ void lvgl_imglabel_set_text(lv_obj_t * obj, const uint8_t * indices, uint8_t cnt
 		}
 	}
 	label->count = new_count;
-	memcpy(label->indices, indices, sizeof(*indices) * label->count);
+	lv_memcpy(label->indices, indices, sizeof(*indices) * label->count);
 	label->refresh(obj);
 }
 
@@ -179,7 +179,7 @@ static void lvgl_imglabel_destructor(const struct _lv_obj_class_t * class_p, str
 
 	lvgl_imglabel_t *label = (lvgl_imglabel_t *)obj;
 
-	if (label->loader.ops) {
+	if (label->loader) {
 		for (int i = 0; i < label->count; i++)
 			lvgl_imglabel_release(label, i);
 	}
@@ -190,7 +190,7 @@ static void lvgl_imglabel_release(lvgl_imglabel_t *label, int i)
 	int no = label->indices[i];
 	lv_image_dsc_t *src = (void *)&label->src_chars[no];
 	if (src->data) {
-		label->loader.ops->unload(&label->loader, no);
+		label->loader->unload(label->loader, no);
 		src->data = NULL;
 	}
 }
@@ -345,7 +345,7 @@ static void refresh_text(lv_obj_t * obj)
 			label->same_height = 0;
 
 		w += src->header.w;
-		h = LV_MAX(h, src->header.h);
+		h = LV_MAX((uint32_t)h, src->header.h);
 	}
 
 	ll_refresh_text(obj, w, h);
@@ -370,7 +370,7 @@ static void refresh_text_nocache(lv_obj_t * obj)
 		const lv_image_dsc_t *src = &label->src_chars[no];
 		if (!src->data) {
 			//Load picture resource
-			if (label->loader.ops->load(&label->loader, no, (void *)src))
+			if (label->loader->load(label->loader, no, (void *)src))
 				return;
 		}
 
@@ -378,7 +378,7 @@ static void refresh_text_nocache(lv_obj_t * obj)
 			label->same_height = 0;
 
 		w += src->header.w;
-		h = LV_MAX(h, src->header.h);
+		h = LV_MAX((uint32_t)h, src->header.h);
 	}
 
 	ll_refresh_text(obj, w, h);

@@ -7,10 +7,8 @@
 #define WF_USE_LAZYDECOMP 1
 
 #include "embeded/wf_loader.h"
-
-#include "embeded/widget/lvgl_animation.h"
-#include "embeded/widget/lvgl_imglabel.h"
 #include "embeded/resource/resource_lvgl.h"
+#include "embeded/widget/lvgl_imglabel.h"
 
 
 #define WF_MAX_REG (16)

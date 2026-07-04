@@ -10,8 +10,8 @@
  *
  * Note: Not thread-safe (shares the single static cache_controller).
  */
-#ifndef BASEWORK_UI_LZ4_LAZYDECODER_H_
-#define BASEWORK_UI_LZ4_LAZYDECODER_H_
+#ifndef BASEWORK_UI_LVGL_LAZYDECODER_H_
+#define BASEWORK_UI_LVGL_LAZYDECODER_H_
 
 #include <lvgl.h>
 
@@ -60,4 +60,4 @@ int lz4_lazydecoder_init(void);
 #ifdef __cplusplus
 }
 #endif
-#endif /* BASEWORK_UI_LZ4_LAZYDECODER_H_ */
+#endif /* BASEWORK_UI_LVGL_LAZYDECODER_H_ */

@@ -25,8 +25,6 @@ extern "C" {
 #include <lvgl.h>
 #include <src/core/lv_obj_private.h>
 
-#include "embeded/widget/imglabel_ldops.h"
-
 
 /*********************
  *      DEFINES
@@ -39,6 +37,12 @@ extern "C" {
 /**********************
  *      TYPEDEFS
  **********************/
+ 
+typedef struct imglabel_loader {
+	int (*load)(const struct imglabel_loader *loader, int no, void* dsc);
+	int (*unload)(const struct imglabel_loader *loader, int no);
+	void *context;
+} lvgl_imglabel_loader_t;
 
 /** Data of image area */
 typedef struct {
@@ -50,7 +54,7 @@ typedef struct {
 	const lv_image_dsc_t *src_chars; /* image src array */
 	uint8_t num_chars;
 
-	imglabel_loader_t loader; /* image resource operations */
+	const lvgl_imglabel_loader_t *loader; /* image resource operations */
 	void (*refresh)(lv_obj_t * obj);
 
 	uint8_t same_height : 1; /* current draw charactors have the same height */
@@ -131,7 +135,7 @@ void lvgl_imglabel_split_src(lv_obj_t *obj, lv_image_dsc_t * chars, const lv_ima
 
 /* User extension */
 void lvgl_imglabel_set_src_nocache(lv_obj_t *obj, const lv_image_dsc_t * chars, uint8_t cnt,
-	const imglabel_loader_t *ops);
+	const lvgl_imglabel_loader_t *loader);
 /**********************
  *      MACROS
  **********************/

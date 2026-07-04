@@ -17,7 +17,7 @@
 
 #include "embeded/resource/resource_file.h"
 #include "embeded/resource/resource_loader.h"
-#include "embeded/decoder/lz4_lazydecoder.h"
+#include "embeded/decoder/lvgl_lazydecoder.h"
 #include "embeded/wf_loader.h"
 
 
@@ -52,7 +52,8 @@ static void* read_file(const char* name, size_t *size) {
     return blob;
 }
 
-static void view_init(void) {
+static void view_init(void *user) {
+    (void)user;
     lz4_lazydecoder_init();
     lazy_cache_init(decoder_buffer, sizeof(decoder_buffer), NULL);
 

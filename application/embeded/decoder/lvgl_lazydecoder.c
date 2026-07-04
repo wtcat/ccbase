@@ -14,7 +14,7 @@
 #include <src/draw/lv_image_decoder_private.h>
 
 #include "embeded/decoder/lvgl_lazydecomp.h"
-#include "embeded/decoder/lz4_lazydecoder.h"
+#include "embeded/decoder/lvgl_lazydecoder.h"
 
 
 static lv_result_t lz4_lazy_info_cb(lv_image_decoder_t *decoder,
