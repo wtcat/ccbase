@@ -234,6 +234,11 @@ bool FileResource::Format(ImageNode& img, int format, int comp) {
     img.orgsize = sizeof(PixelNode) + orgin_size;
     img.payload = std::move(px_ptr);
 
+    if (verbose_) {
+        printf("Image(%s@ 0x%x) compressed_size(%d) origgin_size(%d)\n", 
+            img.keyname.c_str(), img.key, (int)alloc_size, (int)orgin_size);
+    }
+
     return true;
 }
 

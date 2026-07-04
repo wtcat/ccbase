@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define WF_USE_LAZYDECOMP 1
+#define WF_USE_LAZYDECOMP 0
 
 #include "embeded/wf_loader.h"
 
@@ -28,6 +28,8 @@
 #else
 # define WF_IMAGE_ESIZE (sizeof(lv_image_dsc_t))
 #endif
+
+typedef int (*re_read_t)(const void*, uint32_t, re_desc_t*);
 
 typedef struct {
 	wf_event_cb_t cb;
@@ -80,8 +82,8 @@ static int evnode_count;
 
 extern int LZ4_decompress_safe(const char* src, char* dst, int compressedSize, int dstCapacity);
 
-static inline void* image_array_at(wf_instance_t* in, size_t idx) {
-	return (void *)((char*)in->image_array + WF_IMAGE_ESIZE * idx);
+static inline void* image_array_at(void *array, size_t idx) {
+	return (void *)((char*)array + WF_IMAGE_ESIZE * idx);
 }
 
 static uint32_t crc32_calc(const uint8_t *data, uint32_t len) {
@@ -168,18 +170,18 @@ static int image_decompress(const struct lazy_decomp* ld, void* dst, size_t dsts
 	int ret;
 
 	if (rd->cflag != REFILE_COMPRESS_NONE) {
-		void* debuf = RE_MALLOC(rd->csize);
+		size_t cdata_size = rd->csize - sizeof(struct refile_data);
+		void* debuf = RE_MALLOC(cdata_size);
 		if (debuf == NULL)
 			return -ENOMEM;
 
-		ret = re_read_buf(&rd->re, debuf, rd->csize - sizeof(struct refile_data),
-			sizeof(struct refile_data));
+		ret = re_read_buf(&rd->re, debuf, cdata_size, sizeof(struct refile_data));
 		if (ret)
 			goto _free;
 
 		switch (rd->cflag) {
 		case REFILE_COMPRESS_LZ4:
-			ret = LZ4_decompress_safe(debuf, dst, (int)rd->csize, (int)dstsize);
+			ret = LZ4_decompress_safe(debuf, dst, (int)cdata_size, (int)dstsize);
 			break;
 		default:
 			ret = -ENOTSUP;
@@ -195,13 +197,13 @@ static int image_decompress(const struct lazy_decomp* ld, void* dst, size_t dsts
 		sizeof(struct refile_data));
 }
 
-static int image_prefetch(const re_file_t* refile, uint32_t name,
-	lv_image_dsc_t* dsc, struct image_decomp* rd) {
+static int image_prefetch(const void* handle, uint32_t name,
+	lv_image_dsc_t* dsc, struct image_decomp* rd, re_read_t read) {
 	struct refile_data data;
 	int err;
 
 	/* Get image descriptor */
-	err = re_read_image_dsc(refile, name, &rd->re);
+	err = read(handle, name, &rd->re);
 	if (err)
 		return err;
 
@@ -225,13 +227,13 @@ static int image_prefetch(const re_file_t* refile, uint32_t name,
 	dsc->header.stride = 0;
 	dsc->header.reserved_2 = LV_IMG_LAZYDECOMP_MARKER;
 	dsc->data_size = data.size;
-	dsc->data = (void *)rd;
+	dsc->data = (void*)rd;
 	dsc->reserved = NULL;
 	dsc->reserved_2 = NULL;
 	return 0;
 }
-#endif /* WF_USE_LAZYDECOMP == 1 */
 
+#else /* WF_USE_LAZYDECOMP == 0 */
 static void fill_image_dsc(lv_image_dsc_t *dsc, const struct refile_data *d) {
 	memset(dsc, 0, sizeof(*dsc));
 	dsc->header.magic = LV_IMAGE_HEADER_MAGIC;
@@ -256,6 +258,7 @@ static int load_image_dsc(wf_instance_t *in, const re_file_t *res,
 	fill_image_dsc(odsc, blob);
 	return 0;
 }
+#endif /* WF_USE_LAZYDECOMP == 1 */
 
 static void apply_style(lv_obj_t *obj, const wf_style_t *s) {
 	lv_obj_set_style_text_color(obj, lv_color_hex(s->text_color), 0);
@@ -278,10 +281,11 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 	case WF_W_IMAGE: {
 		obj = lv_image_create(parent);
 		if (w->res_ref != WF_REF_NONE) {
-			lv_image_dsc_t* dsc = image_array_at(in, w->res_ref);
+			lv_image_dsc_t* dsc = image_array_at(in->image_array, w->res_ref);
 #if WF_USE_LAZYDECOMP
 			struct image_decomp* de = (struct image_decomp*)(dsc + 1);
-			if (!image_prefetch(res, in->images[w->res_ref].namekey, dsc, de))
+			if (!image_prefetch(res, in->images[w->res_ref].namekey, dsc, de, 
+				(re_read_t)re_read_image_dsc))
 				lv_image_set_src(obj, dsc);
 #else
 			if (!load_image_dsc(in, res, in->images[w->res_ref].namekey, dsc))
@@ -315,29 +319,37 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 				/* One block holds both the pointer array lv_animimg_set_src
 				 * needs and the contiguous dsc storage it points into — a
 				 * single tracked alloc instead of one malloc per frame. */
-				void *block =
-					n ? malloc(n * (sizeof(void *) + sizeof(lv_image_dsc_t))) : NULL;
+				void *block = n? malloc(n * (sizeof(void *) + WF_IMAGE_ESIZE)) : NULL;
 				if (block && track(in, block) == 0) {
 					const void **srcs = (const void **)block;
-					lv_image_dsc_t *dscs = (lv_image_dsc_t *)(srcs + n);
+					lv_image_dsc_t *dscs = (void *)(srcs + n);
 					size_t got = 0;
 					for (size_t i = 0; i < n; i++) {
-						struct refile_data *blob = NULL;
+#if WF_USE_LAZYDECOMP
+						lv_image_dsc_t* imgdsc = image_array_at(dscs, i);
+						if (image_prefetch(&grp, (uint32_t)i, imgdsc, (void*)(imgdsc + 1),
+							(re_read_t)re_read_group_image_dsc))
+							break;
+						srcs[got] = imgdsc;
+#else
+						struct refile_data* blob = NULL;
 						if (re_load_group_image(&grp, (uint32_t)i, &blob) != 0 || !blob)
 							break;
+
 						if (track(in, blob) != 0) {
 							free(blob);
 							break;
 						}
 						fill_image_dsc(&dscs[got], blob);
 						srcs[got] = &dscs[got];
+#endif
 						got++;
 					}
+
 					if (got) {
 						lv_animimg_set_src(obj, srcs, got);
 						lv_animimg_set_duration(obj, a->duration_ms);
-						lv_animimg_set_repeat_count(
-							obj, a->repeat ? a->repeat : LV_ANIM_REPEAT_INFINITE);
+						lv_animimg_set_repeat_count(obj, a->repeat? a->repeat: LV_ANIM_REPEAT_INFINITE);
 						lv_animimg_start(obj);
 					}
 				} else {
@@ -531,9 +543,8 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 	/* single linear pass — parents precede children (topological order) */
 	for (uint16_t i = 0; i < h->widget_count; i++) {
 		const wf_widget_t *w = &in->widgets[i];
-		lv_obj_t *parent = (w->parent == WF_PARENT_ROOT)
-							   ? screen
-							   : (w->parent < i ? objs[w->parent] : screen);
+		lv_obj_t *parent = (w->parent == WF_PARENT_ROOT)? screen:
+							(w->parent < i ? objs[w->parent] : screen);
 		lv_obj_t *obj = create_widget(in, img_res, env, w, parent);
 		if (!obj) {
 			free(objs);
