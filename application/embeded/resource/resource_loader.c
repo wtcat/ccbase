@@ -3,7 +3,6 @@
  */
 
 #include <errno.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "resource_file.h"
@@ -14,6 +13,29 @@
 #ifndef MIN
 #define MIN(a, b) ((a) < (b)? (a): (b))
 #endif
+
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((__always_inline__))
+#endif
+static void* re_bsearch(const void* key, const void* base, size_t num, size_t size, 
+    int (*cmp)(const void*, const void*)) {
+    const char* pivot;
+    int result;
+    while (num > 0) {
+        pivot = (char *)base + (num >> 1) * size;
+        result = cmp(key, pivot);
+
+        if (result == 0)
+            return (void*)pivot;
+
+        if (result > 0) {
+            base = pivot + size;
+            num--;
+        }
+        num >>= 1;
+    }
+    return NULL;
+}
 
 uint32_t re_crc32_update(uint32_t crc, const uint8_t* data, size_t len) {
     /* crc table generated from polynomial 0xedb88320 */
@@ -137,7 +159,7 @@ int re_read_dsc(const re_file_t* refile, uint32_t id, re_desc_t* desc) {
     struct refile_header* re = refile->p;
     struct refile_index* ind;
 
-    ind = bsearch(&id, re->indexs, re->count, sizeof(struct refile_index), key_compare);
+    ind = re_bsearch(&id, re->indexs, re->count, sizeof(struct refile_index), key_compare);
     if (ind != NULL) {
         desc->refile = refile;
         desc->offset = ind->offset;
@@ -187,7 +209,7 @@ int re_load_group(const re_file_t* refile, uint32_t gid, re_group_t* regroup) {
     struct refile_header* re = refile->p;
     struct refile_index* ind;
 
-    ind = bsearch(&gid, re->indexs, re->count, sizeof(struct refile_index), key_compare);
+    ind = re_bsearch(&gid, re->indexs, re->count, sizeof(struct refile_index), key_compare);
     if (ind != NULL) {
         if (!(ind->size & REFILE_INDEX_SIZE_GROUP_F))
             return -EINVAL;

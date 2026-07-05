@@ -171,7 +171,6 @@ int main(int argc, char* argv[]) {
                 fres.CreateImageGroup(dir.AppendASCII(iter));
             }
         }
-        //fres.CreateImageGroup(dir.AppendASCII("health"));
 
         // Collect all files
         if (fres.CollectFiles(dir) == 0) {
@@ -180,7 +179,9 @@ int main(int argc, char* argv[]) {
         }
 
         // Convert and generate binnary file
-        return fres.SubmitWork(jobs).GenerateResFile(out);
+        int err = fres.SubmitWork(jobs).GenerateResFile(out);
+        if (!err)
+            printf("Generated file(%s)\n", out.AsUTF8Unsafe().c_str());
     }
     return 0;
 }

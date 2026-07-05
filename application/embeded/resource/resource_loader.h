@@ -4,6 +4,8 @@
 #ifndef RESOURCE_LOADER_H_
 #define RESOURCE_LOADER_H_
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
