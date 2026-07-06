@@ -36,7 +36,7 @@ typedef struct {
  *               be NULL when no watchface uses dynamic imglabels.
  */
 typedef struct {
-	void *(*get_font)(uint32_t namekey);
+	void   *(*get_font)(uint32_t namekey);
 	uint8_t (*get_text)(uint32_t provider_hash, char *buf, uint8_t cap);
 } wf_env_t;
 

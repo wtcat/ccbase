@@ -78,6 +78,25 @@ struct refile_group {
 
 #pragma pack(pop)
 
+static inline const char* refile_pixel_fmt_str(uint32_t format) {
+	switch (format) {
+	case PIXEL_FORMAT_INDEXED8: return "indexed8";
+	case PIXEL_FORMAT_RGB565: return "rgb565";
+	case PIXEL_FORMAT_ARGB565: return "rgb565a8";
+	case PIXEL_FORMAT_RGB888: return "rgb888";
+	case PIXEL_FORMAT_ARGB888: return "argb8888";
+	default: return "invalid pixel format";
+	}
+}
+
+static inline const char* refile_compress_fmt_str(uint32_t format) {
+	switch (format) {
+	case REFILE_COMPRESS_NONE: return "none";
+	case REFILE_COMPRESS_LZ4: return "lz4";
+	default: return "invalid compress format";
+	}
+}
+
 #ifdef __cplusplus
 }
 #endif

@@ -22,13 +22,6 @@ void Worker::Run() {
         // Inject image parameters
         for (const auto iter : fres_->filters_) {
             if (!fnmatch(iter->name.c_str(), keyname.c_str(), 0)) {
-                if (fres_->verbose()) {
-                    printf("Picture(%s) format(%d) compress(%d)\n",
-                        node->path.AsUTF8Unsafe().c_str(),
-                        iter->compress,
-                        iter->format
-                    );
-                }
                 node->compress = iter->compress;
                 node->format = iter->format;
             }
@@ -234,11 +227,6 @@ bool FileResource::Format(ImageNode& img, int format, int comp) {
     img.orgsize = sizeof(PixelNode) + orgin_size;
     img.payload = std::move(px_ptr);
 
-    if (verbose_) {
-        printf("Image(%s@ 0x%x) compressed_size(%d) origgin_size(%d)\n", 
-            img.keyname.c_str(), img.key, (int)alloc_size, (int)orgin_size);
-    }
-
     return true;
 }
 
@@ -325,8 +313,15 @@ int FileResource::GenerateResFile(const FilePath& path) {
 
             // Fill binary data
             memcpy(ptr.get() + offset, item->payload.get(), dsize);
-        }
-        else {
+            if (verbose_) {
+                PixelNode* payload = (PixelNode *)item->payload.get();
+                printf("File(%s) size(%d) format(%s) compress(%s)\n",
+                    item->path.BaseName().AsUTF8Unsafe().c_str(),
+                    (int)dsize,
+                    refile_pixel_fmt_str(payload->format),
+                    refile_compress_fmt_str(payload->compress));
+            }
+        } else {
             ImageGroup* group = (ImageGroup*)item;
             group_header_size = group->header_size();
             auto group_mem = std::make_unique<uint8_t[]>(group_header_size);
@@ -340,18 +335,17 @@ int FileResource::GenerateResFile(const FilePath& path) {
 
             for (uint32_t i = 0; i < group_header->count; i++) {
                 size_t item_size = group->images[i]->size;
+                PixelNode* payload = (PixelNode*)group->images[i]->payload.get();
                 group_header->indexs[i].offset = i_offset;
                 group_header->indexs[i].size = (uint32_t)item_size;
-
                 if (verbose_) {
-                    printf("@Group(%s) index(%d) file(%s) offset(0x%x) size(0x%zx) CRC(0x%x)\n",
-                        group->path.AsUTF8Unsafe().c_str(),
+                    printf("Group(%s) index(%d) file(%s) size(0x%zx) format(%s) compress(%s)\n",
+                        group->path.BaseName().AsUTF8Unsafe().c_str(),
                         i,
-                        group->images[i]->path.AsUTF8Unsafe().c_str(),
-                        i_offset + offset,
+                        group->images[i]->path.BaseName().AsUTF8Unsafe().c_str(),
                         group->images[i]->size,
-                        helper::crc32_ieee_update(0, (uint8_t*)group->images[i]->payload.get(), item_size)
-                    );
+                        refile_pixel_fmt_str(payload->format),
+                        refile_compress_fmt_str(payload->compress));
                 }
 
                 /* Copy payload to buffer */
