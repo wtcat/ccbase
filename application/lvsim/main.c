@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "driver/simulator.h"
 #include "thirdparty/lvgl/lvgl.h"
@@ -52,6 +53,47 @@ static void* read_file(const char* name, size_t *size) {
     return blob;
 }
 
+
+static uint8_t get_image_text(uint32_t provider_hash, char* buf, uint8_t cap) {
+    if (provider_hash == __RE("get_hour")) {
+        time_t now = time(NULL);
+        struct tm* t = localtime(&now);
+        uint8_t idx = 0;
+
+        if (idx < cap) buf[idx++] = t->tm_hour / 10 + '0';
+        if (idx < cap) buf[idx++] = t->tm_hour % 10 + '0';
+        return idx;
+    } else if (provider_hash == __RE("get_min")) {
+        time_t now = time(NULL);
+        struct tm* t = localtime(&now);
+        uint8_t idx = 0;
+
+        if (idx < cap) buf[idx++] = t->tm_min / 10 + '0';
+        if (idx < cap) buf[idx++] = t->tm_min % 10 + '0';
+        return idx;
+    } else if (provider_hash == __RE("get_week")) {
+        time_t now = time(NULL);
+        struct tm* t = localtime(&now);
+        uint8_t idx = 0;
+
+        if (idx < cap) buf[idx++] = t->tm_wday+ '0';
+        return idx;
+    } else if (provider_hash == __RE("get_heartrate")) {
+        uint8_t idx = 0;
+        if (idx < cap) buf[idx++] = 8 + '0';
+        if (idx < cap) buf[idx++] = 6 + '0';
+        return idx;
+    }
+
+    return 0;
+}
+
+static void wf_event_start_anim(struct _lv_event_t* e, uint32_t param) {
+    lv_obj_t* target = lv_event_get_current_target(e);
+    (void)param;
+    lv_animimg_start(target);
+}
+
 static void view_init(void *user) {
     (void)user;
     lvgl_lazydecoder_init();
@@ -59,8 +101,11 @@ static void view_init(void *user) {
 
     size_t size;
     void* wfb = read_file("IMG/wface.wfb", &size);
-    wf_env_t env = {NULL};
     wf_binary = wfb;
+
+    wf_env_t env = {NULL};
+    env.get_text = get_image_text;
+    wf_register_event("restart_anim", wf_event_start_anim);
     wf_current = wf_load(wfb, (uint32_t)size, &re_file, &env, lv_screen_active());
 }
 

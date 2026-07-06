@@ -77,12 +77,13 @@
 
     "anim": {
       "type": "object",
-      "required": ["name", "duration"],
+      "required": ["name", "duration", "file"],
       "additionalProperties": false,
       "properties": {
         "name":     { "$ref": "#/$defs/name" },
         "duration": { "type": "integer", "minimum": 1, "maximum": 65535 },
-        "repeat":   { "type": "integer", "minimum": 0, "maximum": 255 }
+        "repeat":   { "type": "integer", "minimum": 0, "maximum": 255 },
+        "file":     { "type": "string" }
       }
     },
 
@@ -126,6 +127,10 @@
         "font":      { "$ref": "#/$defs/name" },
         "anim":      { "$ref": "#/$defs/name" },
         "text":      { "type": "string" },
+        "provider":  { "$ref": "#/$defs/name" },
+        "glyphs":    { "type": "string", "minLength": 1, "maxLength": 64,
+                       "description": "Char-per-atlas-glyph map. Shorthand \"A..B\" expands to the inclusive ASCII run (step 1), e.g. \"0..9:\" = \"0123456789:\". Expanded length must be 1..16." },
+        "max_len":   { "type": "integer", "minimum": 1, "maximum": 16 },
         "clickable": { "type": "boolean" },
         "hidden":    { "type": "boolean" },
         "style":     { "$ref": "#/$defs/style" },
@@ -139,7 +144,9 @@
         { "if": { "properties": { "type": { "const": "frame_anim" } } },
           "then": { "required": ["anim"] } },
         { "if": { "properties": { "type": { "const": "imglabel" } } },
-          "then": { "required": ["image"] } }
+          "then": { "required": ["image"] } },
+        { "if": { "required": ["provider"] },
+          "then": { "required": ["glyphs"] } }
       ]
     }
   }

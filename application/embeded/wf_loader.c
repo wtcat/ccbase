@@ -11,7 +11,9 @@
 #include "embeded/widget/lvgl_imglabel.h"
 
 
-#define WF_MAX_REG (16)
+#define WF_MAX_REG     (16)
+#define WF_MAX_IMGTEXT (16) /* max displayed chars per dynamic imglabel */
+
 #ifndef ROUND_UP
 #define ROUND_UP(x, a) (((x) + (a) - 1) & ~((a) - 1))
 #endif
@@ -33,6 +35,17 @@ typedef struct {
 	wf_event_cb_t cb;
 } wf_evnode_t;
 
+/* One per dynamic (WF_WF_DYNTEXT) imglabel; drives wf_refresh. */
+typedef struct {
+	lv_obj_t *obj;
+	uint32_t provider_hash;
+	const char *glyphs; /* into the read-only wfb strings section (zero-copy) */
+	uint8_t *idxbuf;	/* currently-displayed indices (malloc'd + tracked)   */
+	uint8_t glyph_cnt;
+	uint8_t max_len;
+	uint8_t cur_cnt;	/* number of indices currently displayed (change det) */
+} wf_dynbind_t;
+
 struct wf_instance {
 	lv_obj_t *screen;
 
@@ -46,6 +59,11 @@ struct wf_instance {
 	lv_font_t **font_cache; /* [font_count], lazily resolved             */
 	wf_evbind_t *binds;		/* [event_count], resolved at load time      */
 	void*  image_array;
+	
+	/* dynamic imglabel bindings — also in the single block (after image_array) */
+	wf_dynbind_t *dyn;
+	uint8_t dyn_count;
+	uint8_t (*get_text)(uint32_t provider_hash, char *buf, uint8_t cap);
 
 	/* read-only views into the wfb buffer */
 	const wf_widget_t *widgets;
@@ -68,19 +86,7 @@ static inline void* image_array_at(void *array, size_t idx) {
 }
 
 static uint32_t crc32_calc(const uint8_t *data, uint32_t len) {
-    /* CRC-32 (poly 0xEDB88320)  */
-	static const uint32_t table[16] = {
-		0x00000000U, 0x1db71064U, 0x3b6e20c8U, 0x26d930acU, 0x76dc4190U, 0x6b6b51f4U,
-		0x4db26158U, 0x5005713cU, 0xedb88320U, 0xf00f9344U, 0xd6d6a3e8U, 0xcb61b38cU,
-		0x9b64c2b0U, 0x86d3d2d4U, 0xa00ae278U, 0xbdbdf21cU,
-	};
-	uint32_t crc = ~0u;
-	for (uint32_t i = 0; i < len; i++) {
-		uint8_t b = data[i];
-		crc = (crc >> 4) ^ table[(crc ^ b) & 0x0f];
-		crc = (crc >> 4) ^ table[(crc ^ ((uint32_t)b >> 4)) & 0x0f];
-	}
-	return ~crc;
+	return re_crc32_update(0, data, len);
 }
 
 void wf_register_event(const char *name, wf_event_cb_t cb) {
@@ -184,6 +190,36 @@ static void apply_style(lv_obj_t *obj, const wf_style_t *s) {
 	}
 }
 
+/* Fetch a dynamic imglabel's current value and push it as glyph indices. */
+static void refresh_one(wf_instance_t *in, wf_dynbind_t *b) {
+	if (!in->get_text)
+		return;
+
+	char tmp[WF_MAX_IMGTEXT];
+	uint8_t cap = b->max_len < WF_MAX_IMGTEXT ? b->max_len : WF_MAX_IMGTEXT;
+	uint8_t n = in->get_text(b->provider_hash, tmp, cap);
+	if (n > cap)
+		n = cap;
+
+	uint8_t nb[WF_MAX_IMGTEXT]; /* new indices, staged before comparing */
+	uint8_t m = 0;
+	for (uint8_t i = 0; i < n; i++) {
+		for (uint8_t g = 0; g < b->glyph_cnt; g++) {
+			if (b->glyphs[g] == tmp[i]) {
+				nb[m++] = g;
+				break;
+			}
+		}
+	}
+
+	if (m == b->cur_cnt && memcmp(nb, b->idxbuf, m) == 0)
+		return;
+
+	memcpy(b->idxbuf, nb, m); /* m <= cap <= max_len, fits idxbuf */
+	b->cur_cnt = m;
+	lvgl_imglabel_set_text(b->obj, b->idxbuf, m);
+}
+
 static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 							   const wf_env_t *env, const wf_widget_t *w,
 							   lv_obj_t *parent) {
@@ -281,7 +317,7 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 			re_group_t grp;
 			if (re_load_group(res, in->images[w->res_ref].namekey, &grp) == 0) {
 				size_t n = re_group_size(&grp);
-				lv_image_dsc_t *chars = n ? RE_MALLOC(n * WF_IMAGE_ESIZE) : NULL;
+				lv_image_dsc_t* chars = n ? RE_MALLOC(n * WF_IMAGE_ESIZE) : NULL;
 				if (chars && track(in, chars) == 0) {
 #if WF_USE_LAZYDECOMP
 					struct image_decomp* rds = (struct image_decomp*)(chars + n);
@@ -293,7 +329,7 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 							(re_read_t)re_read_group_dsc))
 							break;
 #else
-						struct refile_data *blob = NULL;
+						struct refile_data* blob = NULL;
 						if (re_load_group_image(&grp, (uint32_t)i, &blob) != 0 || !blob)
 							break;
 						if (track(in, blob) != 0) {
@@ -307,10 +343,29 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 
 					if (got)
 						lvgl_imglabel_set_src(obj, chars, (uint8_t)got);
-				} else {
+				}
+				else {
 					RE_FREE(chars);
 				}
 				re_unload_group(&grp);
+
+				/* dynamic value: bind provider + glyph map, render initial value */
+				if ((w->flags & WF_WF_DYNTEXT) && in->dyn) {
+					const wf_imgtext_t* d = (const wf_imgtext_t*)(in->strings + w->extra);
+					uint8_t* idxbuf = RE_MALLOC(d->max_len ? d->max_len : 1);
+					if (idxbuf && track(in, idxbuf) == 0) {
+						wf_dynbind_t* b = &in->dyn[in->dyn_count++];
+						b->obj = obj;
+						b->provider_hash = d->provider_hash;
+						b->glyphs = (const char*)(d + 1);
+						b->idxbuf = idxbuf;
+						b->glyph_cnt = d->glyph_cnt;
+						b->max_len = d->max_len;
+						refresh_one(in, b);
+					} else {
+						RE_FREE(idxbuf);
+					}
+				}
 			}
 		}
 		break;
@@ -410,24 +465,31 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 
 	const uint8_t *L = (const uint8_t *)wfb + sizeof(*h);
 
-	/* Single instance block: header + font cache + event binds in one RE_CALLOC.
+	/* Single instance block: header + font cache + event binds in one calloc.
 	 * Both trailing arrays are pointer-aligned, so appending them after the
-	 * (pointer-aligned) struct keeps natural alignment. RE_CALLOC zeroes the tail,
+	 * (pointer-aligned) struct keeps natural alignment. calloc zeroes the tail,
 	 * which the font cache relies on for lazy resolution. The objs[] scratch map
 	 * stays a separate alloc — it is freed before wf_load returns. */
-	size_t fc_bytes = (size_t)h->font_count * sizeof(lv_font_t *);
-	size_t bind_bytes = (size_t)h->event_count * sizeof(wf_evbind_t);
-	size_t img_bytes = (size_t)h->image_count * WF_IMAGE_ESIZE;
-	fc_bytes = ROUND_UP_PTR(fc_bytes);
-	bind_bytes = ROUND_UP_PTR(bind_bytes);
+	const wf_widget_t *W = (const wf_widget_t *)(L + h->off_widgets);
+	size_t n_dyn = 0;
+	for (uint16_t i = 0; i < h->widget_count; i++)
+		if (W[i].type == WF_W_IMGLABEL && (W[i].flags & WF_WF_DYNTEXT))
+			n_dyn++;
 
-	wf_instance_t *in = RE_CALLOC(1, sizeof(*in) + fc_bytes + bind_bytes + img_bytes);
+	size_t fc_bytes = (size_t)h->font_count * ROUND_UP_PTR(sizeof(lv_font_t *));
+	size_t bind_bytes = (size_t)h->event_count * ROUND_UP_PTR(sizeof(wf_evbind_t));
+	size_t img_bytes = (size_t)h->image_count * ROUND_UP_PTR(WF_IMAGE_ESIZE);
+	size_t dyn_bytes = n_dyn * ROUND_UP_PTR(sizeof(wf_dynbind_t));
+	wf_instance_t *in = RE_CALLOC(1, sizeof(*in) + fc_bytes + bind_bytes + img_bytes + dyn_bytes);
 	if (!in)
 		return NULL;
+
 	uint8_t *tail = (uint8_t *)in + sizeof(*in);
 	in->font_cache = h->font_count ? (lv_font_t **)tail : NULL;
 	in->binds = h->event_count ? (wf_evbind_t *)(tail + fc_bytes) : NULL;
 	in->image_array = h->image_count ? (void *)(tail + fc_bytes + bind_bytes) : NULL;
+	in->dyn = n_dyn ? (wf_dynbind_t *)(tail + fc_bytes + bind_bytes + img_bytes) : NULL;
+	in->get_text = env ? env->get_text : NULL;
 
 	in->screen = screen;
 	in->hdr = h;
@@ -484,4 +546,11 @@ void wf_unload(wf_instance_t *in, bool del_screen) {
 		RE_FREE(in->allocs[i]);
 	RE_FREE(in->allocs);
 	RE_FREE(in);
+}
+
+void wf_refresh(wf_instance_t *in) {
+	if (!in)
+		return;
+	for (uint8_t i = 0; i < in->dyn_count; i++)
+		refresh_one(in, &in->dyn[i]);
 }

@@ -112,7 +112,8 @@ void lvgl_imglabel_set_text(lv_obj_t * obj, const uint8_t * indices, uint8_t cnt
 	lvgl_imglabel_t * label = (lvgl_imglabel_t *)obj;
 	uint8_t new_count = LV_MIN(cnt, IMG_LABEL_MAX_COUNT);
 
-	//Unload picture resource
+#if 0
+	/* Unload picture resource */
 	if (label->loader) {
 		for (int i = 0, j; i < (int)label->count; i++) {
 			for (j = 0; j < new_count; j++) {
@@ -123,6 +124,7 @@ void lvgl_imglabel_set_text(lv_obj_t * obj, const uint8_t * indices, uint8_t cnt
 				lvgl_imglabel_release(label, i);
 		}
 	}
+#endif
 	label->count = new_count;
 	lv_memcpy(label->indices, indices, sizeof(*indices) * label->count);
 	label->refresh(obj);

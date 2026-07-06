@@ -4,10 +4,23 @@
 
   "resources": {
     "images": [
-      { "name": "background",        "file": "reIMG__RUN_8888" }
+      {"name": "background", "file": "reIMG__BACK_0565"},
+	    {"name": "heart", "file": "reIMG__HEART_8888"},
+	    {"name": "date", "file": "reIMG__GRP_DATE"},
+	    {"name": "heartrate", "file": "reIMG__GRP_HR"},
+		{"name": "runimg", "file": "reIMG__RUN_8888"},
+		{"name": "hour", "file": "reIMG__GRP_HOUR"},
+		{"name": "min", "file": "reIMG__GRP_MIN"},
+		{"name": "week", "file": "reIMG__GRP_WEEK"}
     ],
+	
     "anims": [
-      { "name": "health", "duration": 800, "repeat": 0, "file": "reIMG__GRP_ANI" }
+      {
+        "name": "run",
+        "duration": 1000,
+        "repeat": 3,
+        "file": "reIMG__GRP_ANI"
+      }
     ]
   },
 
@@ -16,14 +29,78 @@
       "id": "bg",
       "type": "image",
       "image": "background",
-      "align": "top_left"
+      "x": 0,
+      "y": 0
     },
     {
-      "id": "loader",
+      "id": "sport",
       "type": "frame_anim",
-      "anim": "health",
-      "align": "left_mid",
-      "y": 60
+      "anim": "run",
+	  "x": 298,
+	  "y": 56,
+	  "w": 64,
+	  "h": 64,
+      "clickable": true,
+      "events": [
+        { "on": "clicked", "call": "restart_anim", "param": 0 }
+      ]
+    },
+    {
+      "id": "heart_rate",
+      "type": "imglabel",
+      "image": "heartrate",
+      "provider": "get_heartrate",
+      "glyphs": "0..9",
+      "max_len": 2,
+	    "x": 152,
+	    "y": 68,
+	    "w": 84,
+	    "h": 40
+    },
+    {
+      "id": "clock-hour",
+      "type": "imglabel",
+      "image": "hour",
+      "provider": "get_hour",
+      "glyphs": "0..9",
+      "max_len": 2,
+	  "x": 48,
+	  "y": 141,
+	  "w": 232,
+	  "h": 160
+    },
+    {
+      "id": "clock-min",
+      "type": "imglabel",
+      "image": "min",
+      "provider": "get_min",
+      "glyphs": "0..9",
+      "max_len": 2,
+	  "x": 288,
+	  "y": 205,
+	  "w": 136,
+	  "h": 96
+    },
+    {
+      "id": "week",
+      "type": "imglabel",
+      "image": "week",
+      "provider": "get_week",
+      "glyphs": "0..6",
+      "max_len": 1,
+      "x": 296,
+      "y": 169,
+      "w": 60,
+      "h": 24
+    },
+    {
+      "id": "icon",
+      "type": "image",
+      "image": "runimg",
+	  "x": 152,
+	  "y": 318,
+	  "w": 161,
+	  "h": 40
     }
   ]
 }

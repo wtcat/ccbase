@@ -14,50 +14,62 @@
  */
 #include <stdarg.h>
 #include <stdint.h>
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "cJSON.h"
 #include "embeded/wfb_format.h"
+#include "cJSON.h"
+#include "wfc_config.h"
 
-#define MAX_WIDGETS 512
-#define MAX_IMAGES 1024
-#define MAX_FONTS 64
-#define MAX_ANIMS 64
-#define MAX_EVENTS 512
-#define MAX_STYLES 128
-#define MAX_NAME 64
-#define STRPOOL_CAP 8192
+/* Capacity caps come from the compile-time target (see wfc_config.h). */
+#define MAX_WIDGETS WFC_MAX_WIDGETS
+#define MAX_IMAGES WFC_MAX_IMAGES
+#define MAX_FONTS WFC_MAX_FONTS
+#define MAX_ANIMS WFC_MAX_ANIMS
+#define MAX_EVENTS WFC_MAX_EVENTS
+#define MAX_STYLES WFC_MAX_STYLES
+#define STRPOOL_CAP WFC_STRPOOL_CAP
 
-struct resource_struct {
-	void (*release)(void* ptr);
-	void* ptr;
-};
-
-#define MAX_RESOURCES 5
-static struct resource_struct resource_array[MAX_RESOURCES];
-static size_t resource_count;
-
+#if !WFC_HAVE_STDIO
+#include <setjmp.h>
+static jmp_buf wfc_err_jmp;   /* die() longjmps here instead of exit() */
+static char wfc_err_msg[128];
+const char *wfc_last_error(void) { return wfc_err_msg; }
+#endif
 
 typedef struct {
-	char id[MAX_NAME];
-	char parent[MAX_NAME]; /* "" = root */
-	int parent_orig;	   /* resolved original index, -1 root */
-	wf_widget_t w;		   /* parent/event_* filled after sort */
+	uint32_t id_hash;	   /* re_name_hash(id): dedup + parent resolution   */
+	uint32_t parent_hash;  /* re_name_hash(parent); valid iff parent!=NULL  */
+	const char *id;		   /* borrowed from cJSON tree; diagnostics only    */
+	const char *parent;	   /* borrowed; NULL = root                         */
+	int parent_orig;	   /* resolved original index, -1 root              */
+	wf_widget_t w;		   /* parent/event_* filled after sort              */
+
+	/* dynamic imglabel (WF_WF_DYNTEXT); emitted into strings at serialize   */
+	uint8_t has_dyntext;
+	uint8_t dt_glyph_cnt;
+	uint8_t dt_max_len;
+	uint32_t dt_provider;  /* provider name hash                            */
+	const char *dt_glyphs; /* -> dt_glyphs_buf; dt_glyph_cnt chars          */
+	char dt_glyphs_buf[16];/* expanded glyphs (shorthand resolved)          */
 } pwidget_t;
+
+#define WFC_IMGTEXT_MAX 16 /* max glyphs and max displayed chars (uint8)    */
 
 typedef struct {
 	int owner;
 	wf_event_t e;
 } pevent_t;
 
-static char img_names[MAX_IMAGES][MAX_NAME];
+/* Only the re_name_hash of each resource NAME is kept — enough for dedup and
+ * for widget->resource resolution. The output tables store namekey(file) for
+ * the ResFile/firmware lookup, which is a separate string. */
+static uint32_t img_keys[MAX_IMAGES];
 static int n_img;
-static char fnt_names[MAX_FONTS][MAX_NAME];
+static uint32_t fnt_keys[MAX_FONTS];
 static int n_fnt;
-static char anm_names[MAX_ANIMS][MAX_NAME];
+static uint32_t anm_keys[MAX_ANIMS];
 static int n_anm;
 
 static wf_image_t images[MAX_IMAGES];
@@ -79,26 +91,47 @@ static int n_pev;
 static int order[MAX_WIDGETS];	   /* order[k] = original index */
 static int new_index[MAX_WIDGETS]; /* new_index[orig] = position */
 
-static const char* const ALIGN_NAMES[] = { "center",		  "top_left",	 "top_mid",
+static const char *const ALIGN_NAMES[] = {"center",		  "top_left",	 "top_mid",
 										  "top_right",	  "bottom_left", "bottom_mid",
-										  "bottom_right", "left_mid",	 "right_mid" };
-static const char* const EVENT_NAMES[] = { "clicked", "pressed", "released",
-										  "long_pressed", "value_changed" };
-static const char* const TYPE_NAMES[] = { "screen", "image", "label",	 "frame_anim",
-										 "arc",	   "bar",	"container", "imglabel" };
+										  "bottom_right", "left_mid",	 "right_mid"};
+static const char *const EVENT_NAMES[] = {"clicked", "pressed", "released",
+										  "long_pressed", "value_changed"};
+static const char *const TYPE_NAMES[] = {"screen", "image", "label",	 "frame_anim",
+										 "arc",	   "bar",	"container", "imglabel"};
 
 
-static void die(const char* fmt, ...) {
+static void die(const char *fmt, ...) {
 	va_list ap;
-	fputs("wfc: error: ", stderr);
 	va_start(ap, fmt);
+#if WFC_HAVE_STDIO
+	fputs("wfc: error: ", stderr);
 	vfprintf(stderr, fmt, ap);
 	va_end(ap);
 	fputc('\n', stderr);
 	exit(1);
+#else
+	vsnprintf(wfc_err_msg, sizeof(wfc_err_msg), fmt, ap);
+	va_end(ap);
+	longjmp(wfc_err_jmp, 1);
+#endif
 }
 
-static uint32_t crc32_update(uint32_t crc, const uint8_t* data, size_t len) {
+/* 1-based line/col of `at` within null-terminated `text` (same buffer). */
+static void json_loc(const char *text, const char *at, int *line, int *col) {
+	int ln = 1, cl = 1;
+	for (const char *p = text; at && p < at && *p; p++) {
+		if (*p == '\n') {
+			ln++;
+			cl = 1;
+		} else {
+			cl++;
+		}
+	}
+	*line = ln;
+	*col = cl;
+}
+
+static uint32_t crc32_update(uint32_t crc, const uint8_t *data, size_t len) {
 	static const uint32_t table[16] = {
 		0x00000000U, 0x1db71064U, 0x3b6e20c8U, 0x26d930acU, 0x76dc4190U, 0x6b6b51f4U,
 		0x4db26158U, 0x5005713cU, 0xedb88320U, 0xf00f9344U, 0xd6d6a3e8U, 0xcb61b38cU,
@@ -113,18 +146,18 @@ static uint32_t crc32_update(uint32_t crc, const uint8_t* data, size_t len) {
 	return ~crc;
 }
 
-static int find_name(char table[][MAX_NAME], int n, const char* s) {
+static int find_key(const uint32_t *keys, int n, uint32_t key) {
 	for (int i = 0; i < n; i++)
-		if (strcmp(table[i], s) == 0)
+		if (keys[i] == key)
 			return i;
 	return -1;
 }
 
-static uint32_t namekey(const char* s) {
+static uint32_t namekey(const char *s) {
 	return wf_name_hash(s, (uint32_t)strlen(s));
 }
 
-static uint16_t intern_style(const wf_style_t* s) {
+static uint16_t intern_style(const wf_style_t *s) {
 	for (int i = 0; i < n_style; i++)
 		if (memcmp(&styles[i], s, sizeof(*s)) == 0)
 			return (uint16_t)i;
@@ -134,7 +167,7 @@ static uint16_t intern_style(const wf_style_t* s) {
 	return (uint16_t)n_style++;
 }
 
-static uint32_t intern_string(const char* s) {
+static uint32_t intern_string(const char *s) {
 	size_t off = 0;
 	while (off < pool_len) {
 		if (strcmp(&strpool[off], s) == 0)
@@ -151,18 +184,18 @@ static uint32_t intern_string(const char* s) {
 }
 
 
-/*
- * JSON field helpers
+/* 
+ * JSON field helpers 
  */
-static const char* req_str(const cJSON* o, const char* key, const char* ctx) {
-	const cJSON* v = cJSON_GetObjectItemCaseSensitive(o, key);
+static const char *req_str(const cJSON *o, const char *key, const char *ctx) {
+	const cJSON *v = cJSON_GetObjectItemCaseSensitive(o, key);
 	if (!cJSON_IsString(v) || !v->valuestring)
 		die("%s: missing/invalid string field \"%s\"", ctx, key);
 	return v->valuestring;
 }
 
-static int opt_int(const cJSON* o, const char* key, int dflt) {
-	const cJSON* v = cJSON_GetObjectItemCaseSensitive(o, key);
+static int opt_int(const cJSON *o, const char *key, int dflt) {
+	const cJSON *v = cJSON_GetObjectItemCaseSensitive(o, key);
 	if (!v)
 		return dflt;
 	if (!cJSON_IsNumber(v))
@@ -170,21 +203,15 @@ static int opt_int(const cJSON* o, const char* key, int dflt) {
 	return v->valueint;
 }
 
-static int opt_bool(const cJSON* o, const char* key) {
-	const cJSON* v = cJSON_GetObjectItemCaseSensitive(o, key);
+static int opt_bool(const cJSON *o, const char *key) {
+	const cJSON *v = cJSON_GetObjectItemCaseSensitive(o, key);
 	return cJSON_IsTrue(v) ? 1 : 0;
 }
 
-static void copy_name(char* dst, const char* src, const char* ctx) {
-	if (strlen(src) >= MAX_NAME)
-		die("%s: name \"%s\" too long (max %d)", ctx, src, MAX_NAME - 1);
-	strcpy(dst, src);
-}
-
-static uint32_t parse_color(const char* s, const char* ctx) {
+static uint32_t parse_color(const char *s, const char *ctx) {
 	if (s[0] != '#' || strlen(s) != 7)
 		die("%s: bad color \"%s\" (want #RRGGBB)", ctx, s);
-	char* end = NULL;
+	char *end = NULL;
 	unsigned long v = strtoul(s + 1, &end, 16);
 	if (!end || *end)
 		die("%s: bad color \"%s\"", ctx, s);
@@ -192,28 +219,55 @@ static uint32_t parse_color(const char* s, const char* ctx) {
 }
 
 /* string enum lookup; returns index or -1 */
-static int enum_index(const char* s, const char* const* names, int n) {
+static int enum_index(const char *s, const char *const *names, int n) {
 	for (int i = 0; i < n; i++)
 		if (strcmp(s, names[i]) == 0)
 			return i;
 	return -1;
 }
 
-/*
- * Resource parsing
+/* Expand glyphs shorthand into `out` (cap bytes). "X..Y" (Y>=X) -> inclusive
+ * ASCII run X..Y step 1; any other char copied verbatim. Returns length.
+ * die() on descending range or overflow. A lone/single '.' stays literal. */
+static uint8_t expand_glyphs(const char *src, char *out, uint8_t cap,
+							 const char *id) {
+	uint8_t n = 0;
+	for (const char *p = src; *p;) {
+		if (p[1] == '.' && p[2] == '.' && p[3]) { /* X..Y */
+			unsigned char a = (unsigned char)p[0], b = (unsigned char)p[3];
+			if (b < a)
+				die("widget \"%s\": glyphs range \"%c..%c\" is descending", id, a, b);
+			for (unsigned c = a; c <= b; c++) {
+				if (n >= cap)
+					die("widget \"%s\": glyphs expands beyond %d chars", id, cap);
+				out[n++] = (char)c;
+			}
+			p += 4;
+		} else {
+			if (n >= cap)
+				die("widget \"%s\": glyphs expands beyond %d chars", id, cap);
+			out[n++] = *p++;
+		}
+	}
+	return n;
+}
+
+/* 
+ * Resource parsing 
  */
-static void parse_resources(const cJSON* res) {
-	const cJSON* arr, * it;
+static void parse_resources(const cJSON *res) {
+	const cJSON *arr, *it;
 
 	arr = cJSON_GetObjectItemCaseSensitive(res, "images");
 	cJSON_ArrayForEach(it, arr) {
 		if (n_img >= MAX_IMAGES)
 			die("too many images (max %d)", MAX_IMAGES);
-		const char* nm = req_str(it, "name", "image");
-		const char* file = req_str(it, "file", "image");
-		if (find_name(img_names, n_img, nm) >= 0)
+		const char *nm = req_str(it, "name", "image");
+		const char *file = req_str(it, "file", "image");
+		uint32_t nk = namekey(nm);
+		if (find_key(img_keys, n_img, nk) >= 0)
 			die("duplicate image name \"%s\"", nm);
-		copy_name(img_names[n_img], nm, "image");
+		img_keys[n_img] = nk;
 		images[n_img].namekey = namekey(file);
 		n_img++;
 	}
@@ -222,11 +276,12 @@ static void parse_resources(const cJSON* res) {
 	cJSON_ArrayForEach(it, arr) {
 		if (n_fnt >= MAX_FONTS)
 			die("too many fonts (max %d)", MAX_FONTS);
-		const char* nm = req_str(it, "name", "font");
-		const char* file = req_str(it, "file", "font");
-		if (find_name(fnt_names, n_fnt, nm) >= 0)
+		const char *nm = req_str(it, "name", "font");
+		const char *file = req_str(it, "file", "font");
+		uint32_t nk = namekey(nm);
+		if (find_key(fnt_keys, n_fnt, nk) >= 0)
 			die("duplicate font name \"%s\"", nm);
-		copy_name(fnt_names[n_fnt], nm, "font");
+		fnt_keys[n_fnt] = nk;
 		fonts[n_fnt].namekey = namekey(file);
 		n_fnt++;
 	}
@@ -235,17 +290,18 @@ static void parse_resources(const cJSON* res) {
 	cJSON_ArrayForEach(it, arr) {
 		if (n_anm >= MAX_ANIMS)
 			die("too many anims (max %d)", MAX_ANIMS);
-		const char* nm = req_str(it, "name", "anim");
-		const char* file = req_str(it, "file", "anim");
+		const char *nm = req_str(it, "name", "anim");
+		const char *file = req_str(it, "file", "anim");
 		int dur = opt_int(it, "duration", -1);
 		if (dur < 1 || dur > 65535)
 			die("anim \"%s\": duration out of range (1..65535)", nm);
 		int rep = opt_int(it, "repeat", 0);
 		if (rep < 0 || rep > 255)
 			die("anim \"%s\": repeat out of range (0..255)", nm);
-		if (find_name(anm_names, n_anm, nm) >= 0)
+		uint32_t nk = namekey(nm);
+		if (find_key(anm_keys, n_anm, nk) >= 0)
 			die("duplicate anim name \"%s\"", nm);
-		copy_name(anm_names[n_anm], nm, "anim");
+		anm_keys[n_anm] = nk;
 		anims[n_anm].namekey = namekey(file);
 		anims[n_anm].duration_ms = (uint16_t)dur;
 		anims[n_anm].repeat = (uint8_t)rep;
@@ -255,11 +311,11 @@ static void parse_resources(const cJSON* res) {
 }
 
 
-/*
- * Widget parsing
+/* 
+ * Widget parsing 
  */
-static int16_t size_val(const cJSON* o, const char* key) {
-	const cJSON* v = cJSON_GetObjectItemCaseSensitive(o, key);
+static int16_t size_val(const cJSON *o, const char *key) {
+	const cJSON *v = cJSON_GetObjectItemCaseSensitive(o, key);
 	if (!v)
 		return WF_SIZE_RES; /* omitted -> native/auto */
 	if (!cJSON_IsNumber(v))
@@ -269,8 +325,8 @@ static int16_t size_val(const cJSON* o, const char* key) {
 	return (int16_t)v->valueint;
 }
 
-static void parse_style(const cJSON* w, wf_widget_t* out) {
-	const cJSON* st = cJSON_GetObjectItemCaseSensitive(w, "style");
+static void parse_style(const cJSON *w, wf_widget_t *out) {
+	const cJSON *st = cJSON_GetObjectItemCaseSensitive(w, "style");
 	if (!st) {
 		out->style_ref = WF_REF_NONE;
 		return;
@@ -280,7 +336,7 @@ static void parse_style(const cJSON* w, wf_widget_t* out) {
 
 	wf_style_t s;
 	memset(&s, 0, sizeof(s));
-	const cJSON* v;
+	const cJSON *v;
 	if ((v = cJSON_GetObjectItemCaseSensitive(st, "text_color")))
 		s.text_color = parse_color(v->valuestring, "style.text_color");
 	if ((v = cJSON_GetObjectItemCaseSensitive(st, "bg_color")))
@@ -293,40 +349,42 @@ static void parse_style(const cJSON* w, wf_widget_t* out) {
 	out->style_ref = intern_style(&s);
 }
 
-static void parse_widget(const cJSON* w) {
+static void parse_widget(const cJSON *w) {
 	if (n_pw >= MAX_WIDGETS)
 		die("too many widgets (max %d)", MAX_WIDGETS);
-	pwidget_t* p = &pw[n_pw];
+	pwidget_t *p = &pw[n_pw];
 	memset(p, 0, sizeof(*p));
-	wf_widget_t* o = &p->w;
+	wf_widget_t *o = &p->w;
 
-	const char* id = req_str(w, "id", "widget");
-	copy_name(p->id, id, "widget id");
+	const char *id = req_str(w, "id", "widget");
+	p->id = id;
+	p->id_hash = namekey(id);
 	for (int i = 0; i < n_pw; i++)
-		if (strcmp(pw[i].id, id) == 0)
+		if (pw[i].id_hash == p->id_hash)
 			die("duplicate widget id \"%s\"", id);
 
-	const char* ts = req_str(w, "type", "widget");
+	const char *ts = req_str(w, "type", "widget");
 	int type =
 		enum_index(ts, TYPE_NAMES, (int)(sizeof(TYPE_NAMES) / sizeof(*TYPE_NAMES)));
 	if (type < 0)
 		die("widget \"%s\": unknown type \"%s\"", id, ts);
 	o->type = (uint8_t)type;
 
-	const cJSON* pj = cJSON_GetObjectItemCaseSensitive(w, "parent");
-	if (cJSON_IsString(pj) && pj->valuestring)
-		copy_name(p->parent, pj->valuestring, "parent");
-	else
-		p->parent[0] = '\0';
+	const cJSON *pj = cJSON_GetObjectItemCaseSensitive(w, "parent");
+	if (cJSON_IsString(pj) && pj->valuestring) {
+		p->parent = pj->valuestring;
+		p->parent_hash = namekey(pj->valuestring);
+	} else {
+		p->parent = NULL;
+	}
 
-	const cJSON* aj = cJSON_GetObjectItemCaseSensitive(w, "align");
+	const cJSON *aj = cJSON_GetObjectItemCaseSensitive(w, "align");
 	if (cJSON_IsString(aj)) {
 		int a = enum_index(aj->valuestring, ALIGN_NAMES, 9);
 		if (a < 0)
 			die("widget \"%s\": bad align \"%s\"", id, aj->valuestring);
 		o->align = (uint8_t)a;
-	}
-	else {
+	} else {
 		o->align = WF_ALIGN_TOP_LEFT; /* LVGL default */
 	}
 
@@ -344,17 +402,34 @@ static void parse_widget(const cJSON* w) {
 	case WF_W_IMAGE:
 	case WF_W_IMGLABEL: {
 		/* both resolve a name from the images table; imglabel's is a group */
-		const char* nm = req_str(
+		const char *nm = req_str(
 			w, "image", type == WF_W_IMAGE ? "image widget" : "imglabel widget");
-		int idx = find_name(img_names, n_img, nm);
+		int idx = find_key(img_keys, n_img, namekey(nm));
 		if (idx < 0)
 			die("widget \"%s\": unknown image \"%s\"", id, nm);
 		o->res_ref = (uint16_t)idx;
+		if (type == WF_W_IMGLABEL) {
+			const cJSON *pv = cJSON_GetObjectItemCaseSensitive(w, "provider");
+			if (cJSON_IsString(pv) && pv->valuestring) {
+				const char *glyphs = req_str(w, "glyphs", "imglabel provider");
+				uint8_t glen = expand_glyphs(glyphs, p->dt_glyphs_buf, WFC_IMGTEXT_MAX, id);
+				if (glen < 1)
+					die("widget \"%s\": glyphs must be non-empty", id);
+				int ml = opt_int(w, "max_len", (int)glen);
+				if (ml < 1 || ml > WFC_IMGTEXT_MAX)
+					die("widget \"%s\": max_len must be 1..%d", id, WFC_IMGTEXT_MAX);
+				p->has_dyntext = 1;
+				p->dt_provider = namekey(pv->valuestring);
+				p->dt_glyphs = p->dt_glyphs_buf;
+				p->dt_glyph_cnt = glen;
+				p->dt_max_len = (uint8_t)ml;
+			}
+		}
 		break;
 	}
 	case WF_W_LABEL: {
-		const char* fn = req_str(w, "font", "label widget");
-		int idx = find_name(fnt_names, n_fnt, fn);
+		const char *fn = req_str(w, "font", "label widget");
+		int idx = find_key(fnt_keys, n_fnt, namekey(fn));
 		if (idx < 0)
 			die("widget \"%s\": unknown font \"%s\"", id, fn);
 		o->res_ref = (uint16_t)idx;
@@ -362,8 +437,8 @@ static void parse_widget(const cJSON* w) {
 		break;
 	}
 	case WF_W_FRAME_ANIM: {
-		const char* nm = req_str(w, "anim", "frame_anim widget");
-		int idx = find_name(anm_names, n_anm, nm);
+		const char *nm = req_str(w, "anim", "frame_anim widget");
+		int idx = find_key(anm_keys, n_anm, namekey(nm));
 		if (idx < 0)
 			die("widget \"%s\": unknown anim \"%s\"", id, nm);
 		o->res_ref = (uint16_t)idx;
@@ -380,19 +455,21 @@ static void parse_widget(const cJSON* w) {
 		o->flags |= WF_WF_HIDDEN;
 	if (opt_bool(w, "clickable"))
 		o->flags |= WF_WF_CLICKABLE;
+	if (p->has_dyntext)
+		o->flags |= WF_WF_DYNTEXT;
 
 	/* events */
 	o->event_start = 0;
 	o->event_count = 0;
-	const cJSON* evs = cJSON_GetObjectItemCaseSensitive(w, "events"), * e;
+	const cJSON *evs = cJSON_GetObjectItemCaseSensitive(w, "events"), *e;
 	cJSON_ArrayForEach(e, evs) {
 		if (n_pev >= MAX_EVENTS)
 			die("too many events (max %d)", MAX_EVENTS);
-		const char* on = req_str(e, "on", "event");
+		const char *on = req_str(e, "on", "event");
 		int code = enum_index(on, EVENT_NAMES, 5);
 		if (code < 0)
 			die("widget \"%s\": bad event \"%s\"", id, on);
-		const char* call = req_str(e, "call", "event");
+		const char *call = req_str(e, "call", "event");
 		pev[n_pev].owner = n_pw;
 		pev[n_pev].e.code = (uint8_t)code;
 		pev[n_pev].e.reserved = 0;
@@ -411,13 +488,13 @@ static void parse_widget(const cJSON* w) {
 static void topo_sort(void) {
 	/* resolve parent names -> original indices */
 	for (int i = 0; i < n_pw; i++) {
-		if (pw[i].parent[0] == '\0') {
+		if (pw[i].parent == NULL) {
 			pw[i].parent_orig = -1;
 			continue;
 		}
 		int pj = -1;
 		for (int k = 0; k < n_pw; k++)
-			if (strcmp(pw[k].id, pw[i].parent) == 0) {
+			if (pw[k].id_hash == pw[i].parent_hash) {
 				pj = k;
 				break;
 			}
@@ -450,12 +527,33 @@ static void topo_sort(void) {
 }
 
 
-/* Serialize */
-static void write_out(const char* path, uint16_t sw, uint16_t sh) {
+/* Reset all accumulator state so the compiler can run more than once
+ * (a single main() run on PC, but repeated wfc_compile() calls on MCU). */
+static void reset_state(void) {
+	n_img = n_fnt = n_anm = 0;
+	n_style = 0;
+	n_pw = 0;
+	n_pev = 0;
+	pool_len = 0;
+}
+
+/*
+ * Serialize the current state into a freshly malloc'd file image
+ * (wf_header_t followed by the layout section). Caller frees the buffer.
+ * *file_size gets the total byte count. die() on OOM.
+ */
+#define WFC_RU4(x) (((uint32_t)(x) + 3u) & ~3u)
+
+static uint8_t *serialize(uint16_t sw, uint16_t sh, uint32_t *file_size) {
 	/* final widget array in topo order */
 	static wf_widget_t out_w[MAX_WIDGETS];
 	static wf_event_t out_e[MAX_EVENTS];
 	int n_e = 0;
+
+	/* wf_imgtext_t blobs live in the strings section after the label pool,
+	 * each 4-byte aligned; extra (offset within the strings section) is
+	 * assigned here since it depends on the final pool length. */
+	uint32_t blob_cursor = WFC_RU4(pool_len);
 
 	for (int k = 0; k < n_pw; k++) {
 		int orig = order[k];
@@ -475,6 +573,12 @@ static void write_out(const char* path, uint16_t sw, uint16_t sh) {
 			cnt++;
 		}
 		wd.event_count = (uint8_t)cnt;
+
+		if (wd.flags & WF_WF_DYNTEXT) {
+			wd.extra = blob_cursor;
+			blob_cursor =
+				WFC_RU4(blob_cursor + sizeof(wf_imgtext_t) + pw[orig].dt_glyph_cnt);
+		}
 		out_w[k] = wd;
 	}
 
@@ -486,12 +590,16 @@ static void write_out(const char* path, uint16_t sw, uint16_t sh) {
 	uint32_t off_events = off_anims + (uint32_t)n_anm * sizeof(wf_anim_t);
 	uint32_t off_styles = off_events + (uint32_t)n_e * sizeof(wf_event_t);
 	uint32_t off_strings = off_styles + (uint32_t)n_style * sizeof(wf_style_t);
-	uint32_t pool_pad = (4 - (pool_len & 3)) & 3;
-	uint32_t layout_size = off_strings + pool_len + pool_pad;
+	/* blob_cursor is the 4-aligned end of the strings section (label pool +
+	 * imgtext blobs); equals WFC_RU4(pool_len) when there are no dyntext widgets */
+	uint32_t layout_size = off_strings + blob_cursor;
 
-	uint8_t* layout = calloc(1, layout_size);
-	if (!layout)
+	/* One allocation for the whole file: header + layout, contiguous. */
+	uint32_t total = (uint32_t)sizeof(wf_header_t) + layout_size;
+	uint8_t *buf = calloc(1, total);
+	if (!buf)
 		die("out of memory");
+	uint8_t *layout = buf + sizeof(wf_header_t);
 	memcpy(layout + off_widgets, out_w, (size_t)n_pw * sizeof(wf_widget_t));
 	memcpy(layout + off_images, images, (size_t)n_img * sizeof(wf_image_t));
 	memcpy(layout + off_fonts, fonts, (size_t)n_fnt * sizeof(wf_font_t));
@@ -500,50 +608,87 @@ static void write_out(const char* path, uint16_t sw, uint16_t sh) {
 	memcpy(layout + off_styles, styles, (size_t)n_style * sizeof(wf_style_t));
 	memcpy(layout + off_strings, strpool, pool_len);
 
-	wf_header_t h;
-	memset(&h, 0, sizeof(h));
-	h.magic[0] = WFB_MAGIC0;
-	h.magic[1] = WFB_MAGIC1;
-	h.magic[2] = WFB_MAGIC2;
-	h.magic[3] = WFB_MAGIC3;
-	h.version = WFB_VERSION;
-	h.flags = 0;
-	h.screen_w = sw;
-	h.screen_h = sh;
-	h.widget_count = (uint16_t)n_pw;
-	h.image_count = (uint16_t)n_img;
-	h.font_count = (uint16_t)n_fnt;
-	h.anim_count = (uint16_t)n_anm;
-	h.event_count = (uint16_t)n_e;
-	h.style_count = (uint16_t)n_style;
-	h.off_widgets = off_widgets;
-	h.off_images = off_images;
-	h.off_fonts = off_fonts;
-	h.off_anims = off_anims;
-	h.off_events = off_events;
-	h.off_styles = off_styles;
-	h.off_strings = off_strings;
-	h.layout_size = layout_size;
-	h.crc32 = crc32_update(0, layout, layout_size);
+	/* emit wf_imgtext_t blobs (padding bytes already zeroed by calloc) */
+	for (int k = 0; k < n_pw; k++) {
+		if (!(out_w[k].flags & WF_WF_DYNTEXT))
+			continue;
+		int orig = order[k];
+		uint8_t *bp = layout + off_strings + out_w[k].extra;
+		wf_imgtext_t d;
+		memset(&d, 0, sizeof(d));
+		d.provider_hash = pw[orig].dt_provider;
+		d.glyph_cnt = pw[orig].dt_glyph_cnt;
+		d.max_len = pw[orig].dt_max_len;
+		memcpy(bp, &d, sizeof(d));
+		memcpy(bp + sizeof(d), pw[orig].dt_glyphs, pw[orig].dt_glyph_cnt);
+	}
 
-	FILE* f = fopen(path, "wb");
-	if (!f)
-		die("cannot open output \"%s\"", path);
-	if (fwrite(&h, sizeof(h), 1, f) != 1 ||
-		fwrite(layout, 1, layout_size, f) != layout_size)
-		die("write failed");
-	fclose(f);
-	free(layout);
+	wf_header_t *h = (wf_header_t *)buf; /* buf is malloc-aligned */
+	h->magic[0] = WFB_MAGIC0;
+	h->magic[1] = WFB_MAGIC1;
+	h->magic[2] = WFB_MAGIC2;
+	h->magic[3] = WFB_MAGIC3;
+	h->version = WFB_VERSION;
+	h->flags = 0;
+	h->screen_w = sw;
+	h->screen_h = sh;
+	h->widget_count = (uint16_t)n_pw;
+	h->image_count = (uint16_t)n_img;
+	h->font_count = (uint16_t)n_fnt;
+	h->anim_count = (uint16_t)n_anm;
+	h->event_count = (uint16_t)n_e;
+	h->style_count = (uint16_t)n_style;
+	h->off_widgets = off_widgets;
+	h->off_images = off_images;
+	h->off_fonts = off_fonts;
+	h->off_anims = off_anims;
+	h->off_events = off_events;
+	h->off_styles = off_styles;
+	h->off_strings = off_strings;
+	h->layout_size = layout_size;
+	h->crc32 = crc32_update(0, layout, layout_size);
 
-	fprintf(stderr,
-		"wfc: ok -> %s (%u widgets, %u img, %u font, %u anim, %u ev, %u style; "
-		"header %zu + layout %u bytes)\n",
-		path, (unsigned)n_pw, (unsigned)n_img, (unsigned)n_fnt, (unsigned)n_anm,
-		(unsigned)n_e, (unsigned)n_style, sizeof(h), layout_size);
+	*file_size = total;
+	return buf;
 }
 
-static char* read_file(const char* path) {
-	FILE* f = fopen(path, "rb");
+/*
+ * Parse a validated document (version/screen/resources/widgets) into the
+ * accumulator state and topologically order the widgets. die() on any error.
+ */
+static void parse_document(const cJSON *root, uint16_t *sw_out, uint16_t *sh_out) {
+	const cJSON *ver = cJSON_GetObjectItemCaseSensitive(root, "version");
+	if (!cJSON_IsNumber(ver) || ver->valueint != 1)
+		die("version must be 1");
+
+	const cJSON *scr = cJSON_GetObjectItemCaseSensitive(root, "screen");
+	if (!cJSON_IsObject(scr))
+		die("missing \"screen\" object");
+	int sw = opt_int(scr, "w", 0), sh = opt_int(scr, "h", 0);
+	if (sw < 1 || sw > 65535 || sh < 1 || sh > 65535)
+		die("screen w/h out of range");
+
+	const cJSON *res = cJSON_GetObjectItemCaseSensitive(root, "resources");
+	if (res && !cJSON_IsObject(res))
+		die("\"resources\" must be an object");
+	if (res)
+		parse_resources(res);
+
+	const cJSON *ws = cJSON_GetObjectItemCaseSensitive(root, "widgets"), *w;
+	if (!cJSON_IsArray(ws) || cJSON_GetArraySize(ws) < 1)
+		die("\"widgets\" must be a non-empty array");
+	cJSON_ArrayForEach(w, ws) parse_widget(w);
+
+	topo_sort();
+	*sw_out = (uint16_t)sw;
+	*sh_out = (uint16_t)sh;
+}
+
+#if WFC_HAVE_STDIO
+/* ------------------------------ PC entry ------------------------------- */
+
+static char *read_file(const char *path) {
+	FILE *f = fopen(path, "rb");
 	if (!f)
 		die("cannot open input \"%s\"", path);
 	fseek(f, 0, SEEK_END);
@@ -551,7 +696,7 @@ static char* read_file(const char* path) {
 	rewind(f);
 	if (n < 0)
 		die("cannot size input");
-	char* buf = malloc((size_t)n + 1);
+	char *buf = malloc((size_t)n + 1);
 	if (!buf)
 		die("out of memory");
 	if (fread(buf, 1, (size_t)n, f) != (size_t)n)
@@ -561,25 +706,8 @@ static char* read_file(const char* path) {
 	return buf;
 }
 
-#define RESOURCE_ADD(fn, p) resource_add((void (*)(void*))fn, p)
-static void resource_add(void (*release)(void*), void* ptr) {
-	assert(resource_count < MAX_RESOURCES);
-	resource_array[resource_count].release = release;
-	resource_array[resource_count].ptr = ptr;
-	resource_count++;
-}
-
-static void on_exit(void) {
-	printf("Release all memory resources\n");
-	for (size_t i = 0; i < resource_count; i++) {
-		struct resource_struct* p = &resource_array[i];
-		if (p->release && p->ptr)
-			p->release(p->ptr);
-	}
-}
-
-int main(int argc, char** argv) {
-	const char* in = NULL, * out = NULL;
+int main(int argc, char **argv) {
+	const char *in = NULL, *out = NULL;
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "-o") == 0 && i + 1 < argc)
 			out = argv[++i];
@@ -593,42 +721,87 @@ int main(int argc, char** argv) {
 		return 2;
 	}
 
-	atexit(on_exit);
-	char* text = read_file(in);
-	cJSON* root = cJSON_Parse(text);
-	RESOURCE_ADD(free, text);
-	RESOURCE_ADD(cJSON_Delete, root);
+	reset_state();
+	char *text = read_file(in);
+	cJSON *root = cJSON_Parse(text);
 	if (!root) {
-		const char* e = cJSON_GetErrorPtr();
-		die("JSON parse error near: %.40s", e ? e : "(unknown)");
+		const char *e = cJSON_GetErrorPtr();
+		int line, col;
+		json_loc(text, e, &line, &col);
+		die("%s:%d:%d: JSON parse error near: %.40s", in, line, col,
+			e ? e : "(unknown)");
 	}
 
-	const cJSON* ver = cJSON_GetObjectItemCaseSensitive(root, "version");
-	if (!cJSON_IsNumber(ver) || ver->valueint != 1)
-		die("version must be 1");
+	uint16_t sw, sh;
+	parse_document(root, &sw, &sh);
 
-	const cJSON* scr = cJSON_GetObjectItemCaseSensitive(root, "screen");
-	if (!cJSON_IsObject(scr))
-		die("missing \"screen\" object");
-	int sw = opt_int(scr, "w", 0), sh = opt_int(scr, "h", 0);
-	if (sw < 1 || sw > 65535 || sh < 1 || sh > 65535)
-		die("screen w/h out of range");
+	uint32_t size;
+	uint8_t *img = serialize(sw, sh, &size);
+	FILE *f = fopen(out, "wb");
+	if (!f)
+		die("cannot open output \"%s\"", out);
+	if (fwrite(img, 1, size, f) != size)
+		die("write failed");
+	fclose(f);
 
-	const cJSON* res = cJSON_GetObjectItemCaseSensitive(root, "resources");
-	if (res && !cJSON_IsObject(res))
-		die("\"resources\" must be an object");
-	if (res)
-		parse_resources(res);
+	uint32_t layout_size = size - (uint32_t)sizeof(wf_header_t);
+	fprintf(stderr,
+			"wfc: ok -> %s (%u widgets, %u img, %u font, %u anim, %u ev, %u style; "
+			"header %zu + layout %u bytes)\n",
+			out, (unsigned)n_pw, (unsigned)n_img, (unsigned)n_fnt, (unsigned)n_anm,
+			(unsigned)n_pev, (unsigned)n_style, sizeof(wf_header_t), layout_size);
 
-	const cJSON* ws = cJSON_GetObjectItemCaseSensitive(root, "widgets"), * w;
-	if (!cJSON_IsArray(ws) || cJSON_GetArraySize(ws) < 1)
-		die("\"widgets\" must be a non-empty array");
-	cJSON_ArrayForEach(w, ws) parse_widget(w);
-
-	topo_sort();
-	write_out(out, (uint16_t)sw, (uint16_t)sh);
-
-	// cJSON_Delete(root);
-	// free(text);
+	free(img);
+	cJSON_Delete(root);
+	free(text);
 	return 0;
 }
+
+#else
+/* ------------------------------ MCU entry ------------------------------ */
+
+/*
+ * Compile a JSON document held in memory into a WFB image written to the
+ * caller-provided output buffer. Returns the number of bytes written, or -1
+ * on error (message available via wfc_last_error()).
+ *
+ * Firmware may route cJSON's allocations to a pool by calling cJSON_InitHooks()
+ * before this — wfc adds no allocator of its own beyond the single output buffer.
+ */
+int wfc_compile(const void *json, size_t json_len, void *out, size_t out_cap) {
+	cJSON *volatile root = NULL; /* volatile: read after longjmp */
+	if (setjmp(wfc_err_jmp)) {
+		if (root)
+			cJSON_Delete(root);
+		return -1;
+	}
+
+	reset_state();
+	root = cJSON_ParseWithLength((const char *)json, json_len);
+	if (!root) {
+		const char *e = cJSON_GetErrorPtr();
+		int line, col;
+		json_loc((const char *)json, e, &line, &col);
+		die("JSON parse error at line %d col %d", line, col);
+	}
+
+	uint16_t sw, sh;
+	parse_document(root, &sw, &sh);
+
+	uint32_t size;
+	uint8_t *img = serialize(sw, sh, &size);
+	int rc;
+	if (size > out_cap) {
+		free(img);
+		die("output buffer too small (need %u, have %u)", (unsigned)size,
+			(unsigned)out_cap);
+	}
+	memcpy(out, img, size);
+	rc = (int)size;
+
+	free(img);
+	cJSON_Delete(root);
+	return rc;
+}
+
+#endif

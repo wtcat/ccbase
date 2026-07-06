@@ -36,12 +36,16 @@ enum wf_widget_type {
 	WF_W_CONTAINER = 6,	 /* plain lv_obj                                  */
 	WF_W_IMGLABEL = 7,	 /* image label; res_ref = image index (the       */
 						 /* referenced virtual image is a ResFile group,  */
-						 /* one member per glyph — e.g. digit tiles)      */
+						 /* one member per glyph — e.g. digit tiles).     */
+						 /* If WF_WF_DYNTEXT is set, extra -> wf_imgtext_t */
+						 /* (a runtime-driven value); else the whole group*/
+						 /* is shown statically.                          */
 };
 
 /* Widget flags (wf_widget_t.flags) */
 #define WF_WF_HIDDEN (1u << 0)
 #define WF_WF_CLICKABLE (1u << 1)
+#define WF_WF_DYNTEXT (1u << 2) /* IMGLABEL: extra -> wf_imgtext_t in strings */
 
 /* Alignment (wf_widget_t.align) — the Loader maps these to lv_align_t.     */
 /* Order MUST match the "align" enum in watchface.schema.json.             */
@@ -138,6 +142,22 @@ typedef struct {
 	uint8_t repeat;		  /* 0 = infinite, else count                    */
 	uint8_t flags;		  /* reserved                                    */
 } wf_anim_t;
+
+/*
+ * Dynamic imglabel binding. Emitted 4-byte-aligned INTO THE STRINGS POOL;
+ * wf_widget_t.extra is its offset (relative to off_strings) when the widget's
+ * WF_WF_DYNTEXT flag is set. Immediately followed by glyph_cnt char bytes: the
+ * character each atlas glyph displays (glyphs[i] == char shown by atlas glyph i).
+ * The Loader fetches the current value string via wf_env_t.get_text(provider_hash),
+ * maps each char through glyphs -> atlas index, and calls lvgl_imglabel_set_text.
+ */
+typedef struct {
+	uint32_t provider_hash; /* re_name_hash of the firmware provider name  */
+	uint8_t glyph_cnt;		/* number of glyph chars that follow (== atlas)*/
+	uint8_t max_len;		/* max displayed chars (index-buffer bound)    */
+	uint8_t reserved[2];
+	/* char glyphs[glyph_cnt] follows */
+} wf_imgtext_t;
 
 
 /* Event binding */

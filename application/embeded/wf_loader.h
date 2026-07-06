@@ -29,10 +29,15 @@ typedef struct {
 /*
  * Firmware-provided environment.
  *   get_font  : return a persistent lv_font_t* for a font namekey (required).
+ *               Event callbacks are resolved via the built-in registry
+ *               (wf_register_event), not through this struct.
+ *   get_text  : current display text for a dynamic imglabel provider. Writes up
+ *               to `cap` chars into buf (no NUL needed), returns the count. May
+ *               be NULL when no watchface uses dynamic imglabels.
  */
 typedef struct {
 	void *(*get_font)(uint32_t namekey);
-    int  (*get_time)(wf_time_t* tm);
+	uint8_t (*get_text)(uint32_t provider_hash, char *buf, uint8_t cap);
 } wf_env_t;
 
 typedef struct wf_instance wf_instance_t;
@@ -45,6 +50,13 @@ typedef struct wf_instance wf_instance_t;
 wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_res,
 					   const wf_env_t *env, void *screen);
 void wf_unload(wf_instance_t* inst, bool del_screen);
+
+/*
+ * Re-fetch every dynamic imglabel's value (via wf_env_t.get_text) and update
+ * its displayed glyphs. Call from a firmware tick / on data change. No-op if
+ * the watchface has no dynamic imglabels or no get_text was provided.
+ */
+void wf_refresh(wf_instance_t *inst);
 
 /* Built-in event registry (used when wf_env_t.get_event is NULL). */
 void wf_register_event(const char *name, wf_event_cb_t cb);
