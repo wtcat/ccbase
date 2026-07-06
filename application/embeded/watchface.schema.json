@@ -91,11 +91,35 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "text_color": { "$ref": "#/$defs/color" },
-        "bg_color":   { "$ref": "#/$defs/color" },
-        "bg_opa":     { "type": "integer", "minimum": 0, "maximum": 255 },
-        "arc_width":  { "type": "integer", "minimum": 0, "maximum": 65535 },
-        "arc_color":  { "$ref": "#/$defs/color" }
+        "text_color":        { "$ref": "#/$defs/color" },
+        "bg_color":          { "$ref": "#/$defs/color" },
+        "bg_opa":            { "type": "integer", "minimum": 0, "maximum": 255 },
+        "arc_width":         { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "arc_color":         { "$ref": "#/$defs/color" },
+        "image_recolor":     { "$ref": "#/$defs/color" },
+        "image_recolor_opa": { "type": "integer", "minimum": 0, "maximum": 255 }
+      }
+    },
+
+    "flexFlow": {
+      "type": "string",
+      "enum": ["row", "column", "row_wrap", "column_wrap", "row_reverse", "column_reverse"]
+    },
+
+    "flexAlign": {
+      "type": "string",
+      "enum": ["start", "end", "center", "space_evenly", "space_around", "space_between"]
+    },
+
+    "flex": {
+      "type": "object",
+      "required": ["flow"],
+      "additionalProperties": false,
+      "properties": {
+        "flow":  { "$ref": "#/$defs/flexFlow" },
+        "main":  { "$ref": "#/$defs/flexAlign" },
+        "cross": { "$ref": "#/$defs/flexAlign" },
+        "track": { "$ref": "#/$defs/flexAlign" }
       }
     },
 
@@ -133,6 +157,9 @@
         "max_len":   { "type": "integer", "minimum": 1, "maximum": 16 },
         "clickable": { "type": "boolean" },
         "hidden":    { "type": "boolean" },
+        "recolor":   { "type": "boolean" },
+        "flex":      { "$ref": "#/$defs/flex" },
+        "flex_grow": { "type": "integer", "minimum": 0, "maximum": 255 },
         "style":     { "$ref": "#/$defs/style" },
         "events":    { "type": "array", "items": { "$ref": "#/$defs/event" } }
       },
@@ -146,7 +173,9 @@
         { "if": { "properties": { "type": { "const": "imglabel" } } },
           "then": { "required": ["image"] } },
         { "if": { "required": ["provider"] },
-          "then": { "required": ["glyphs"] } }
+          "then": { "required": ["glyphs"] } },
+        { "if": { "required": ["flex"] },
+          "then": { "properties": { "type": { "enum": ["screen", "container"] } } } }
       ]
     }
   }

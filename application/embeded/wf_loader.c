@@ -151,6 +151,22 @@ static lv_event_code_t map_event(uint8_t c) {
 	return (c < sizeof(m) / sizeof(m[0])) ? m[c] : LV_EVENT_CLICKED;
 }
 
+static lv_flex_flow_t map_flow(uint8_t f) {
+	static const lv_flex_flow_t m[] = {
+		LV_FLEX_FLOW_ROW,		 LV_FLEX_FLOW_COLUMN,	   LV_FLEX_FLOW_ROW_WRAP,
+		LV_FLEX_FLOW_COLUMN_WRAP, LV_FLEX_FLOW_ROW_REVERSE, LV_FLEX_FLOW_COLUMN_REVERSE,
+	};
+	return (f < sizeof(m) / sizeof(m[0])) ? m[f] : LV_FLEX_FLOW_ROW;
+}
+
+static lv_flex_align_t map_falign(uint8_t a) {
+	static const lv_flex_align_t m[] = {
+		LV_FLEX_ALIGN_START,		LV_FLEX_ALIGN_END,			LV_FLEX_ALIGN_CENTER,
+		LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_SPACE_AROUND, LV_FLEX_ALIGN_SPACE_BETWEEN,
+	};
+	return (a < sizeof(m) / sizeof(m[0])) ? m[a] : LV_FLEX_ALIGN_START;
+}
+
 #if WF_USE_LAZYDECOMP == 0
 static void fill_image_dsc(lv_image_dsc_t *dsc, const struct refile_data *d) {
 	memset(dsc, 0, sizeof(*dsc));
@@ -187,6 +203,10 @@ static void apply_style(lv_obj_t *obj, const wf_style_t *s) {
 	if (s->arc_width > 0) {
 		lv_obj_set_style_arc_width(obj, s->arc_width, 0);
 		lv_obj_set_style_arc_color(obj, lv_color_hex(s->arc_color), 0);
+	}
+	if (s->image_recolor_opa > 0) {
+		lv_obj_set_style_image_recolor(obj, lv_color_hex(s->image_recolor), 0);
+		lv_obj_set_style_image_recolor_opa(obj, (lv_opa_t)s->image_recolor_opa, 0);
 	}
 }
 
@@ -246,6 +266,8 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 	case WF_W_LABEL: {
 		obj = lv_label_create(parent);
 		lv_label_set_text_static(obj, in->strings + w->extra);
+		if (w->flags & WF_WF_RECOLOR)
+			lv_label_set_recolor(obj, true);
 		if (w->res_ref != WF_REF_NONE) {
 			lv_font_t *f = in->font_cache[w->res_ref];
 			if (!f && env && env->get_font)
@@ -405,6 +427,30 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 		lv_obj_add_flag(obj, LV_OBJ_FLAG_CLICKABLE);
 	if (w->flags & WF_WF_HIDDEN)
 		lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+
+	/* flex container: set flow + align on itself */
+	if (w->flags & WF_WF_FLEX) {
+		const wf_flex_t *f = (const wf_flex_t *)(in->strings + w->extra);
+		lv_obj_set_flex_flow(obj, map_flow(f->flow));
+		lv_obj_set_flex_align(obj, map_falign(f->main_align), map_falign(f->cross_align),
+							  map_falign(f->track_align));
+	}
+	/* flex child: pull this child's grow from the parent's blob by child order.
+	 * The child was just appended to parent, so its index == child_count - 1. */
+	if (w->parent != WF_PARENT_ROOT) {
+		const wf_widget_t *p = &in->widgets[w->parent];
+		if (p->flags & WF_WF_FLEX) {
+			const wf_flex_t *pf = (const wf_flex_t *)(in->strings + p->extra);
+			uint32_t ord = lv_obj_get_child_count(parent);
+			if (ord)
+				ord--;
+			if (ord < pf->item_cnt) {
+				uint8_t g = ((const uint8_t *)(pf + 1))[ord];
+				if (g)
+					lv_obj_set_flex_grow(obj, g);
+			}
+		}
+	}
 
 	return obj;
 }

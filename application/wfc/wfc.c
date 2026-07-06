@@ -53,6 +53,11 @@ typedef struct {
 	uint32_t dt_provider;  /* provider name hash                            */
 	const char *dt_glyphs; /* -> dt_glyphs_buf; dt_glyph_cnt chars          */
 	char dt_glyphs_buf[16];/* expanded glyphs (shorthand resolved)          */
+
+	/* flex (WF_WF_FLEX container config; emitted into strings at serialize)  */
+	uint8_t has_flex;
+	uint8_t flex_flow, flex_main, flex_cross, flex_track;
+	uint8_t flex_grow;	   /* this widget's grow AS A CHILD (default 0)      */
 } pwidget_t;
 
 #define WFC_IMGTEXT_MAX 16 /* max glyphs and max displayed chars (uint8)    */
@@ -98,6 +103,10 @@ static const char *const EVENT_NAMES[] = {"clicked", "pressed", "released",
 										  "long_pressed", "value_changed"};
 static const char *const TYPE_NAMES[] = {"screen", "image", "label",	 "frame_anim",
 										 "arc",	   "bar",	"container", "imglabel"};
+static const char *const FLEX_FLOW_NAMES[] = {"row",		 "column",		 "row_wrap",
+											  "column_wrap", "row_reverse",	 "column_reverse"};
+static const char *const FLEX_ALIGN_NAMES[] = {"start",		  "end",		 "center",
+											   "space_evenly", "space_around", "space_between"};
 
 
 static void die(const char *fmt, ...) {
@@ -345,8 +354,45 @@ static void parse_style(const cJSON *w, wf_widget_t *out) {
 	s.arc_width = (uint16_t)opt_int(st, "arc_width", 0);
 	if ((v = cJSON_GetObjectItemCaseSensitive(st, "arc_color")))
 		s.arc_color = parse_color(v->valuestring, "style.arc_color");
+	int has_ir = 0;
+	if ((v = cJSON_GetObjectItemCaseSensitive(st, "image_recolor"))) {
+		s.image_recolor = parse_color(v->valuestring, "style.image_recolor");
+		has_ir = 1;
+	}
+	/* recolor is a no-op without opa; default to full when a color was given */
+	s.image_recolor_opa = (uint16_t)opt_int(st, "image_recolor_opa", has_ir ? 255 : 0);
 
 	out->style_ref = intern_style(&s);
+}
+
+/* enum field with a default; die() on a bad string. */
+static uint8_t flex_enum(const cJSON *o, const char *key, const char *const *names,
+						 int n, uint8_t dflt, const char *id) {
+	const cJSON *v = cJSON_GetObjectItemCaseSensitive(o, key);
+	if (!v)
+		return dflt;
+	if (!cJSON_IsString(v))
+		die("widget \"%s\": flex.%s must be a string", id, key);
+	int i = enum_index(v->valuestring, names, n);
+	if (i < 0)
+		die("widget \"%s\": bad flex.%s \"%s\"", id, key, v->valuestring);
+	return (uint8_t)i;
+}
+
+static void parse_flex(const cJSON *w, pwidget_t *p, int type, const char *id) {
+	const cJSON *fx = cJSON_GetObjectItemCaseSensitive(w, "flex");
+	if (!fx)
+		return;
+	if (!cJSON_IsObject(fx))
+		die("widget \"%s\": flex must be an object", id);
+	if (type != WF_W_SCREEN && type != WF_W_CONTAINER)
+		die("widget \"%s\": flex only on screen/container", id);
+	p->has_flex = 1;
+	p->flex_flow = flex_enum(fx, "flow", FLEX_FLOW_NAMES, 6, WF_FLEX_ROW, id);
+	p->flex_main = flex_enum(fx, "main", FLEX_ALIGN_NAMES, 6, WF_FLEX_START, id);
+	p->flex_cross = flex_enum(fx, "cross", FLEX_ALIGN_NAMES, 6, WF_FLEX_START, id);
+	p->flex_track = flex_enum(fx, "track", FLEX_ALIGN_NAMES, 6, WF_FLEX_START, id);
+	p->w.flags |= WF_WF_FLEX;
 }
 
 static void parse_widget(const cJSON *w) {
@@ -457,6 +503,16 @@ static void parse_widget(const cJSON *w) {
 		o->flags |= WF_WF_CLICKABLE;
 	if (p->has_dyntext)
 		o->flags |= WF_WF_DYNTEXT;
+	if (opt_bool(w, "recolor")) {
+		if (type != WF_W_LABEL)
+			die("widget \"%s\": recolor only on label", id);
+		o->flags |= WF_WF_RECOLOR;
+	}
+	parse_flex(w, p, type, id);
+	int fg = opt_int(w, "flex_grow", 0);
+	if (fg < 0 || fg > 255)
+		die("widget \"%s\": flex_grow must be 0..255", id);
+	p->flex_grow = (uint8_t)fg;
 
 	/* events */
 	o->event_start = 0;
@@ -579,6 +635,14 @@ static uint8_t *serialize(uint16_t sw, uint16_t sh, uint32_t *file_size) {
 			blob_cursor =
 				WFC_RU4(blob_cursor + sizeof(wf_imgtext_t) + pw[orig].dt_glyph_cnt);
 		}
+		if (wd.flags & WF_WF_FLEX) { /* mutually exclusive with DYNTEXT */
+			int child_cnt = 0;
+			for (int j = 0; j < n_pw; j++)
+				if (pw[j].parent_orig == orig)
+					child_cnt++;
+			wd.extra = blob_cursor;
+			blob_cursor = WFC_RU4(blob_cursor + sizeof(wf_flex_t) + child_cnt);
+		}
 		out_w[k] = wd;
 	}
 
@@ -621,6 +685,29 @@ static uint8_t *serialize(uint16_t sw, uint16_t sh, uint32_t *file_size) {
 		d.max_len = pw[orig].dt_max_len;
 		memcpy(bp, &d, sizeof(d));
 		memcpy(bp + sizeof(d), pw[orig].dt_glyphs, pw[orig].dt_glyph_cnt);
+	}
+
+	/* emit wf_flex_t blobs; grow[] gathered in topo order == child creation order */
+	for (int k = 0; k < n_pw; k++) {
+		if (!(out_w[k].flags & WF_WF_FLEX))
+			continue;
+		int corig = order[k];
+		uint8_t *bp = layout + off_strings + out_w[k].extra;
+		wf_flex_t f;
+		memset(&f, 0, sizeof(f));
+		f.flow = pw[corig].flex_flow;
+		f.main_align = pw[corig].flex_main;
+		f.cross_align = pw[corig].flex_cross;
+		f.track_align = pw[corig].flex_track;
+		uint8_t *gp = bp + sizeof(f);
+		uint8_t ic = 0;
+		for (int k2 = 0; k2 < n_pw; k2++) {
+			int o2 = order[k2];
+			if (pw[o2].parent_orig == corig)
+				gp[ic++] = pw[o2].flex_grow;
+		}
+		f.item_cnt = ic;
+		memcpy(bp, &f, sizeof(f));
 	}
 
 	wf_header_t *h = (wf_header_t *)buf; /* buf is malloc-aligned */

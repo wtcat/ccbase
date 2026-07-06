@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "screen": { "w": 466, "h": 466, "bg": "#000000" },
+
+  "resources": {
+    "images": [
+      { "name": "bg",        "file": "bg.bin" },
+      { "name": "menu_icon", "file": "menu.bin" },
+      { "name": "loading",   "file": "loading.bin" }
+    ],
+    "fonts": [
+      { "name": "num40", "file": "num40.bin" }
+    ],
+    "anims": [
+      { "name": "loading", "duration": 800, "repeat": 0, "file": "loading.bin" }
+    ]
+  },
+
+  "widgets": [
+    {
+      "id": "bg",
+      "type": "image",
+      "image": "bg",
+      "align": "center",
+      "style": { "image_recolor": "#FF0000", "image_recolor_opa": 128 }
+    },
+    {
+      "id": "time",
+      "type": "label",
+      "font": "num40",
+      "text": "12:00",
+      "align": "center",
+      "y": -40,
+      "recolor": true,
+      "style": { "text_color": "#FFFFFF" }
+    },
+    {
+      "id": "loader",
+      "type": "frame_anim",
+      "anim": "loading",
+      "align": "center",
+      "y": 60
+    },
+    {
+      "id": "btnMenu",
+      "type": "image",
+      "image": "menu_icon",
+      "align": "bottom_mid",
+      "y": -20,
+      "clickable": true,
+      "events": [
+        { "on": "clicked", "call": "goto_screen", "param": 2 }
+      ]
+    },
+    {
+      "id": "clock",
+      "type": "imglabel",
+      "image": "loading",
+      "provider": "get_clock",
+      "glyphs": "0..2",
+      "max_len": 3,
+      "align": "center",
+      "y": 120
+    },
+    {
+      "id": "row",
+      "type": "container",
+      "align": "bottom_mid",
+      "y": -60,
+      "w": 200,
+      "h": 40,
+      "flex": { "flow": "row", "main": "space_between", "cross": "center" }
+    },
+    {
+      "id": "rowA",
+      "type": "container",
+      "parent": "row",
+      "flex_grow": 1
+    },
+    {
+      "id": "rowB",
+      "type": "container",
+      "parent": "row",
+      "flex_grow": 2
+    }
+  ]
+}

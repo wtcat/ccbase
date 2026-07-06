@@ -46,6 +46,8 @@ enum wf_widget_type {
 #define WF_WF_HIDDEN (1u << 0)
 #define WF_WF_CLICKABLE (1u << 1)
 #define WF_WF_DYNTEXT (1u << 2) /* IMGLABEL: extra -> wf_imgtext_t in strings */
+#define WF_WF_RECOLOR (1u << 3) /* LABEL: enable #RRGGBB# inline recolor markup */
+#define WF_WF_FLEX (1u << 4)	/* SCREEN/CONTAINER: extra -> wf_flex_t in strings */
 
 /* Alignment (wf_widget_t.align) — the Loader maps these to lv_align_t.     */
 /* Order MUST match the "align" enum in watchface.schema.json.             */
@@ -59,6 +61,26 @@ enum wf_align {
 	WF_ALIGN_BOTTOM_RIGHT,
 	WF_ALIGN_LEFT_MID,
 	WF_ALIGN_RIGHT_MID,
+};
+
+/* Flex layout (wf_flex_t) — the Loader maps these to LVGL's lv_flex_* enums.  */
+/* Order MUST match the "flexFlow"/"flexAlign" enums in watchface.schema.json. */
+enum wf_flex_flow {
+	WF_FLEX_ROW = 0,
+	WF_FLEX_COLUMN,
+	WF_FLEX_ROW_WRAP,
+	WF_FLEX_COLUMN_WRAP,
+	WF_FLEX_ROW_REVERSE,
+	WF_FLEX_COLUMN_REVERSE,
+};
+
+enum wf_flex_align {
+	WF_FLEX_START = 0,
+	WF_FLEX_END,
+	WF_FLEX_CENTER,
+	WF_FLEX_SPACE_EVENLY,
+	WF_FLEX_SPACE_AROUND,
+	WF_FLEX_SPACE_BETWEEN,
 };
 
 /* Event code (wf_event_t.code) — the Loader maps these to lv_event_code_t.  */
@@ -159,6 +181,24 @@ typedef struct {
 	/* char glyphs[glyph_cnt] follows */
 } wf_imgtext_t;
 
+/*
+ * Flex layout for a SCREEN/CONTAINER widget. Emitted 4-byte-aligned INTO THE
+ * STRINGS POOL; wf_widget_t.extra is its offset (relative to off_strings) when
+ * the widget's WF_WF_FLEX flag is set. Followed by item_cnt grow bytes — one per
+ * child, in child creation order (== widget-table order among siblings): grow[i]
+ * is lv_obj_set_flex_grow for the i-th child (0 = no grow). The Loader sets
+ * lv_obj_set_flex_flow/align on the container and applies grow[] to each child.
+ */
+typedef struct {
+	uint8_t flow;		 /* enum wf_flex_flow  */
+	uint8_t main_align;	 /* enum wf_flex_align */
+	uint8_t cross_align; /* enum wf_flex_align */
+	uint8_t track_align; /* enum wf_flex_align */
+	uint8_t item_cnt;	 /* == container child count; grow[] length */
+	uint8_t reserved[3];
+	/* uint8_t grow[item_cnt] follows */
+} wf_flex_t;
+
 
 /* Event binding */
 typedef struct {
@@ -176,7 +216,10 @@ typedef struct {
 	uint32_t bg_color;	 /* 0x00RRGGBB */
 	uint16_t bg_opa;	 /* 0..255 */
 	uint16_t arc_width;
-	uint32_t arc_color; /* 0x00RRGGBB */
+	uint32_t arc_color;			/* 0x00RRGGBB */
+	uint32_t image_recolor;		/* 0x00RRGGBB (image tint)  */
+	uint16_t image_recolor_opa; /* 0..255; 0 = off          */
+	uint16_t reserved;
 } wf_style_t;
 
 struct _lv_event_t;
