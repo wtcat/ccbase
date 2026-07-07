@@ -58,6 +58,15 @@ typedef struct {
 	uint8_t has_flex;
 	uint8_t flex_flow, flex_main, flex_cross, flex_track;
 	uint8_t flex_grow;	   /* this widget's grow AS A CHILD (default 0)      */
+
+	/* lottie (WF_W_LOTTIE; emitted into strings at serialize)                */
+	uint8_t has_lottie;
+	uint32_t lottie_src;   /* source name hash                              */
+	int16_t lottie_w, lottie_h; /* render buffer dims                       */
+
+	/* hand (WF_W_HAND; emitted into strings at serialize)                    */
+	uint8_t has_hand, hand_unit, hand_smooth;
+	int16_t hand_pivot_x, hand_pivot_y;
 } pwidget_t;
 
 #define WFC_IMGTEXT_MAX 16 /* max glyphs and max displayed chars (uint8)    */
@@ -101,8 +110,10 @@ static const char *const ALIGN_NAMES[] = {"center",		  "top_left",	 "top_mid",
 										  "bottom_right", "left_mid",	 "right_mid"};
 static const char *const EVENT_NAMES[] = {"clicked", "pressed", "released",
 										  "long_pressed", "value_changed"};
-static const char *const TYPE_NAMES[] = {"screen", "image", "label",	 "frame_anim",
-										 "arc",	   "bar",	"container", "imglabel"};
+static const char *const TYPE_NAMES[] = {"screen", "image",		"label",	"frame_anim",
+										 "arc",	   "bar",		"container", "imglabel",
+										 "lottie", "hand"};
+static const char *const HAND_UNIT_NAMES[] = {"hour", "minute", "second"};
 static const char *const FLEX_FLOW_NAMES[] = {"row",		 "column",		 "row_wrap",
 											  "column_wrap", "row_reverse",	 "column_reverse"};
 static const char *const FLEX_ALIGN_NAMES[] = {"start",		  "end",		 "center",
@@ -490,6 +501,45 @@ static void parse_widget(const cJSON *w) {
 		o->res_ref = (uint16_t)idx;
 		break;
 	}
+	case WF_W_LOTTIE: {
+		const cJSON *lt = cJSON_GetObjectItemCaseSensitive(w, "lottie");
+		if (!cJSON_IsObject(lt))
+			die("widget \"%s\": lottie widget needs a \"lottie\" object", id);
+		const char *src = req_str(lt, "src", "lottie widget");
+		int lw = opt_int(lt, "w", 0);
+		int lh = opt_int(lt, "h", 0);
+		if (lw < 1 || lw > 32767 || lh < 1 || lh > 32767)
+			die("widget \"%s\": lottie w/h must be 1..32767", id);
+		p->has_lottie = 1;
+		p->lottie_src = namekey(src);
+		p->lottie_w = (int16_t)lw;
+		p->lottie_h = (int16_t)lh;
+		break;
+	}
+	case WF_W_HAND: {
+		const char *nm = req_str(w, "image", "hand widget");
+		int idx = find_key(img_keys, n_img, namekey(nm));
+		if (idx < 0)
+			die("widget \"%s\": unknown image \"%s\"", id, nm);
+		o->res_ref = (uint16_t)idx;
+		const char *un = req_str(w, "unit", "hand widget");
+		int ui = enum_index(un, HAND_UNIT_NAMES, 3);
+		if (ui < 0)
+			die("widget \"%s\": bad hand unit \"%s\"", id, un);
+		const cJSON *pv = cJSON_GetObjectItemCaseSensitive(w, "pivot");
+		if (!cJSON_IsArray(pv) || cJSON_GetArraySize(pv) != 2)
+			die("widget \"%s\": hand needs pivot [x, y]", id);
+		const cJSON *px = cJSON_GetArrayItem(pv, 0), *py = cJSON_GetArrayItem(pv, 1);
+		if (!cJSON_IsNumber(px) || !cJSON_IsNumber(py) || px->valueint < -32768 ||
+			px->valueint > 32767 || py->valueint < -32768 || py->valueint > 32767)
+			die("widget \"%s\": hand pivot must be two ints -32768..32767", id);
+		p->has_hand = 1;
+		p->hand_unit = (uint8_t)ui;
+		p->hand_smooth = (uint8_t)opt_bool(w, "smooth");
+		p->hand_pivot_x = (int16_t)px->valueint;
+		p->hand_pivot_y = (int16_t)py->valueint;
+		break;
+	}
 	default:
 		break;
 	}
@@ -643,6 +693,14 @@ static uint8_t *serialize(uint16_t sw, uint16_t sh, uint32_t *file_size) {
 			wd.extra = blob_cursor;
 			blob_cursor = WFC_RU4(blob_cursor + sizeof(wf_flex_t) + child_cnt);
 		}
+		if (wd.type == WF_W_LOTTIE) { /* extra -> wf_lottie_t (distinct type) */
+			wd.extra = blob_cursor;
+			blob_cursor = WFC_RU4(blob_cursor + sizeof(wf_lottie_t));
+		}
+		if (wd.type == WF_W_HAND) { /* extra -> wf_hand_t (distinct type) */
+			wd.extra = blob_cursor;
+			blob_cursor = WFC_RU4(blob_cursor + sizeof(wf_hand_t));
+		}
 		out_w[k] = wd;
 	}
 
@@ -708,6 +766,35 @@ static uint8_t *serialize(uint16_t sw, uint16_t sh, uint32_t *file_size) {
 		}
 		f.item_cnt = ic;
 		memcpy(bp, &f, sizeof(f));
+	}
+
+	/* emit wf_lottie_t blobs */
+	for (int k = 0; k < n_pw; k++) {
+		if (out_w[k].type != WF_W_LOTTIE)
+			continue;
+		int orig = order[k];
+		uint8_t *bp = layout + off_strings + out_w[k].extra;
+		wf_lottie_t lt;
+		memset(&lt, 0, sizeof(lt));
+		lt.src_hash = pw[orig].lottie_src;
+		lt.buf_w = pw[orig].lottie_w;
+		lt.buf_h = pw[orig].lottie_h;
+		memcpy(bp, &lt, sizeof(lt));
+	}
+
+	/* emit wf_hand_t blobs */
+	for (int k = 0; k < n_pw; k++) {
+		if (out_w[k].type != WF_W_HAND)
+			continue;
+		int orig = order[k];
+		uint8_t *bp = layout + off_strings + out_w[k].extra;
+		wf_hand_t hd;
+		memset(&hd, 0, sizeof(hd));
+		hd.pivot_x = pw[orig].hand_pivot_x;
+		hd.pivot_y = pw[orig].hand_pivot_y;
+		hd.unit = pw[orig].hand_unit;
+		hd.flags = pw[orig].hand_smooth ? WF_HAND_F_SMOOTH : 0;
+		memcpy(bp, &hd, sizeof(hd));
 	}
 
 	wf_header_t *h = (wf_header_t *)buf; /* buf is malloc-aligned */

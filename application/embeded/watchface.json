@@ -82,6 +82,22 @@
       "type": "container",
       "parent": "row",
       "flex_grow": 2
+    },
+    {
+      "id": "spinner",
+      "type": "lottie",
+      "lottie": { "src": "boot_spin", "w": 120, "h": 120 },
+      "align": "center",
+      "y": 180
+    },
+    {
+      "id": "minHand",
+      "type": "hand",
+      "unit": "minute",
+      "smooth": true,
+      "image": "menu_icon",
+      "pivot": [10, 90],
+      "align": "center"
     }
   ]
 }

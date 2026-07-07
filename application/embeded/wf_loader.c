@@ -46,6 +46,14 @@ typedef struct {
 	uint8_t cur_cnt;	/* number of indices currently displayed (change det) */
 } wf_dynbind_t;
 
+/* One per clock-hand (WF_W_HAND) widget; drives wf_refresh. */
+typedef struct {
+	lv_obj_t *obj;
+	uint16_t cur_angle; /* 0.1° currently applied (change detection) */
+	uint8_t unit;		/* enum wf_hand_unit */
+	uint8_t smooth;		/* minute hand sweeps with seconds */
+} wf_handbind_t;
+
 struct wf_instance {
 	lv_obj_t *screen;
 
@@ -64,6 +72,11 @@ struct wf_instance {
 	wf_dynbind_t *dyn;
 	uint8_t dyn_count;
 	uint8_t (*get_text)(uint32_t provider_hash, char *buf, uint8_t cap);
+
+	/* clock-hand bindings — also in the single block (after dyn) */
+	wf_handbind_t *hands;
+	uint8_t hand_count;
+	int (*get_time)(wf_time_t *tm);
 
 	/* read-only views into the wfb buffer */
 	const wf_widget_t *widgets;
@@ -240,6 +253,36 @@ static void refresh_one(wf_instance_t *in, wf_dynbind_t *b) {
 	lvgl_imglabel_set_text(b->obj, b->idxbuf, m);
 }
 
+static uint16_t hand_angle(const wf_instance_t *in, const wf_handbind_t *hb) {
+	wf_time_t tm;
+
+	in->get_time(&tm);
+	switch (hb->unit) {
+	case WF_HAND_HOUR: {
+		uint8_t h12 = (tm.tm_hour >= 12)? (uint8_t)(tm.tm_hour - 12): (uint8_t)tm.tm_hour;
+		return (uint16_t)(h12 * 300 + tm.tm_min * 5);	/* 30°/h + 0.5°/min */
+	}
+	case WF_HAND_MINUTE:
+		return (uint16_t)(tm.tm_min * 60 + (hb->smooth? tm.tm_sec : 0)); /* 6°/min (+0.1°/s) */
+	case WF_HAND_SECOND:
+		return (uint16_t)(tm.tm_sec * 60); /* 6°/s */
+	default:
+		return 0;
+	}
+}
+
+static void refresh_hand(wf_instance_t *in, wf_handbind_t *hb) {
+	if (!in->get_time)
+		return;
+
+	uint16_t a = hand_angle(in, hb);
+	if (a == hb->cur_angle)
+		return;
+
+	hb->cur_angle = a;
+	lv_image_set_rotation(hb->obj, a);
+}
+
 static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 							   const wf_env_t *env, const wf_widget_t *w,
 							   lv_obj_t *parent) {
@@ -259,6 +302,33 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 			if (!load_image_dsc(in, res, in->images[w->res_ref].namekey, dsc))
 				lv_image_set_src(obj, dsc);
 #endif
+		}
+		break;
+	}
+	
+	case WF_W_HAND: {
+		obj = lv_image_create(parent);
+		const wf_hand_t *hd = (const wf_hand_t *)(in->strings + w->extra);
+		lv_image_dsc_t* dsc = image_array_at(in->image_array, w->res_ref);
+		if (w->res_ref != WF_REF_NONE) {
+#if WF_USE_LAZYDECOMP
+			struct image_decomp* de = (struct image_decomp*)(dsc + 1);
+			if (!re_image_prefetch(res, in->images[w->res_ref].namekey, dsc, de,
+				(re_read_t)re_read_dsc))
+				lv_image_set_src(obj, dsc);
+#else
+			if (!load_image_dsc(in, res, in->images[w->res_ref].namekey, dsc))
+				lv_image_set_src(obj, dsc);
+#endif
+			lv_image_set_pivot(obj, hd->pivot_x, hd->pivot_y);
+			if (in->hands) {
+				wf_handbind_t* hb = &in->hands[in->hand_count++];
+				hb->obj = obj;
+				hb->unit = hd->unit;
+				hb->smooth = (hd->flags & WF_HAND_F_SMOOTH) ? 1 : 0;
+				hb->cur_angle = 0xFFFF; /* force first rotation */
+				refresh_hand(in, hb);
+			}
 		}
 		break;
 	}
@@ -399,6 +469,27 @@ static lv_obj_t *create_widget(wf_instance_t *in, const re_file_t *res,
 	case WF_W_BAR:
 		obj = lv_bar_create(parent);
 		break;
+
+	case WF_W_LOTTIE:
+#if LV_USE_LOTTIE
+		obj = lv_lottie_create(parent);
+		if (env->get_lottie && env->get_lottie_buffer) {
+			const wf_lottie_t *lt = (const wf_lottie_t *)(in->strings + w->extra);
+			if (lt->buf_w > 0 && lt->buf_h > 0) {
+				uint32_t sz = 0;
+				const void *data = env->get_lottie(lt->src_hash, &sz);
+				void *buf = env->get_lottie_buffer(lt->buf_w, lt->buf_h);
+				if (data && sz && buf) {
+					/* firmware owns both the source and the buffer */
+					lv_lottie_set_buffer(obj, lt->buf_w, lt->buf_h, buf);
+					lv_lottie_set_src_data(obj, data, sz);
+				}
+			}
+		}
+#else
+		obj = lv_obj_create(parent); /* lottie unsupported in this build: placeholder */
+#endif
+		break;
 	case WF_W_SCREEN:
 	case WF_W_CONTAINER:
 	default:
@@ -517,16 +608,20 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 	 * which the font cache relies on for lazy resolution. The objs[] scratch map
 	 * stays a separate alloc — it is freed before wf_load returns. */
 	const wf_widget_t *W = (const wf_widget_t *)(L + h->off_widgets);
-	size_t n_dyn = 0;
-	for (uint16_t i = 0; i < h->widget_count; i++)
+	size_t n_dyn = 0, n_hand = 0;
+	for (uint16_t i = 0; i < h->widget_count; i++) {
 		if (W[i].type == WF_W_IMGLABEL && (W[i].flags & WF_WF_DYNTEXT))
 			n_dyn++;
+		else if (W[i].type == WF_W_HAND)
+			n_hand++;
+	}
 
 	size_t fc_bytes = (size_t)h->font_count * ROUND_UP_PTR(sizeof(lv_font_t *));
 	size_t bind_bytes = (size_t)h->event_count * ROUND_UP_PTR(sizeof(wf_evbind_t));
 	size_t img_bytes = (size_t)h->image_count * ROUND_UP_PTR(WF_IMAGE_ESIZE);
 	size_t dyn_bytes = n_dyn * ROUND_UP_PTR(sizeof(wf_dynbind_t));
-	wf_instance_t *in = RE_CALLOC(1, sizeof(*in) + fc_bytes + bind_bytes + img_bytes + dyn_bytes);
+	size_t hand_bytes = n_hand * ROUND_UP_PTR(sizeof(wf_handbind_t));
+	wf_instance_t *in = RE_CALLOC(1, sizeof(*in) + fc_bytes + bind_bytes + img_bytes + dyn_bytes + hand_bytes);
 	if (!in)
 		return NULL;
 
@@ -535,7 +630,10 @@ wf_instance_t *wf_load(const void *wfb, uint32_t wfb_size, const re_file_t *img_
 	in->binds = h->event_count ? (wf_evbind_t *)(tail + fc_bytes) : NULL;
 	in->image_array = h->image_count ? (void *)(tail + fc_bytes + bind_bytes) : NULL;
 	in->dyn = n_dyn ? (wf_dynbind_t *)(tail + fc_bytes + bind_bytes + img_bytes) : NULL;
+	in->hands =
+		n_hand ? (wf_handbind_t *)(tail + fc_bytes + bind_bytes + img_bytes + dyn_bytes) : NULL;
 	in->get_text = env ? env->get_text : NULL;
+	in->get_time = env ? env->get_time : NULL;
 
 	in->screen = screen;
 	in->hdr = h;
@@ -597,6 +695,12 @@ void wf_unload(wf_instance_t *in, bool del_screen) {
 void wf_refresh(wf_instance_t *in) {
 	if (!in)
 		return;
+
+	/* Refresh all pointer */
+	for (uint8_t i = 0; i < in->hand_count; i++)
+		refresh_hand(in, &in->hands[i]);
+
+	/* Refresh all image-label */
 	for (uint8_t i = 0; i < in->dyn_count; i++)
 		refresh_one(in, &in->dyn[i]);
 }

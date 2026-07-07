@@ -40,6 +40,12 @@ enum wf_widget_type {
 						 /* If WF_WF_DYNTEXT is set, extra -> wf_imgtext_t */
 						 /* (a runtime-driven value); else the whole group*/
 						 /* is shown statically.                          */
+	WF_W_LOTTIE = 8,	 /* lv_lottie (ThorVG); res_ref = NONE;           */
+						 /* extra -> wf_lottie_t in strings. Source and   */
+						 /* render buffer are firmware-provided.          */
+	WF_W_HAND = 9,		 /* lv_image rotated around a pivot (clock hand); */
+						 /* res_ref = image index; extra -> wf_hand_t.    */
+						 /* Angle is time-driven via wf_env_t.get_time.   */
 };
 
 /* Widget flags (wf_widget_t.flags) */
@@ -81,6 +87,14 @@ enum wf_flex_align {
 	WF_FLEX_SPACE_EVENLY,
 	WF_FLEX_SPACE_AROUND,
 	WF_FLEX_SPACE_BETWEEN,
+};
+
+/* Clock-hand unit (wf_hand_t.unit) — order MUST match the "handUnit" enum in  */
+/* watchface.schema.json.                                                      */
+enum wf_hand_unit {
+	WF_HAND_HOUR = 0,
+	WF_HAND_MINUTE,
+	WF_HAND_SECOND,
 };
 
 /* Event code (wf_event_t.code) — the Loader maps these to lv_event_code_t.  */
@@ -198,6 +212,43 @@ typedef struct {
 	uint8_t reserved[3];
 	/* uint8_t grow[item_cnt] follows */
 } wf_flex_t;
+
+/*
+ * Lottie animation for a WF_W_LOTTIE widget. Emitted 4-byte-aligned INTO THE
+ * STRINGS POOL; wf_widget_t.extra is its offset (relative to off_strings) — the
+ * widget type alone selects this interpretation (no flag). The Loader fetches
+ * the Lottie JSON bytes via wf_env_t.get_lottie(src_hash) and an ARGB8888 render
+ * canvas of buf_w*buf_h*4 bytes via wf_env_t.get_lottie_buffer(buf_w, buf_h),
+ * then calls lv_lottie_set_buffer + lv_lottie_set_src_data. Both the source and
+ * the buffer are firmware-owned; the Loader never allocates or frees them.
+ */
+typedef struct {
+	uint32_t src_hash; /* re_name_hash of lottie source (env->get_lottie) */
+	int16_t buf_w;	   /* render buffer width  (px, > 0)                  */
+	int16_t buf_h;	   /* render buffer height (px, > 0)                  */
+} wf_lottie_t;
+
+/* wf_hand_t.flags */
+#define WF_HAND_F_SMOOTH (1u << 0) /* minute hand incorporates seconds (sweep) */
+
+/*
+ * Clock hand for a WF_W_HAND widget: an lv_image rotated around a pivot, its
+ * angle derived from the current time. Emitted 4-byte-aligned INTO THE STRINGS
+ * POOL; wf_widget_t.extra is its offset (relative to off_strings) — the widget
+ * type alone selects this interpretation (no flag). res_ref is the hand image
+ * index. The Loader sets lv_image_set_pivot(pivot_x, pivot_y) once, and on each
+ * wf_refresh recomputes the angle (0.1° units) from wf_env_t.get_time(&h,&m,&s):
+ *   second = s*60;  minute = m*60 (+s if WF_HAND_F_SMOOTH);
+ *   hour   = (h%12)*300 + m*5;
+ * calling lv_image_set_rotation only when the angle changed.
+ */
+typedef struct {
+	int16_t pivot_x; /* rotation axis, image-local px (lv_image_set_pivot) */
+	int16_t pivot_y;
+	uint8_t unit;  /* enum wf_hand_unit */
+	uint8_t flags; /* WF_HAND_F_*       */
+	uint8_t reserved[2];
+} wf_hand_t;
 
 
 /* Event binding */

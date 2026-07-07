@@ -38,6 +38,9 @@ typedef struct {
 typedef struct {
 	void   *(*get_font)(uint32_t namekey);
 	uint8_t (*get_text)(uint32_t provider_hash, char *buf, uint8_t cap);
+	const void *(*get_lottie)(uint32_t src_hash, uint32_t *size);
+	void *(*get_lottie_buffer)(int32_t w, int32_t h);
+	int  (*get_time)(wf_time_t *tm);
 } wf_env_t;
 
 typedef struct wf_instance wf_instance_t;

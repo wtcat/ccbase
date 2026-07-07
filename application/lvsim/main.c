@@ -12,6 +12,7 @@
 #include "driver/simulator.h"
 #include "thirdparty/lvgl/lvgl.h"
 #include "thirdparty/lvgl/src/misc/lv_event.h"
+#include "thirdparty/lvgl/src/misc/lv_timer.h"
 #include "thirdparty/lvgl/src/display/lv_display.h"
 #include "thirdparty/lz4/lib/lz4.h"
 #undef main
@@ -54,7 +55,7 @@ static void* read_file(const char* name, size_t *size) {
 }
 
 
-static uint8_t get_image_text(uint32_t provider_hash, char* buf, uint8_t cap) {
+static uint8_t env_get_text(uint32_t provider_hash, char* buf, uint8_t cap) {
     if (provider_hash == __RE("get_hour")) {
         time_t now = time(NULL);
         struct tm* t = localtime(&now);
@@ -88,10 +89,25 @@ static uint8_t get_image_text(uint32_t provider_hash, char* buf, uint8_t cap) {
     return 0;
 }
 
+static int env_get_time(wf_time_t* tm) {
+    time_t now = time(NULL);
+    *tm = *(wf_time_t *)localtime(&now);
+    return 0;
+}
+
 static void wf_event_start_anim(struct _lv_event_t* e, uint32_t param) {
     lv_obj_t* target = lv_event_get_current_target(e);
     (void)param;
     lv_animimg_start(target);
+}
+
+static void wf_timer_cb(lv_timer_t* t) {
+    wf_refresh(lv_timer_get_user_data(t));
+}
+
+static void screen_delete_cb(lv_event_t* e) {
+    lv_timer_t* t = lv_event_get_user_data(e);
+    lv_timer_delete(t);
 }
 
 static void view_init(void *user) {
@@ -104,9 +120,14 @@ static void view_init(void *user) {
     wf_binary = wfb;
 
     wf_env_t env = {NULL};
-    env.get_text = get_image_text;
+    env.get_text = env_get_text;
+    env.get_time = env_get_time;
     wf_register_event("restart_anim", wf_event_start_anim);
     wf_current = wf_load(wfb, (uint32_t)size, &re_file, &env, lv_screen_active());
+
+    lv_timer_t *timer = lv_timer_create(wf_timer_cb, 1000, wf_current);
+    if (timer)
+        lv_obj_add_event_cb(lv_screen_active(), screen_delete_cb, LV_EVENT_DELETE, timer);
 }
 
 static void on_exit(void) {
@@ -116,6 +137,7 @@ static void on_exit(void) {
         free(wf_binary);
     re_file_close(&re_file);
 }
+
 
 int main(int argc, char* argv[]) {
     if (re_file_open("IMG/res.bin", RE_F_FILE_CHECK, &re_file))
